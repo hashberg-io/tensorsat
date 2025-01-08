@@ -245,18 +245,18 @@ We don't define the rank of a relational network, because this information is no
 We define the #defn[contraction] $floor(Gamma)$ of one such relational network $Gamma$ to be the relation of output shape $underline(Y)$ obtained by enforcing the existence of a compatible values for all network relations and all wiring nodes:
 
 #[
-  #show math.equation: set text(size: 10pt)
+  #show math.equation: set text(size: 11pt)
   $
     floor(Gamma) eqdef {
       underline(y) in product underline(Y)
       mid(|)
       exists underline(underline(x)) in product_(k in K) R_k. #h(3pt)
       exists underline(z) in product_(nu in W) Z_nu. #h(3pt)
-      forall k in K. #h(3pt)
-      forall i in I_k. #h(3pt)
+      text("s.t.")
+      forall k, i. #h(3pt)
       x_(k,i) = z_(w^"in" (k, i))
       text("and")
-      forall o in O. #h(3pt)
+      forall o. #h(3pt)
       y_o = z_(w^"out" (o))
     }
   $
@@ -275,7 +275,7 @@ where $underline(Z)$ are the wiring sets for the typed wiring diagram.
 // - Finding all satisfying assignments of a CNF formula
 // - Determining whether a CNF formula has a satisfying assignment
 
-== Monoids and Frobenius Algebras
+// == Monoids and Frobenius Algebras
 
 // Contents:
 // - Monoids
@@ -283,31 +283,31 @@ where $underline(Z)$ are the wiring sets for the typed wiring diagram.
 // - Commutativity, symmetry
 // - Diagonal spiders as wiring nodes
 
-== Factorisation
+// == Factorisation
 
 // Contents:
 // - Simple factorisation (split in two)
 // - Factorisation rank (rank-1 = disconnected)
 // - Complex factorisation (into network)
 
-== Relational Languages
+// == Relational Languages
 
 // Contents:
 // - Simple languages: generators and rules.
 // - Extensions to dagger-SCFAs, commutative (co-)monoids, and non-commutative versions.
 
-== Relations as Boolean Tensors
+// == Relations as Boolean Tensors
 
 // Contents:
 // - Indicator functions -> Boolean tensors
 // - Boolean tensor network contraction = relational network contraction
 
-= Roadmap
+// = Roadmap
 
 // Contents:
 // - Create a Hashberg GitHub repo for the project, cited here.
 
-== Proof of concept using Cotengra
+// == Proof of concept using Cotengra
 
 // The goal for this initial proof of concept is the following:
 
@@ -319,31 +319,31 @@ where $underline(Z)$ are the wiring sets for the typed wiring diagram.
 // - Talk about the basic proof of concept using unmodified cotengra, with uint8 tensors.
 // - Mention that matrix multiplcation uses +, not or, and explain how this is fixed.
 
-== Vertex Cutting
+// == Vertex Cutting
 
 // Contents:
 // - Talk about vertex cutting techniques.
 // - Talk about the opportunity to keep track of sparsity approximations.
 // - Approximations as bounded vertex cutting.
 
-== Monoids, Comonoids and Frobenius Algebras
+// == Monoids, Comonoids and Frobenius Algebras
 
 // Contents:
 // - Allow labelling of hyperedges by Frobenius algebras; contraction uses monoid/comonoid. This includes commutative groups and groupoids.
 // - Support commutative (co-)monoids by making hyperedges with distinguished leg, which cannot be contracted with other legs.
 // - Support non-commutative (co-)monoids and Frobenius algebras by making hyperedges with ordered legs and neighbour-only contractions allowed.
 
-== Binary Packing
+// == Binary Packing
 
 // Contents:
 // - Write about binary packing of dense tensors.
 
-== Tensor Sparsification
+// == Tensor Sparsification
 
 // Contents:
 // - Write about tensor sparsification using roaring bitmaps (up to 64 legs).
 
-== Diagrammatic Simplification
+// == Diagrammatic Simplification
 
 // Contents:
 // - Write about diagrammatic simplification using diagrammatic calculi, e.g. the ZH calculus.
