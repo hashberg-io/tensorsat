@@ -3,7 +3,6 @@ TensorSAT: A SAT/SMT solver based on hyper-optimised tensor network contraction.
 """
 
 # TensorSAT: A SAT/SMT solver based on hyper-optimised tensor network contraction
-# Copyright (C) 2025 Hashberg Ltd, Ayberk Tosun and Mirco Giacobbe
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

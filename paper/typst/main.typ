@@ -34,6 +34,29 @@ accent-color: blue,
 bibliography: bibliography("biblio.bib"),
 )
 
+/* Document-specific macros */
+
+/* Product of bits */
+#let Bits(n) = if n == [1] [${0,1}$] else [${0,1}^#n$]
+
+/* Type of a relation. */
+#let Type(r) = $"Type"(#r)$
+
+/* Graph of a function. */
+#let grph(f) = $"grph"(#f)$
+
+/* Degree of a relation. */
+#let deg(r) = $"deg"(#r)$
+
+/* Shape of a relation. */
+#let shp(r) = $"shp"(#r)$
+
+/* rank of a relation. */
+#let rnk(r) = $"rnk"(#r)$
+
+
+#set math.equation(numbering: none)
+
 = Introduction
 
 In State-of-the-Art (SotA) verification of neural networks, solvers tackle verification questions on pre- and postconditions of neural networks in isolation (e.g. adversarial attacks), and offload other questions—required e.g. for the verification of neural certificates—to standard SMT solvers.
@@ -75,6 +98,110 @@ We plan to benchmark our solver against the following SoTA SAT/SMT solvers:
 
 We plan to use benchmarks from the following conferences and competitions:
 
-- SAT Competition 2023: https://satcompetition.github.io/2023/
-- SMT-COMP 2023 https://smt-comp.github.io/2023/
-- SAT 2023 https://satisfiability.org/SAT23/
+- SAT Competition 2024: https://satcompetition.github.io/2024/
+- SMT-COMP 2024 https://smt-comp.github.io/2024/
+- SAT 2024 https://satisfiability.org/SAT24/
+
+= Relational Networks
+
+In their most general form, satisfiability problems talk about the inhabitants of relations between  sets: given an implicit description of one such relation $R$, we may be tasked to determine whether $R != emptyset$, to produce some point $underline(x) in R$, to count the number of points in $R$, or even to explicitly enumerate all points $underline(x) in R$.
+
+We consider very broad family of relational description languages, where relations are implicitly presented as the "contraction" of a (typically large) network of simpler relations, chosen from a fixed set of "generators", relations small enough to be enumerated with negligible complexity.
+
+== Relations
+
+When talking about a #defn[relation], we mean a finitary relation between any number of non-empty finite sets:
+
+$
+  R subset.eq
+  underbrace(
+    product_(j=1)^(m) X_j,
+    Type(R)
+  )
+$
+
+We refer to $deg(R) eqdef m$ as the #defn[degree] of the relation, to the sets $Type(R)_j eqdef X_j$ as its #defn[component types], and to the product set $Type(R)$ as its #defn[type].
+We define the #defn[rank] of $R$ to be the number $rnk(r) eqdef |R|$ of points in the relation and its #defn[shape] to be the tuple $shp(R) eqdef (|X_j|)_(j=1)^(m)$ of sizes for its component types.
+While it is insightful to allow arbitrary finite sets as component types, in practice we presume that each component type has been explicitly enumerated.
+#footnote[Computationally, explicit enumeration of a set $X$ means fixing an inverse pair of functions, both with negligible complexity, between the set $X$ and the corresponding range ${0,...,|X|-1}$.]
+#footnote[We adopted one-based indexing in this paper to improve legibility, but indexing in the implementation is zero-based. Ranges are zero-based also in this paper, in the form ${0,...,n-1}$ for $n$ elements, in accordance with common convention for modular arithmetic.]
+
+== Functions and Values
+
+Functions arise as a special case of relations, with additional information keeping track of which component types are input types and which are output types for the function.
+We allow functions to have multiple input types and output types:
+
+$
+  f: product_(j=1)^(m) X_j arrow product_(i=1)^(n) Y_i
+$
+
+Every function $f$ has a corresponding relation $grph(f)$, known as its #defn[graph], listing its input-output pairs.
+We fix a convention by which the function output types appear before the function input types:
+
+$
+  grph(f)
+  eqdef
+  {(y_1,...,y_n, x_1,...,x_m) | f(underline(x)) = underline(y)}
+  subset.eq
+  product_(i=1)^(n) Y_i times product_(j=1)^(m) X_j
+$
+
+This convention is sufficient to reconstruct a single-output function from its graph, but additional information about the number $n$ of outputs is necessary to reconstruct the function in the general case.
+Values $underline(y) in product_(i=1)^(n) Y_i$ can be thought of as the special case of functions with no inputs, and they correspond to rank-1 relations, a.k.a. #defn[singletons]:
+
+$
+  {underline(y)} subset.eq product_(i=1)^(n) Y_i
+$
+
+Given a relation $R$, it is sometimes useful to consider the associated #defn[indicator function] $1_R$, mapping a point in the relation's type to a bit indicating whether the point is in the relation or not:
+
+$
+  1_R: && Type(R) & arrow && Bits(1) \
+  && underline(x) & |-> && cases(
+    1 "if" underline(x) in R,
+    0 "otherwise"
+  )
+$
+
+Because we are interested in relations, we will ultimately end up working with the graph of the indicator function, shown below:
+
+$
+  grph(1_R) = {
+    (
+      1_R (underline(x)),
+      x_1,...,x_m
+    )
+  }
+$
+
+== Logical Structure
+
+Fix component types $underline(X) = (X_1, ..., X_m)$ and consider the set of relations with those component types:
+
+$
+  "Rel"(underline(X))
+  = {R subset.eq product_(j=1)^(m) X_j}
+$
+
+The set $"Rel"(underline(X))$ is a powerset, so it forms a Boolean algebra under subset inclusion $subset.eq$.
+It is a complete distributive lattice under union and intersection, with the empty relation $emptyset$ and the entire set $product_(j=1)^(m) X_j$ as bottom and top elements:
+
+$
+  sect.big_(k=1)^K R_k
+  & =
+  {underline(x) | forall k=1,...,K "s.t." underline(x) in R_k}
+  \
+  union.big_(k=1)^K R_k
+  & =
+  {underline(x) | exists k=1,...,K "s.t." underline(x) in R_k}
+$
+
+It also has a relative complement operation:
+
+$
+  R backslash S
+  = {underline(x) | underline(x) in R "and" underline(x) in.not S}
+$
+
+We will see later on that the intersection operation can be derived as a simple example of composition of relations, while the union operation corresponds to the linear structure of relational tensors.
+
