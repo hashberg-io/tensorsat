@@ -133,11 +133,11 @@ $
   product underline(X) times product underline(Y)
 $
 
-where $underline(y) union.sq underline(x)$ is the following family, indexed by the disjoint product $J union.sq O$:
+where $underline(y) union.sq underline(x)$ is the following family, indexed by the disjoint product $O union.sq J$:
 
 $
-  (underline(y) union.sq underline(x))_(0, j) &= x_j \
-  (underline(y) union.sq underline(x))_(1, o) &= y_o
+  (underline(y) union.sq underline(x))_(0, o) &= y_o \
+  (underline(y) union.sq underline(x))_(1, j) &= x_j
 $
 
 Values $underline(y) in product underline(Y)$ can be thought of as the special case of functions with no inputs, and they correspond to rank-1 relations, a.k.a. #defn[singletons]:
