@@ -36,23 +36,11 @@ bibliography: bibliography("biblio.bib"),
 
 /* Document-specific macros */
 
-/* Product of bits */
-#let Bits(n) = if n == [1] [${0,1}$] else [${0,1}^#n$]
-
-/* Type of a relation. */
-#let Type(r) = $"Type"(#r)$
-
 /* Graph of a function. */
 #let grph(f) = $"grph"(#f)$
 
-/* Degree of a relation. */
-#let deg(r) = $"deg"(#r)$
-
-/* Shape of a relation. */
-#let shp(r) = $"shp"(#r)$
-
-/* rank of a relation. */
-#let rnk(r) = $"rnk"(#r)$
+/* Relations with given shape. */
+#let Rel(X) = $"Rel"(#X)$
 
 
 #set math.equation(numbering: none)
@@ -104,39 +92,40 @@ We plan to use benchmarks from the following conferences and competitions:
 
 = Relational Networks
 
-In their most general form, satisfiability problems talk about the inhabitants of relations between  sets: given an implicit description of one such relation $R$, we may be tasked to determine whether $R != emptyset$, to produce some point $underline(x) in R$, to count the number of points in $R$, or even to explicitly enumerate all points $underline(x) in R$.
+In their most general form, satisfiability problems talk about the inhabitants of relations between  sets: given an implicit description of one such relation $R$, we may be tasked to determine whether $R != emptyset$, to produce some point $underline(x) in R$, to count the number of tuples in $R$, or even to explicitly enumerate all tuples $underline(x) in R$.
 
 We consider very broad family of relational description languages, where relations are implicitly presented as the "contraction" of a (typically large) network of simpler relations, chosen from a fixed set of "generators", relations small enough to be enumerated with negligible complexity.
 
 == Relations
 
-When talking about a #defn[relation], we mean a finitary relation between any number of non-empty finite sets:
+We define a #defn[shape] to be a finite family $underline(X) = (X_j)_(j in J)$ of non-empty finite sets.
+We refer to the indices $j in J$ as the #defn[components], to the sets $X_j$ as the #defn[component sets] and to $J$ as the #defn[index set].
+We define the following shorthand for the product set associated to the shape:
 
 $
-  R subset.eq
-  underbrace(
-    product_(j=1)^(m) X_j,
-    Type(R)
-  )
+  product underline(X) eqdef product_(j in J) X_j
 $
 
-We refer to $deg(R) eqdef m$ as the #defn[degree] of the relation, to the sets $Type(R)_j eqdef X_j$ as its #defn[component types], and to the product set $Type(R)$ as its #defn[type].
-We define the #defn[rank] of $R$ to be the number $rnk(r) eqdef |R|$ of points in the relation and its #defn[shape] to be the tuple $shp(R) eqdef (|X_j|)_(j=1)^(m)$ of sizes for its component types.
-While it is insightful to allow arbitrary finite sets as component types, in practice we presume that each component type has been explicitly enumerated.
-#footnote[Computationally, explicit enumeration of a set $X$ means fixing an inverse pair of functions, both with negligible complexity, between the set $X$ and the corresponding range ${0,...,|X|-1}$.]
-#footnote[We adopted one-based indexing in this paper to improve legibility, but indexing in the implementation is zero-based. Ranges are zero-based also in this paper, in the form ${0,...,n-1}$ for $n$ elements, in accordance with common convention for modular arithmetic.]
+We define a #defn[relation of shape $underline(X)$] to be a finitary relation with the component sets as its domains:
+$
+  R subset.eq product underline(X)
+$
+
+By extension, we refer to the indices $j in J$ as the #defn[components] of the relation, to the sets $X_j$ as its #defn[component sets] and to $J$ as its #defn[index set].
+We define the #defn[rank] of the relation to be the number $|R|$ of tuples in it.
+
 
 == Functions and Values
 
-Functions arise as a special case of relations, with additional information keeping track of which component types are input types and which are output types for the function.
-We allow functions to have multiple input types and output types:
+Functions arise as a special case of relations, with additional information keeping track of which components for the relation are inputs for the function and which ones are outputs.
+We allow functions to have multiple inputs and outputs, i.e. we explicitly factorise its domain and codomain into products:
 
 $
   f: product_(j=1)^(m) X_j arrow product_(i=1)^(n) Y_i
 $
 
 Every function $f$ has a corresponding relation $grph(f)$, known as its #defn[graph], listing its input-output pairs.
-We fix a convention by which the function output types appear before the function input types:
+We fix a convention by which the components corresponding to the function's outputs appear before the components corresponding to its inputs:
 
 $
   grph(f)
@@ -153,10 +142,10 @@ $
   {underline(y)} subset.eq product_(i=1)^(n) Y_i
 $
 
-Given a relation $R$, it is sometimes useful to consider the associated #defn[indicator function] $1_R$, mapping a point in the relation's type to a bit indicating whether the point is in the relation or not:
+Given a relation $R$ of shape $underline(X)=(X_j)_(j=1)^m$, it is sometimes useful to consider the associated #defn[indicator function] $1_R$, mapping a tuple in the product of the relation's component sets to a bit indicating whether the tuple is in the relation or not:
 
 $
-  1_R: && Type(R) & arrow && Bits(1) \
+  1_R: && product_(j=1)^(m) X_j & arrow.long && {0, 1} \
   && underline(x) & |-> && cases(
     1 "if" underline(x) in R,
     0 "otherwise"
@@ -171,20 +160,22 @@ $
       1_R (underline(x)),
       x_1,...,x_m
     )
+    mid(|)
+    underline(x) in
   }
 $
 
-== Logical Structure
+== Boolean Structure
 
-Fix component types $underline(X) = (X_1, ..., X_m)$ and consider the set of relations with those component types:
+Fix a shape $underline(X) = (X_1, ..., X_m)$ and consider the set of relations of that shape:
 
 $
-  "Rel"(underline(X))
-  = {R subset.eq product_(j=1)^(m) X_j}
+  Rel(underline(X))
+  = {R subset.eq product underline(X)}
 $
 
-The set $"Rel"(underline(X))$ is a powerset, so it forms a Boolean algebra under subset inclusion $subset.eq$.
-It is a complete distributive lattice under union and intersection, with the empty relation $emptyset$ and the entire set $product_(j=1)^(m) X_j$ as bottom and top elements:
+The set $Rel(underline(X))$ is a powerset, so it forms a Boolean algebra under subset inclusion $subset.eq$.
+It is a complete distributive lattice under union and intersection, with the empty relation $emptyset$ and the entire product set $product underline(X)$ as bottom and top elements, respectively:
 
 $
   sect.big_(k=1)^K R_k
@@ -203,5 +194,97 @@ $
   = {underline(x) | underline(x) in R "and" underline(x) in.not S}
 $
 
-We will see later on that the intersection operation can be derived as a simple example of composition of relations, while the union operation corresponds to the linear structure of relational tensors.
+We will see later on that the intersection operation can be derived as a simple example of contraction of relational networks.
 
+== Relational Networks
+
+A #defn[wiring diagram] $Delta = (K, underline(I), O, W, w^"in", w^"out")$ consists of the following data:
+
+- A finite set $K$ of #defn[input slots].
+- A family $underline(I)$ of sets $I_k$ of #defn[input components] for each input slot $k in K$.
+- A finite set $O$ of #defn[output components].
+- A finite set $W$ of #defn[wiring nodes].
+- An #defn[input wiring function] $w^"in"$, mapping each input component to a wiring node:
+
+$
+  w^"in": product.co_(k in K) I_k arrow W
+$
+
+- An #defn[output wiring function] $w^"out"$, mapping each output component to a wiring node:
+
+$
+  w^"out": O arrow W
+$
+
+The data is subject to the requirement that $w^"in"$ and $w^"out"$ be jointly surjective, i.e. that $im(w^"in") union im(w^"out") = W$.
+For more information about wiring diagrams, please refer to @spivak2013operad and Chapter 7 of @yau2018operads (bearing in mind differences in nomenclature).
+
+A #defn[typed wiring diagram] $(Delta, underline(underline(X)), underline(Y))$ consists of the following data:
+
+- A wiring diagram $Delta = (K, underline(I), O, W, w^"in", w^"out")$.
+- A family $underline(underline(X))$, indexed by the input slots $k in K$, of #defn[input shapes] $underline(X)^((k))$. We refer to the component sets in the input shapes as #defn[input component sets].
+- An #defn[output shape] $underline(Y)$. We refer to the component sets in the output shape as #defn[output component sets].
+
+The data is subject to the following requirements:
+
+- Each input shape $underline(X)^((k))$ is indexed by the corresponding set $I_k$ of input components.
+- The output shape $underline(Y)$ is indexed by the set $O$ of output components.
+- All input and output components wired onto the same wiring node have the same component set. That is, we can associate a (necessarily unique) non-empty finite set $Z_nu$ to each wiring node $nu in W$ such that $X_i^((k)) = Z_nu$ for all input wires $(k, i) in f^(-1)(nu)$ and $Y_o = Z_nu$ for all output wires $o in g^(-1)(nu)$.
+
+A #defn[relational network] $Gamma = (Delta, underline(underline(X)), underline(Y), underline(R))$ consists of the following data:
+
+- A typed wiring diagram $(Delta, underline(X), underline(R))$, where we write $Delta = (K, underline(I), O, W, w^"in", w^"out")$.
+- A family $underline(R)$ of relations, indexed by the input slots $k in K$ of the wiring diagram, each relation $R_k$ having input shape $underline(X)^((k))$.
+
+In analogy with relations, we refer to the indices $o in O$ as the #defn[output components] for the relational network $Gamma$, to the sets $Y_o$ as its #defn[output component sets], and to the set $O$ as its #defn[output index set].
+We don't define the rank of a relational network, because this information is not typically available without contracting the network into a relation.
+
+
+
+// == Relational Contraction
+
+// Networks of
+
+
+
+
+// A #defn[contraction operation] consists of a wiring diagram $Delta = (underline(d), n, m, v)$ together with a sequence of sets $underline(X) = (X_i)_(i=1)^(n+m)$ assigning component types the individual variables (output+internal),
+
+
+
+// // Say that types freely confuse products and lists of components.
+
+
+// A composition operation is defined by:
+
+// - a list of types
+// - surjective function from the coproduct of component indices to a finite set
+// - partial function from range of outer indices to finite set
+
+// Honestly, the operad description is much better. Use multipants.
+
+// Operation applied to relations of the right types gives a relation.
+// Operad of relational composition, with outwards composition.
+// Describe the composition operad: discs (with starting point), outer disc, internal spiders.
+
+// Consider relations $R_1,...,R_K$, each relation $R_k subset.eq product_(j=1)^(D_(R_k)) T_(R_k, j)$ having potentially different degree and component types.
+// The #defn[tensor product] is defined as follows:
+
+// $
+//   times.circle.big _(k=1)^K R_k
+//   eqdef
+//   {
+//     (x^((1))_1, ..., x^((1))_(D_(R_1)), ..., x^((K))_1, ..., x^((K))_(D_(R_K)))
+//     in product_(k=1)^K product_(j=1)^(D_(R_k)) T_(R_k,j)
+//   }
+// $
+
+// // Function composition: single-input, single-output
+// // Function composition: multiple-input, single-output
+// // Relations in parallel
+// // Relational composition (contraction)
+// // Relational networks
+// //
+// // Simple equations as contractions
+// // Intersections as a special case of composition
+// // Systems of equations as compositions (combine points above)
