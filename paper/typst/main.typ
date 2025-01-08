@@ -121,53 +121,46 @@ Functions arise as a special case of relations, with additional information keep
 We allow functions to have multiple inputs and outputs, i.e. we explicitly factorise its domain and codomain into products:
 
 $
-  f: product_(j=1)^(m) X_j arrow product_(i=1)^(n) Y_i
+  f: product_(j in J) X_j times product_(o in O) Y_o
 $
 
-Every function $f$ has a corresponding relation $grph(f)$, known as its #defn[graph], listing its input-output pairs.
-We fix a convention by which the components corresponding to the function's outputs appear before the components corresponding to its inputs:
-
+Every function $f$ has a corresponding relation $grph(f)$, known as its #defn[graph], listing its input-output pairs:
 $
   grph(f)
   eqdef
-  {(y_1,...,y_n, x_1,...,x_m) | f(underline(x)) = underline(y)}
+  {underline(y) union.sq underline(x) | f(underline(x)) = underline(y)}
   subset.eq
-  product_(i=1)^(n) Y_i times product_(j=1)^(m) X_j
+  product underline(X) times product underline(Y)
 $
 
-This convention is sufficient to reconstruct a single-output function from its graph, but additional information about the number $n$ of outputs is necessary to reconstruct the function in the general case.
-Values $underline(y) in product_(i=1)^(n) Y_i$ can be thought of as the special case of functions with no inputs, and they correspond to rank-1 relations, a.k.a. #defn[singletons]:
+where $underline(y) union.sq underline(x)$ is the following family, indexed by the disjoint product $J union.sq O$:
 
 $
-  {underline(y)} subset.eq product_(i=1)^(n) Y_i
+  (underline(y) union.sq underline(x))_(0, j) &= x_j \
+  (underline(y) union.sq underline(x))_(1, o) &= y_o
 $
 
-Given a relation $R$ of shape $underline(X)=(X_j)_(j=1)^m$, it is sometimes useful to consider the associated #defn[indicator function] $1_R$, mapping a tuple in the product of the relation's component sets to a bit indicating whether the tuple is in the relation or not:
+Values $underline(y) in product underline(Y)$ can be thought of as the special case of functions with no inputs, and they correspond to rank-1 relations, a.k.a. #defn[singletons]:
 
 $
-  1_R: && product_(j=1)^(m) X_j & arrow.long && {0, 1} \
+  {underline(y)} subset.eq product underline(Y)
+$
+
+Given a relation $R$ of shape $underline(X)$, it is sometimes useful to consider the associated #defn[indicator function] $1_R$, mapping a tuple in the product of the relation's component sets to a bit indicating whether the tuple is in the relation or not:
+
+$
+  1_R: && product underline(X) & arrow.long && {0, 1} \
   && underline(x) & |-> && cases(
     1 "if" underline(x) in R,
     0 "otherwise"
   )
 $
 
-Because we are interested in relations, we will ultimately end up working with the graph of the indicator function, shown below:
-
-$
-  grph(1_R) = {
-    (
-      1_R (underline(x)),
-      x_1,...,x_m
-    )
-    mid(|)
-    underline(x) in
-  }
-$
+Because we are interested in relations, we will ultimately end up working with the graph of the indicator function.
 
 == Boolean Structure
 
-Fix a shape $underline(X) = (X_1, ..., X_m)$ and consider the set of relations of that shape:
+Fix a shape $underline(X)$ and consider the set of relations of that shape:
 
 $
   Rel(underline(X))
@@ -178,13 +171,13 @@ The set $Rel(underline(X))$ is a powerset, so it forms a Boolean algebra under s
 It is a complete distributive lattice under union and intersection, with the empty relation $emptyset$ and the entire product set $product underline(X)$ as bottom and top elements, respectively:
 
 $
-  sect.big_(k=1)^K R_k
+  sect.big_(k in K) R_k
   & =
-  {underline(x) | forall k=1,...,K "s.t." underline(x) in R_k}
+  {underline(x) | forall k in K "s.t." underline(x) in R_k}
   \
-  union.big_(k=1)^K R_k
+  union.big_(k in K) R_k
   & =
-  {underline(x) | exists k=1,...,K "s.t." underline(x) in R_k}
+  {underline(x) | exists k in K "s.t." underline(x) in R_k}
 $
 
 It also has a relative complement operation:
@@ -196,9 +189,9 @@ $
 
 We will see later on that the intersection operation can be derived as a simple example of contraction of relational networks.
 
-== Relational Networks
+== Wiring diagrams
 
-A #defn[wiring diagram] $Delta = (K, underline(I), O, W, w^"in", w^"out")$ consists of the following data:
+We define a #defn[wiring diagram] $Delta = (K, underline(I), O, W, w^"in", w^"out")$ to consist of the following data:
 
 - A finite set $K$ of #defn[input slots].
 - A family $underline(I)$ of sets $I_k$ of #defn[input components] for each input slot $k in K$.
@@ -217,74 +210,67 @@ $
 $
 
 The data is subject to the requirement that $w^"in"$ and $w^"out"$ be jointly surjective, i.e. that $im(w^"in") union im(w^"out") = W$.
-For more information about wiring diagrams, please refer to @spivak2013operad and Chapter 7 of @yau2018operads (bearing in mind differences in nomenclature).
-
-A #defn[typed wiring diagram] $(Delta, underline(underline(X)), underline(Y))$ consists of the following data:
+We define a #defn[typed wiring diagram] $(Delta, underline(underline(X)), underline(Y))$ to consist of the following data:
 
 - A wiring diagram $Delta = (K, underline(I), O, W, w^"in", w^"out")$.
-- A family $underline(underline(X))$, indexed by the input slots $k in K$, of #defn[input shapes] $underline(X)^((k))$. We refer to the component sets in the input shapes as #defn[input component sets].
+- A family $underline(underline(X))$, indexed by the input slots $k in K$, of #defn[input shapes] $underline(X)_k$. We refer to the component sets in the input shapes as #defn[input component sets].
 - An #defn[output shape] $underline(Y)$. We refer to the component sets in the output shape as #defn[output component sets].
 
 The data is subject to the following requirements:
 
-- Each input shape $underline(X)^((k))$ is indexed by the corresponding set $I_k$ of input components.
+- Each input shape $underline(X)_k$ is indexed by the corresponding set $I_k$ of input components.
 - The output shape $underline(Y)$ is indexed by the set $O$ of output components.
-- All input and output components wired onto the same wiring node have the same component set. That is, we can associate a (necessarily unique) non-empty finite set $Z_nu$ to each wiring node $nu in W$ such that $X_i^((k)) = Z_nu$ for all input wires $(k, i) in f^(-1)(nu)$ and $Y_o = Z_nu$ for all output wires $o in g^(-1)(nu)$.
+- All input and output components wired onto the same wiring node have the same component set. That is, we can associate a (necessarily unique) non-empty finite set $Z_nu$ to each wiring node $nu in W$ such that $X_(k,i) = Z_nu$ for all input wires $(k, i) in (w^"in")^(-1)(nu)$ and $Y_o = Z_nu$ for all output wires $o in (w^"out")^(-1)(nu)$. We refer to $underline(Z)$ as the family of #defn[wiring sets] for the wiring diagrams.
 
-A #defn[relational network] $Gamma = (Delta, underline(underline(X)), underline(Y), underline(R))$ consists of the following data:
+Wiring diagrams have the structure of a symmetric operad:
+
+- Permuting the input slots of a wiring diagram results in another wiring diagram, giving rise to a right action of the symmetric group $S_K$ onto the set of wiring diagrams with input slots $K$.
+- Wiring diagrams can be composed by "gluing" a suitable family of wiring diagrams $(Delta^((k)))_(k in K)$ into the input slots of a wiring diagram $Delta$ with input slots $K$, resulting in a wiring diagram with input slots $product.co_(k in K) K^((k))$, where we denoted by $K^((k))$ the input slot set for wiring diagram $Delta^((k))$.
+- The composition operation is equivariant between the right action of the symmetric group $S_K$ on the input slots of $Delta$ and the right action of the direct product group $product_(k in K) S_(K^((k)))$ onto the input slots of the wiring diagrams $(Delta^((k)))_(k in K)$.
+
+The symmetric operad structure extends to typed wiring diagrams, by enforcing compatibility of input and output shapes during composition.
+For more information, please refer to @spivak2013operad and Chapter 7 of @yau2018operads (bearing in mind differences in nomenclature).
+
+
+== Relational Networks
+
+We define a #defn[relational network] $Gamma = (Delta, underline(underline(X)), underline(Y), underline(R))$ to consist of the following data:
 
 - A typed wiring diagram $(Delta, underline(X), underline(R))$, where we write $Delta = (K, underline(I), O, W, w^"in", w^"out")$.
-- A family $underline(R)$ of relations, indexed by the input slots $k in K$ of the wiring diagram, each relation $R_k$ having input shape $underline(X)^((k))$.
+- A family $underline(R)$ of #defn[network relations], indexed by the input slots $k in K$ of the wiring diagram, each relation $R_k$ having input shape $underline(X)_k$.
 
 In analogy with relations, we refer to the indices $o in O$ as the #defn[output components] for the relational network $Gamma$, to the sets $Y_o$ as its #defn[output component sets], and to the set $O$ as its #defn[output index set].
 We don't define the rank of a relational network, because this information is not typically available without contracting the network into a relation.
 
+We define the #defn[contraction] $floor(Gamma)$ of one such relational network $Gamma$ to be the relation of output shape $underline(Y)$ obtained by enforcing the existence of a compatible values for all network relations and all wiring nodes:
 
+#[
+  #show math.equation: set text(size: 10pt)
+  $
+    floor(Gamma) eqdef {
+      underline(y) in product underline(Y)
+      mid(|)
+      exists underline(underline(x)) in product_(k in K) R_k. #h(3pt)
+      exists underline(z) in product_(nu in W) Z_nu. #h(3pt)
+      forall k in K. #h(3pt)
+      forall i in I_k. #h(3pt)
+      x_(k,i) = z_(w^"in" (k, i))
+      text("and")
+      forall o in O. #h(3pt)
+      y_o = z_(w^"out" (o))
+    }
+  $
+]
 
-// == Relational Contraction
+where $underline(Z)$ are the wiring sets for the typed wiring diagram.
 
-// Networks of
-
-
-
-
-// A #defn[contraction operation] consists of a wiring diagram $Delta = (underline(d), n, m, v)$ together with a sequence of sets $underline(X) = (X_i)_(i=1)^(n+m)$ assigning component types the individual variables (output+internal),
-
-
-
-// // Say that types freely confuse products and lists of components.
-
-
-// A composition operation is defined by:
-
-// - a list of types
-// - surjective function from the coproduct of component indices to a finite set
-// - partial function from range of outer indices to finite set
-
-// Honestly, the operad description is much better. Use multipants.
-
-// Operation applied to relations of the right types gives a relation.
-// Operad of relational composition, with outwards composition.
-// Describe the composition operad: discs (with starting point), outer disc, internal spiders.
-
-// Consider relations $R_1,...,R_K$, each relation $R_k subset.eq product_(j=1)^(D_(R_k)) T_(R_k, j)$ having potentially different degree and component types.
-// The #defn[tensor product] is defined as follows:
-
-// $
-//   times.circle.big _(k=1)^K R_k
-//   eqdef
-//   {
-//     (x^((1))_1, ..., x^((1))_(D_(R_1)), ..., x^((K))_1, ..., x^((K))_(D_(R_K)))
-//     in product_(k=1)^K product_(j=1)^(D_(R_k)) T_(R_k,j)
-//   }
-// $
-
-// // Function composition: single-input, single-output
-// // Function composition: multiple-input, single-output
-// // Relations in parallel
-// // Relational composition (contraction)
-// // Relational networks
-// //
-// // Simple equations as contractions
-// // Intersections as a special case of composition
-// // Systems of equations as compositions (combine points above)
+// Give examples of common operations which can be expressed as relational network contractions:
+// - Function composition (single-input, single-output)
+// - Function composition (multiple-input, single-output)
+// - Function composition (multiple-input, multiple-output)
+// - Functions in parallel
+// - Simple equations
+// - Relational intersections
+// - Systems of equations
+// - Finding all satisfying assignments of a CNF formula
+// - Determining whether a CNF formula has a satisfying assignment
