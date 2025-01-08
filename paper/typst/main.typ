@@ -274,3 +274,76 @@ where $underline(Z)$ are the wiring sets for the typed wiring diagram.
 // - Systems of equations
 // - Finding all satisfying assignments of a CNF formula
 // - Determining whether a CNF formula has a satisfying assignment
+
+== Monoids and Frobenius Algebras
+
+// Contents:
+// - Monoids
+// - Frobenius algebras
+// - Commutativity, symmetry
+// - Diagonal spiders as wiring nodes
+
+== Factorisation
+
+// Contents:
+// - Simple factorisation (split in two)
+// - Factorisation rank (rank-1 = disconnected)
+// - Complex factorisation (into network)
+
+== Relational Languages
+
+// Contents:
+// - Simple languages: generators and rules.
+// - Extensions to dagger-SCFAs, commutative (co-)monoids, and non-commutative versions.
+
+== Relations as Boolean Tensors
+
+// Contents:
+// - Indicator functions -> Boolean tensors
+// - Boolean tensor network contraction = relational network contraction
+
+= Roadmap
+
+// Contents:
+// - Create a Hashberg GitHub repo for the project, cited here.
+
+== Proof of concept using Cotengra
+
+// The goal for this initial proof of concept is the following:
+
+// > Given a circuit implementing a binary function $f: \lbrace 0,1\rbrace^m \rightarrow \lbrace 0,1\rbrace^n$ and an output bitstring $y \in \lbrace 0,1\rbrace^n$, find all input bitstrings $x \in \lbrace 0,1\rbrace^m$ such that $f(x) = y$.
+
+// This is a very hard problem, comprising both #SAT and SAT as special cases, but it is the natural problem solved by naive tensor contraction in this setting.
+
+// Further contents:
+// - Talk about the basic proof of concept using unmodified cotengra, with uint8 tensors.
+// - Mention that matrix multiplcation uses +, not or, and explain how this is fixed.
+
+== Vertex Cutting
+
+// Contents:
+// - Talk about vertex cutting techniques.
+// - Talk about the opportunity to keep track of sparsity approximations.
+// - Approximations as bounded vertex cutting.
+
+== Monoids, Comonoids and Frobenius Algebras
+
+// Contents:
+// - Allow labelling of hyperedges by Frobenius algebras; contraction uses monoid/comonoid. This includes commutative groups and groupoids.
+// - Support commutative (co-)monoids by making hyperedges with distinguished leg, which cannot be contracted with other legs.
+// - Support non-commutative (co-)monoids and Frobenius algebras by making hyperedges with ordered legs and neighbour-only contractions allowed.
+
+== Binary Packing
+
+// Contents:
+// - Write about binary packing of dense tensors.
+
+== Tensor Sparsification
+
+// Contents:
+// - Write about tensor sparsification using roaring bitmaps (up to 64 legs).
+
+== Diagrammatic Simplification
+
+// Contents:
+// - Write about diagrammatic simplification using diagrammatic calculi, e.g. the ZH calculus.
