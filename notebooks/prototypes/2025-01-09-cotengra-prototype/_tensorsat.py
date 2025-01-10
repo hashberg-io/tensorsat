@@ -10,6 +10,8 @@ from types import MappingProxyType
 from typing import Any, Protocol, Self, SupportsIndex, TypeAlias, TypedDict, cast, overload
 import numpy as np
 import numpy.typing as npt
+import cotengra as ct # type: ignore[import-untyped]
+from cotengra import ContractionTree
 
 BoolTensor: TypeAlias = npt.NDArray[np.uint8]
 """Type alias for a boolean tensor, currently implemented as a NumPy uint8 ndarray."""
@@ -290,14 +292,50 @@ class Wiring:
         return self.__slot_shapes
 
     @property
+    def num_slots(self) -> int:
+        """Number of inner slots."""
+        return len(self.__slot_shapes)
+
+    @property
+    def slots(self) -> tuple[Slot, ...]:
+        """Indices of the inner slots."""
+        return tuple(range(self.num_slots))
+
+    def num_slot_ports(self, slot: Slot) -> int:
+        """Number of ports for the given slot."""
+        return len(self.__slot_shapes[slot])
+
+    def slot_ports(self, slot: Slot) -> tuple[Node, ...]:
+        """Tuple of wiring nodes to which ports for the given slot are connected."""
+        num_inputs = self.num_slot_ports(slot)
+        slot_wiring = self.__slot_wiring
+        return tuple(slot_wiring[slot, i] for i in range(num_inputs))
+
+    @property
     def outer_shape(self) -> Shape:
         """Outer shape."""
         return self.__outer_shape
 
     @property
+    def num_outer_ports(self) -> int:
+        """Number of outer ports."""
+        return len(self.__outer_shape)
+
+    @property
+    def outer_ports(self) -> tuple[Node, ...]:
+        """Tuple of wiring nodes to which outer ports are connected."""
+        outer_wiring = self.__outer_wiring
+        return tuple(outer_wiring[o] for o in range(self.num_outer_ports))
+
+    @property
     def node_dims(self) -> Shape:
         """Dimensions of the wiring nodes."""
         return self.__node_dims
+
+    @property
+    def num_nodes(self) -> int:
+        """Number of wiring nodes."""
+        return len(self.__node_dims)
 
     @property
     def slot_wiring(self) -> Mapping[SlotPort, Node]:
@@ -308,6 +346,15 @@ class Wiring:
     def outer_wiring(self) -> Mapping[OuterPort, Node]:
         """Wiring of outer ports to nodes."""
         return self.__outer_wiring
+
+    @property
+    def contraction_tree(self) -> ContractionTree:
+        """The cotengra contraction tree for this wiring."""
+        return ct.array_contract_tree(
+            [self.slot_ports(slot) for slot in self.slots],
+            self.outer_ports,
+            shapes=self.slot_shapes
+        )
 
 
 class WiringBuilder:
@@ -348,6 +395,11 @@ class WiringBuilder:
     def num_slots(self) -> int:
         """Number of inner slots."""
         return len(self._slot_shapes)
+
+    @property
+    def slots(self) -> tuple[Slot, ...]:
+        """Indices of the inner slots."""
+        return tuple(range(self.num_slots))
 
     def num_slot_ports(self, slot: Slot) -> int:
         """Number of ports for the given slot."""
