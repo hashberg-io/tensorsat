@@ -707,3 +707,34 @@ class _SelectedWiringNodes:
         return self._builder._add_gate(gate, self._nodes)
 
 
+class CircuitApplicable(Protocol):
+    """Structural type for objects which can be applied to selected wiring nodes."""
+
+    def __matmul__(self, selected: _SelectedWiringNodes, /) -> tuple[int, ...]:
+        """Logic executed when the object is applied to selected wiring nodes."""
+
+
+class circuit_applicable(CircuitApplicable):
+    """
+    Function decorator, to define custom logic which is triggered upon application
+    to selected wiring nodes in a circuit, analogously to relations.
+    Can be used, for example, to dynamically extend a given circuit via Python code.
+    """
+
+    _apply: Callable[[CircuitBuilder, tuple[int, ...]], tuple[int, ...]]
+
+    def __new__(
+        cls, apply: Callable[[CircuitBuilder, tuple[int, ...]], tuple[int, ...]], /
+    ) -> Self:
+        """Constructor for the decorator."""
+        self = super().__new__(cls)
+        self._apply = apply
+        return self
+
+    def __matmul__(self, selected: _SelectedWiringNodes) -> tuple[int, ...]:
+        """Executes the decorated function when applied to selected wiring nodes."""
+        builder = selected._builder
+        nodes = selected._nodes
+        if any(w is None for w in nodes):
+            raise ValueError("All inputs to a circuit extender must be passed.")
+        return self._apply(builder, cast(tuple[int, ...], nodes))
