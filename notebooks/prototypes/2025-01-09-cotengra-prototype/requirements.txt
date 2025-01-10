@@ -1,0 +1,12 @@
+numpy
+matplotlib
+cotengra
+autoray
+cmaes
+cotengrus
+cytoolz
+loky
+networkx
+opt_einsum
+optuna
+tqdm
