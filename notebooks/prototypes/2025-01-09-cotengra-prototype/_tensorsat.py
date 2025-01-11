@@ -3,6 +3,7 @@ A temporary minimal implementation of tensorsat, for prototyping purposes.
 """
 
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from math import prod
@@ -228,8 +229,95 @@ class WiringDiagramData(TypedDict, total=True):
     """Mapping of output ports to wiring nodes."""
 
 
-class Wiring:
-    """A wiring diagram."""
+class WiringBase(ABC):
+    """Abstract base class for wiring diagrams (mutable and immutable)."""
+
+    @property
+    @abstractmethod
+    def slot_shapes(self) -> tuple[Shape, ...]:
+        """Shapes for the slots."""
+
+    @property
+    @abstractmethod
+    def outer_shape(self) -> Shape:
+        """Outer shape."""
+
+    @property
+    @abstractmethod
+    def node_dims(self) -> Shape:
+        """Dimensions of the wiring nodes."""
+
+    @property
+    @abstractmethod
+    def slot_wiring(self) -> Mapping[SlotPort, Node]:
+        """Wiring of slot ports to nodes."""
+
+    @property
+    @abstractmethod
+    def outer_wiring(self) -> Mapping[OuterPort, Node]:
+        """Wiring of outer ports to nodes."""
+
+    @property
+    def num_slots(self) -> int:
+        """Number of inner slots."""
+        return len(self.slot_shapes)
+
+    @property
+    def slots(self) -> tuple[Slot, ...]:
+        """Indices of the inner slots."""
+        return tuple(range(self.num_slots))
+
+    def num_slot_ports(self, slot: Slot) -> int:
+        """Number of ports for the given slot."""
+        return len(self.slot_shapes[slot])
+
+    def slot_ports(self, slot: Slot) -> tuple[Node, ...]:
+        """Tuple of wiring nodes to which ports for the given slot are connected."""
+        num_inputs = self.num_slot_ports(slot)
+        slot_wiring = self.slot_wiring
+        return tuple(slot_wiring[slot, i] for i in range(num_inputs))
+
+    @property
+    def num_outer_ports(self) -> int:
+        """Number of outer ports."""
+        return len(self.outer_shape)
+
+    @property
+    def outer_ports(self) -> tuple[Node, ...]:
+        """Tuple of wiring nodes to which outer ports are connected."""
+        outer_wiring = self.outer_wiring
+        return tuple(outer_wiring[o] for o in range(self.num_outer_ports))
+
+    @property
+    def num_nodes(self) -> int:
+        """Number of wiring nodes."""
+        return len(self.node_dims)
+
+    @property
+    def nodes(self) -> tuple[Node, ...]:
+        """Indices of the wiring nodes."""
+        return tuple(range(self.num_nodes))
+
+    @property
+    def contraction_tree(self) -> ContractionTree:
+        """The cotengra contraction tree for this wiring."""
+        return ct.array_contract_tree(
+            [self.slot_ports(slot) for slot in self.slots],
+            self.outer_ports,
+            shapes=self.slot_shapes
+        )
+
+    @property
+    def hypergraph(self) -> HyperGraph:
+        return ct.hypergraph.get_hypergraph(
+            [list(map(str, self.slot_ports(slot))) for slot in self.slots],
+            list(map(str, self.outer_ports)),
+            size_dict={str(w): dim for w, dim in enumerate(self.node_dims)},
+        )
+
+
+class Wiring(WiringBase):
+    """An immutable wiring diagram."""
 
     @classmethod
     def _new(
@@ -291,55 +379,14 @@ class Wiring:
         return self.__slot_shapes
 
     @property
-    def num_slots(self) -> int:
-        """Number of inner slots."""
-        return len(self.__slot_shapes)
-
-    @property
-    def slots(self) -> tuple[Slot, ...]:
-        """Indices of the inner slots."""
-        return tuple(range(self.num_slots))
-
-    def num_slot_ports(self, slot: Slot) -> int:
-        """Number of ports for the given slot."""
-        return len(self.__slot_shapes[slot])
-
-    def slot_ports(self, slot: Slot) -> tuple[Node, ...]:
-        """Tuple of wiring nodes to which ports for the given slot are connected."""
-        num_inputs = self.num_slot_ports(slot)
-        slot_wiring = self.__slot_wiring
-        return tuple(slot_wiring[slot, i] for i in range(num_inputs))
-
-    @property
     def outer_shape(self) -> Shape:
         """Outer shape."""
         return self.__outer_shape
 
     @property
-    def num_outer_ports(self) -> int:
-        """Number of outer ports."""
-        return len(self.__outer_shape)
-
-    @property
-    def outer_ports(self) -> tuple[Node, ...]:
-        """Tuple of wiring nodes to which outer ports are connected."""
-        outer_wiring = self.__outer_wiring
-        return tuple(outer_wiring[o] for o in range(self.num_outer_ports))
-
-    @property
     def node_dims(self) -> Shape:
         """Dimensions of the wiring nodes."""
         return self.__node_dims
-
-    @property
-    def num_nodes(self) -> int:
-        """Number of wiring nodes."""
-        return len(self.__node_dims)
-
-    @property
-    def nodes(self) -> tuple[Node, ...]:
-        """Indices of the wiring nodes."""
-        return tuple(range(self.num_nodes))
 
     @property
     def slot_wiring(self) -> Mapping[SlotPort, Node]:
@@ -351,116 +398,63 @@ class Wiring:
         """Wiring of outer ports to nodes."""
         return self.__outer_wiring
 
-    @property
-    def contraction_tree(self) -> ContractionTree:
-        """The cotengra contraction tree for this wiring."""
-        return ct.array_contract_tree(
-            [self.slot_ports(slot) for slot in self.slots],
-            self.outer_ports,
-            shapes=self.slot_shapes
-        )
 
-    @property
-    def hypergraph(self) -> HyperGraph:
-        return ct.hypergraph.get_hypergraph(
-            [list(map(str, self.slot_ports(slot))) for slot in self.slots],
-            list(map(str, self.outer_ports)),
-            size_dict={str(w): dim for w, dim in enumerate(self.node_dims)},
-        )
+class MutableWiring(WiringBase):
+    """A mutable wiring diagram."""
 
-
-class WiringBuilder:
-    """A builder for wiring diagrams."""
-
-    _slot_shapes: list[list[Dim]]
-    _outer_shape: list[Dim]
-    _node_dims: list[Dim]
-    _slot_wiring: dict[SlotPort, Node]
-    _outer_wiring: dict[OuterPort, Node]
+    __slot_shapes: list[list[Dim]]
+    __outer_shape: list[Dim]
+    __node_dims: list[Dim]
+    __slot_wiring: dict[SlotPort, Node]
+    __outer_wiring: dict[OuterPort, Node]
 
     def __new__(cls) -> Self:
-        """Constructs a blank wiring diagram builder."""
+        """Constructs a blank mutable wiring diagram."""
         self = super().__new__(cls)
-        self._slot_shapes = []
-        self._outer_shape = []
-        self._node_dims = []
-        self._slot_wiring = {}
-        self._outer_wiring = {}
+        self.__slot_shapes = []
+        self.__outer_shape = []
+        self.__node_dims = []
+        self.__slot_wiring = {}
+        self.__outer_wiring = {}
         return self
-
-    def clone(self) -> WiringBuilder:
-        """Clones the wiring diagram builder."""
-        clone = WiringBuilder.__new__(WiringBuilder)
-        clone._slot_shapes = [s.copy() for s in self._slot_shapes]
-        clone._outer_shape = self._outer_shape.copy()
-        clone._node_dims = self._node_dims.copy()
-        clone._slot_wiring = self._slot_wiring.copy()
-        clone._outer_wiring = self._outer_wiring.copy()
-        return clone
 
     @property
     def slot_shapes(self) -> tuple[Shape, ...]:
-        """Shapes for the inner slots."""
-        return tuple(Shape(dims) for dims in self._slot_shapes)
-
-    @property
-    def num_slots(self) -> int:
-        """Number of inner slots."""
-        return len(self._slot_shapes)
-
-    @property
-    def slots(self) -> tuple[Slot, ...]:
-        """Indices of the inner slots."""
-        return tuple(range(self.num_slots))
-
-    def num_slot_ports(self, slot: Slot) -> int:
-        """Number of ports for the given slot."""
-        return len(self._slot_shapes[slot])
-
-    def slot_ports(self, slot: Slot) -> tuple[Node, ...]:
-        """Tuple of wiring nodes to which ports for the given slot are connected."""
-        num_inputs = self.num_slot_ports(slot)
-        slot_wiring = self._slot_wiring
-        return tuple(slot_wiring[slot, i] for i in range(num_inputs))
+        """Shapes for the slots."""
+        return tuple(Shape(shape) for shape in self.__slot_shapes)
 
     @property
     def outer_shape(self) -> Shape:
-        """Outer shape of the wiring."""
-        return Shape(self._outer_shape)
-
-    @property
-    def num_outer_ports(self) -> int:
-        """Number of outer ports for the wiring result."""
-        return len(self._outer_shape)
-
-    @property
-    def outer_ports(self) -> tuple[Node, ...]:
-        """Tuple of wiring nodes to which outer ports of the wiring are connected."""
-        return tuple(range(self.num_outer_ports))
+        """Outer shape."""
+        return Shape(self.__outer_shape)
 
     @property
     def node_dims(self) -> Shape:
         """Dimensions of the wiring nodes."""
-        return Shape(self._node_dims)
-
-    @property
-    def num_nodes(self) -> int:
-        """Number of wiring nodes."""
-        return len(self._node_dims)
+        return Shape(self.__node_dims)
 
     @property
     def slot_wiring(self) -> MappingProxyType[SlotPort, Node]:
         """Wiring of slot ports to nodes."""
-        return MappingProxyType(self._slot_wiring)
+        return MappingProxyType(self.__slot_wiring)
 
     @property
     def outer_wiring(self) -> MappingProxyType[OuterPort, Node]:
-        """Wiring of outer ports to node."""
-        return MappingProxyType(self._outer_wiring)
+        """Wiring of outer ports to nodes."""
+        return MappingProxyType(self.__outer_wiring)
 
-    @property
-    def wiring(self) -> Wiring:
-        """Wiring diagram constructed by the builder."""
+    def clone(self) -> MutableWiring:
+        """Mutable copy of this  mutable wiring diagram."""
+        clone = MutableWiring.__new__(MutableWiring)
+        clone.__slot_shapes = [s.copy() for s in self.__slot_shapes]
+        clone.__outer_shape = self.__outer_shape.copy()
+        clone.__node_dims = self.__node_dims.copy()
+        clone.__slot_wiring = self.__slot_wiring.copy()
+        clone.__outer_wiring = self.__outer_wiring.copy()
+        return clone
+
+    def freeze(self) -> Wiring:
+        """Immutable copy of this mutable wiring diagram."""
         return Wiring._new(
             self.slot_shapes,
             self.outer_shape,
@@ -482,14 +476,14 @@ class WiringBuilder:
         return self._add_nodes(dims)
 
     def _add_nodes(self, dims: Sequence[Dim]) -> tuple[Node, ...]:
-        node_dims = self._node_dims
+        node_dims = self.__node_dims
         len_before = len(node_dims)
         node_dims.extend(dims)
         return tuple(range(len_before, len(node_dims)))
 
     def add_outer_port(self, node: Node) -> OuterPort:
         """Adds an outer ports component for the given wiring node."""
-        if not 0 <= node < len(self._node_dims):
+        if not 0 <= node < len(self.__node_dims):
             raise ValueError(f"Invalid wiring node index {node}.")
         return self._add_outer_ports([node])[0]
 
@@ -497,7 +491,7 @@ class WiringBuilder:
         self, nodes: Sequence[Node]
     ) -> tuple[OuterPort, ...]:
         """Adds new outer ports connected the given wiring nodes."""
-        num_nodes = len(self._node_dims)
+        num_nodes = len(self.__node_dims)
         if not all(0 <= w < num_nodes for w in nodes):
             raise ValueError("Invalid wiring node index.")
         return self._add_outer_ports(nodes)
@@ -505,11 +499,11 @@ class WiringBuilder:
     def _add_outer_ports(
         self, nodes: Sequence[Node]
     ) -> tuple[OuterPort, ...]:
-        output_shape, node_dims = self._outer_shape, self._node_dims
+        output_shape, node_dims = self.__outer_shape, self.__node_dims
         len_before = len(output_shape)
         output_shape.extend(node_dims[w] for w in nodes)
         new_outputs = tuple(range(len_before, len(output_shape)))
-        self._outer_wiring.update(zip(new_outputs, nodes))
+        self.__outer_wiring.update(zip(new_outputs, nodes))
         return new_outputs
 
     @overload
@@ -522,14 +516,14 @@ class WiringBuilder:
         self, nodes: Sequence[Node] | None = None
     ) -> Slot | tuple[Slot, tuple[SlotPort, ...]]:
         """Adds a new inner slot to the wiring diagram."""
-        k = len(self._slot_shapes)
-        self._slot_shapes.append([])
+        k = len(self.__slot_shapes)
+        self.__slot_shapes.append([])
         if nodes is None:
             return k
         try:
             new_inputs = self.add_slot_ports(k, nodes)
         except ValueError:
-            self._slot_shapes.pop()
+            self.__slot_shapes.pop()
             raise
         return k, new_inputs
 
@@ -541,20 +535,20 @@ class WiringBuilder:
         self, slot: Slot, nodes: Sequence[Node]
     ) -> tuple[SlotPort, ...]:
         """Adds new ports for the given slot, connected the given wiring nodes."""
-        if not 0 <= slot < len(self._slot_shapes):
+        if not 0 <= slot < len(self.__slot_shapes):
             raise ValueError(f"Invalid inner slot index {slot}.")
-        if not all(0 <= w < len(self._node_dims) for w in nodes):
+        if not all(0 <= w < len(self.__node_dims) for w in nodes):
             raise ValueError("Invalid wiring node index.")
         return self._add_slot_ports(slot, nodes)
 
     def _add_slot_ports(
         self, slot: Slot, nodes: Sequence[Node]
     ) -> tuple[SlotPort, ...]:
-        input_shape, node_dims = self._slot_shapes[slot], self._node_dims
+        input_shape, node_dims = self.__slot_shapes[slot], self.__node_dims
         len_before = len(input_shape)
         input_shape.extend(node_dims[w] for w in nodes)
         new_inputs = tuple((slot, i) for i in range(len_before, len(input_shape)))
-        self._slot_wiring.update(zip(new_inputs, nodes))
+        self.__slot_wiring.update(zip(new_inputs, nodes))
         return new_inputs
 
 
@@ -607,7 +601,7 @@ class CircuitBuilder:
     """A builder for relation networks using circuit-like construction syle."""
 
     _gates: list[GateData]
-    _builder: WiringBuilder
+    _wiring: MutableWiring
     _input_shape: Shape
     _outputs: list[OuterPort]
 
@@ -615,17 +609,17 @@ class CircuitBuilder:
         """Constructs a blank circuit builder."""
         self = super().__new__(cls)
         self._gates = []
-        self._builder = builder = WiringBuilder()
+        self._wiring = wiring = MutableWiring()
         self._input_shape = input_shape = Shape(input_shape)
         self._outputs = []
-        builder._add_outer_ports(builder._add_nodes(input_shape))
+        wiring._add_outer_ports(wiring._add_nodes(input_shape))
         return self
 
     def clone(self) -> CircuitBuilder:
         """Clones the circuit builder."""
         clone = CircuitBuilder.__new__(CircuitBuilder, self._input_shape)
         clone._gates = self._gates.copy()
-        clone._builder = self._builder.clone()
+        clone._wiring = self._wiring.clone()
         clone._input_shape = self._input_shape
         clone._outputs = self._outputs
         return clone
@@ -653,12 +647,12 @@ class CircuitBuilder:
     @property
     def outputs(self) -> tuple[Node, ...]:
         """Wiring nodes corresponding to the outputs of the circuit."""
-        return self._builder.outer_ports[self.num_inputs:]
+        return self._wiring.outer_ports[self.num_inputs:]
 
     @property
     def network(self) -> RelNet:
         """Relational network for the circuit."""
-        return RelNet(self._builder.wiring, [rel for rel, _, _ in self._gates])
+        return RelNet(self._wiring.freeze(), [rel for rel, _, _ in self._gates])
 
     def add_gate(
         self, gate: Rel, nodes: ComponentsToWiringNodes
@@ -683,7 +677,7 @@ class CircuitBuilder:
             _nodes = tuple(nodes.get(i) for i in range(num_components))
         else:
             _nodes = tuple(nodes)
-        num_nodes = self._builder.num_nodes
+        num_nodes = self._wiring.num_nodes
         if not all(0 <= w < num_nodes for w in _nodes if w is not None):
             raise ValueError("Invalid wiring node index.")
         return _nodes
@@ -695,12 +689,12 @@ class CircuitBuilder:
             nodes = nodes + (None,) * _residual
         else:
             raise ValueError("Too many wiring nodes specified.")
-        all_node_dims = self._builder._node_dims
+        all_node_dims = self._wiring.__node_dims
         for w, (j, d) in zip(nodes, enumerate(gate.shape)):
             if w is not None and all_node_dims[w] != d:
                 raise ValueError(f"Incorrect dimension for component {j}.")
-        builder = self._builder
-        output_nodes = builder.add_nodes(
+        wiring = self._wiring
+        output_nodes = wiring.add_nodes(
             [d for w, d in zip(nodes, gate.shape) if w is None]
         )
         slot_notes: list[Node] = []
@@ -712,13 +706,13 @@ class CircuitBuilder:
                 slot_notes.append(output_nodes_q.popleft())
             else:
                 slot_notes.append(node)
-        builder.add_slot(slot_notes)
+        wiring.add_slot(slot_notes)
         self._gates.append((gate, nodes, output_nodes))
         return output_nodes
 
     def add_outputs(self, outputs: Sequence[Node]) -> None:
         """Adds the given wiring nodes as outputs of the circuit."""
-        self._builder.add_outer_ports(outputs)
+        self._wiring.add_outer_ports(outputs)
 
     def __getitem__(
         self, nodes: tuple[Node | None, ...]
