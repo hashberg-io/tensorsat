@@ -6,6 +6,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from itertools import product
 from math import prod
 from types import MappingProxyType
 from typing import Any, Protocol, Self, SupportsIndex, TypeAlias, TypedDict, cast, overload
@@ -120,6 +121,35 @@ class Rel:
         output_shape = Shape(output_shape)
         mapping = {idx: func(idx) for idx in np.ndindex(input_shape)}
         return cls.from_mapping(input_shape, output_shape, mapping)
+
+    @classmethod
+    def from_wiring(
+        cls,
+        outer_wiring: list[Node],
+        node_dims: Mapping[Node, Dim],
+    ) -> Self:
+        """
+        Creates the spider relation for the given wiring.
+        """
+        # 1. Extract and validate wiring nodes and dimensions:
+        nodes = sorted(set(outer_wiring))
+        for node in nodes:
+            if node not in node_dims:
+                raise ValueError("Dimension missing for wiring node.")
+        if any(dim <= 0 for dim in node_dims.values()):
+            raise ValueError("Invalid wiring node dimension.")
+        # 2. Re-index the wiring nodes:
+        _node_idx = {node: i for i, node in enumerate(nodes)}
+        outer_wiring = [_node_idx[node] for node in outer_wiring]
+        node_dims = {_node_idx[node]: node_dims[node] for node in nodes}
+        # 3. Construct and return the relation:
+        ports = range(len(outer_wiring))
+        shape = Shape(node_dims[outer_wiring[port]] for port in ports)
+        subset = frozenset(
+            tuple(values[outer_wiring[port]] for port in ports)
+            for values in product(*(range(node_dims[node]) for node in nodes))
+        )
+        return cls.from_subset(shape, subset)
 
     @classmethod
     def _new(
