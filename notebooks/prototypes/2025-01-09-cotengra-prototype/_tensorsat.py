@@ -11,7 +11,7 @@ from typing import Any, Protocol, Self, SupportsIndex, TypeAlias, TypedDict, cas
 import numpy as np
 import numpy.typing as npt
 import cotengra as ct # type: ignore[import-untyped]
-from cotengra import ContractionTree
+from cotengra import ContractionTree, HyperGraph
 
 BoolTensor: TypeAlias = npt.NDArray[np.uint8]
 """Type alias for a boolean tensor, currently implemented as a NumPy uint8 ndarray."""
@@ -24,7 +24,6 @@ Dim: TypeAlias = int
 
 El: TypeAlias = int
 """Type alias for an individual element in a component set of a relation."""
-
 
 class Shape(tuple[Dim, ...]):
     """A shape, defined as a tuple of of positive dimensions."""
@@ -338,6 +337,11 @@ class Wiring:
         return len(self.__node_dims)
 
     @property
+    def nodes(self) -> tuple[Node, ...]:
+        """Indices of the wiring nodes."""
+        return tuple(range(self.num_nodes))
+
+    @property
     def slot_wiring(self) -> Mapping[SlotPort, Node]:
         """Wiring of slot ports to nodes."""
         return self.__slot_wiring
@@ -354,6 +358,14 @@ class Wiring:
             [self.slot_ports(slot) for slot in self.slots],
             self.outer_ports,
             shapes=self.slot_shapes
+        )
+
+    @property
+    def hypergraph(self) -> HyperGraph:
+        return ct.hypergraph.get_hypergraph(
+            [list(map(str, self.slot_ports(slot))) for slot in self.slots],
+            list(map(str, self.outer_ports)),
+            size_dict={str(w): dim for w, dim in enumerate(self.node_dims)},
         )
 
 
