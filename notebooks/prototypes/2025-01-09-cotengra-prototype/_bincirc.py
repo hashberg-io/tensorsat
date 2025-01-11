@@ -3,7 +3,6 @@ Utilities to construct tensor networks for binary circuits.
 """
 
 from __future__ import annotations
-from ast import TypeAlias
 from itertools import product
 from _tensorsat import CircuitBuilder, Rel, circuit_applicable, Node
 
