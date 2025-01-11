@@ -1,6 +1,7 @@
 """
 Utilities to construct tensor networks for SAT problems.
 """
+
 from __future__ import annotations
 from collections.abc import Sequence
 from math import comb
@@ -21,17 +22,13 @@ A SAT clause, as a tuple of non-zero integers representing the literals in the c
 with the integer sign determining whether the literal is positive or negative.
 """
 
+
 class CNFInstance:
     """A SAT instance in CNF form."""
 
     @classmethod
     def random(
-        cls,
-        k: int,
-        n: int,
-        m: int,
-        *,
-        rng: int|np.random.Generator|None = None
+        cls, k: int, n: int, m: int, *, rng: int | np.random.Generator | None = None
     ) -> Self:
         """
         Generates a random SAT instance.
@@ -43,8 +40,10 @@ class CNFInstance:
             raise ValueError(f"Number of variables 'n' must be at least {k = }.")
         if m <= 0:
             raise ValueError("Number of clauses 'm' must be positive.")
-        if m > comb(n, k)*2**k:
-            raise ValueError(f"Number of clauses 'm' cannot exceed {comb(n, k)*2**k = }")
+        if m > comb(n, k) * 2**k:
+            raise ValueError(
+                f"Number of clauses 'm' cannot exceed {comb(n, k)*2**k = }"
+            )
         if not isinstance(rng, np.random.Generator):
             rng = np.random.default_rng(rng)
         num_clauses = 0
@@ -53,7 +52,9 @@ class CNFInstance:
         while num_clauses < m:
             vs = rng.choice(range(n), size=k, replace=False)
             signs = rng.choice(range(2), size=k)
-            clause = tuple(sorted((v+1 if n == 0 else -v-1 for v, n in zip(vs, signs))))
+            clause = tuple(
+                sorted((v + 1 if n == 0 else -v - 1 for v, n in zip(vs, signs)))
+            )
             if clause not in seen:
                 clauses.append(clause)
                 seen.add(clause)
@@ -72,17 +73,13 @@ class CNFInstance:
         num_vars, num_clauses = map(int, start_match.groups())
         clauses = tuple(
             tuple(map(int, frag.strip().split(" ")))
-            for frag in dimacs[start_match.end():].split("0")
+            for frag in dimacs[start_match.end() :].split("0")
             if frag.strip()
         )
         if len(clauses) != num_clauses:
-            raise ValueError(
-                "Number of clauses does not match the specified number."
-            )
+            raise ValueError("Number of clauses does not match the specified number.")
         if num_vars < max(abs(lit) for clause in clauses for lit in clause):
-            raise ValueError(
-                "Clauses contain invalid variables."
-            )
+            raise ValueError("Clauses contain invalid variables.")
         return cls._new(num_vars, clauses)
 
     @classmethod
@@ -99,13 +96,8 @@ class CNFInstance:
     def __new__(cls, num_vars: int, clauses: Sequence[Sequence[int]]) -> Self:
         """Create a SAT instance from a number of vars and a sequence of clauses."""
         if num_vars < max(abs(lit) for clause in clauses for lit in clause):
-            raise ValueError(
-                "Clauses contain invalid variables."
-            )
-        return cls._new(
-            num_vars,
-            tuple(tuple(clause) for clause in clauses)
-        )
+            raise ValueError("Clauses contain invalid variables.")
+        return cls._new(num_vars, tuple(tuple(clause) for clause in clauses))
 
     @property
     def num_vars(self) -> int:
@@ -122,23 +114,22 @@ class CNFInstance:
         num_clauses = len(self.__clauses)
         lines = [
             f"p cnf {self.num_vars} {num_clauses}",
-            *(f"{' '.join(map(str, clause))} 0"for clause in self.__clauses)
+            *(f"{' '.join(map(str, clause))} 0" for clause in self.__clauses),
         ]
         return "\n".join(lines)
 
     def network(self) -> RelNet:
         """Construct a tensor network for the SAT instance."""
         num_vars, clauses = self.__num_vars, self.__clauses
-        circ = CircuitBuilder([2]*num_vars)
+        circ = CircuitBuilder([2] * num_vars)
         for clause in clauses:
             layer = [
-                x-1 if x > 0 else circ.add_gate(not_, [-x-1])[0]
-                for x in clause
+                x - 1 if x > 0 else circ.add_gate(not_, [-x - 1])[0] for x in clause
             ]
             while (n := len(layer)) > 1:
                 new_layer = [
-                    circ.add_gate(or_, layer[2*i:2*i+2])[0]
-                    for i in range(n//2)
+                    circ.add_gate(or_, layer[2 * i : 2 * i + 2])[0]
+                    for i in range(n // 2)
                 ]
                 if n % 2 == 1:
                     new_layer[-1] = circ.add_gate(or_, [new_layer[-1], layer[-1]])[0]

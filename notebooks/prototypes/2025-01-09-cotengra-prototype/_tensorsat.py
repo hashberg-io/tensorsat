@@ -9,10 +9,19 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from itertools import product
 from math import prod
 from types import MappingProxyType
-from typing import Any, Protocol, Self, SupportsIndex, TypeAlias, TypedDict, cast, overload
+from typing import (
+    Any,
+    Protocol,
+    Self,
+    SupportsIndex,
+    TypeAlias,
+    TypedDict,
+    cast,
+    overload,
+)
 import numpy as np
 import numpy.typing as npt
-import cotengra as ct # type: ignore[import-untyped]
+import cotengra as ct  # type: ignore[import-untyped]
 from cotengra import ContractionTree, HyperGraph
 
 BoolTensor: TypeAlias = npt.NDArray[np.uint8]
@@ -26,6 +35,7 @@ Dim: TypeAlias = int
 
 El: TypeAlias = int
 """Type alias for an individual element in a component set of a relation."""
+
 
 class Shape(tuple[Dim, ...]):
     """A shape, defined as a tuple of of positive dimensions."""
@@ -334,7 +344,7 @@ class WiringBase(ABC):
         return ct.array_contract_tree(
             [self.slot_ports(slot) for slot in self.slots],
             self.outer_ports,
-            shapes=self.slot_shapes
+            shapes=self.slot_shapes,
         )
 
     @property
@@ -395,8 +405,7 @@ class Wiring(WiringBase):
             raise ValueError("Incorrect image for output wiring.")
         # Create and return the instance:
         input_shapes = tuple(
-            Shape(node_dims[i] for i in range(num_in))
-            for num_in in slot_num_inputs
+            Shape(node_dims[i] for i in range(num_in)) for num_in in slot_num_inputs
         )
         output_shape = Shape(node_dims[o] for o in range(num_outputs))
         return cls._new(
@@ -517,18 +526,14 @@ class MutableWiring(WiringBase):
             raise ValueError(f"Invalid wiring node index {node}.")
         return self._add_outer_ports([node])[0]
 
-    def add_outer_ports(
-        self, nodes: Sequence[Node]
-    ) -> tuple[OuterPort, ...]:
+    def add_outer_ports(self, nodes: Sequence[Node]) -> tuple[OuterPort, ...]:
         """Adds new outer ports connected the given wiring nodes."""
         num_nodes = len(self.__node_dims)
         if not all(0 <= w < num_nodes for w in nodes):
             raise ValueError("Invalid wiring node index.")
         return self._add_outer_ports(nodes)
 
-    def _add_outer_ports(
-        self, nodes: Sequence[Node]
-    ) -> tuple[OuterPort, ...]:
+    def _add_outer_ports(self, nodes: Sequence[Node]) -> tuple[OuterPort, ...]:
         output_shape, node_dims = self.__outer_shape, self.__node_dims
         len_before = len(output_shape)
         output_shape.extend(node_dims[w] for w in nodes)
@@ -539,9 +544,7 @@ class MutableWiring(WiringBase):
     @overload
     def add_slot(self) -> Slot: ...
     @overload
-    def add_slot(
-        self, nodes: Sequence[Node]
-    ) -> tuple[Slot, tuple[SlotPort, ...]]: ...
+    def add_slot(self, nodes: Sequence[Node]) -> tuple[Slot, tuple[SlotPort, ...]]: ...
     def add_slot(
         self, nodes: Sequence[Node] | None = None
     ) -> Slot | tuple[Slot, tuple[SlotPort, ...]]:
@@ -561,9 +564,7 @@ class MutableWiring(WiringBase):
         """Adds a new port for the given slot, connected the given wiring node."""
         return self.add_slot_ports(slot, (wired_to,))[0]
 
-    def add_slot_ports(
-        self, slot: Slot, nodes: Sequence[Node]
-    ) -> tuple[SlotPort, ...]:
+    def add_slot_ports(self, slot: Slot, nodes: Sequence[Node]) -> tuple[SlotPort, ...]:
         """Adds new ports for the given slot, connected the given wiring nodes."""
         if not 0 <= slot < len(self.__slot_shapes):
             raise ValueError(f"Invalid inner slot index {slot}.")
@@ -677,16 +678,14 @@ class CircuitBuilder:
     @property
     def outputs(self) -> tuple[Node, ...]:
         """Wiring nodes corresponding to the outputs of the circuit."""
-        return self._wiring.outer_ports[self.num_inputs:]
+        return self._wiring.outer_ports[self.num_inputs :]
 
     @property
     def network(self) -> RelNet:
         """Relational network for the circuit."""
         return RelNet(self._wiring.freeze(), [rel for rel, _, _ in self._gates])
 
-    def add_gate(
-        self, gate: Rel, nodes: ComponentsToWiringNodes
-    ) -> tuple[Node, ...]:
+    def add_gate(self, gate: Rel, nodes: ComponentsToWiringNodes) -> tuple[Node, ...]:
         """
         Adds the given relation as a gate in the circuit,
         by using the given wiring nodes as its inputs.
@@ -712,9 +711,7 @@ class CircuitBuilder:
             raise ValueError("Invalid wiring node index.")
         return _nodes
 
-    def _add_gate(
-        self, gate: Rel, nodes: tuple[Node | None, ...]
-    ) -> tuple[Node, ...]:
+    def _add_gate(self, gate: Rel, nodes: tuple[Node | None, ...]) -> tuple[Node, ...]:
         if (_residual := len(gate.shape) - len(nodes)) >= 0:
             nodes = nodes + (None,) * _residual
         else:
@@ -744,9 +741,7 @@ class CircuitBuilder:
         """Adds the given wiring nodes as outputs of the circuit."""
         self._wiring.add_outer_ports(outputs)
 
-    def __getitem__(
-        self, nodes: tuple[Node | None, ...]
-    ) -> _SelectedWiringNodes:
+    def __getitem__(self, nodes: tuple[Node | None, ...]) -> _SelectedWiringNodes:
         """
         Returns a wiring node selector for the given wiring nodes,
         to implement EDSL syntax for gate addition.
@@ -776,9 +771,7 @@ class _SelectedWiringNodes:
     _builder: CircuitBuilder
     _nodes: tuple[Node | None, ...]
 
-    def __new__(
-        cls, builder: CircuitBuilder, nodes: ComponentsToWiringNodes
-    ) -> Self:
+    def __new__(cls, builder: CircuitBuilder, nodes: ComponentsToWiringNodes) -> Self:
         """Constructs a wiring node selector for the given circuit builder."""
         nodes = builder._validate_nodes(nodes)
         self = super().__new__(cls)
