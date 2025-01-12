@@ -20,7 +20,6 @@ Hybrid diagrams for compact-closed categories.
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from types import MappingProxyType
 from typing import Self, TypeAlias, TypedDict, final, overload
 
 if __debug__:
@@ -36,7 +35,13 @@ class Type(ABC):
     dimensionality of a vector space.
     """
 
-    __slots__ = ()
+    __slots__ = ("__weakref__",)
+
+    def __new__(cls) -> Self:
+        """Constructs a new type."""
+        if cls is Type:
+            raise TypeError("Cannot instantiate abstract class Type.")
+        return super().__new__(cls)
 
 
 @final
@@ -56,17 +61,15 @@ class Shape:
         self.__components = components
         return self
 
-    def __new__(cls, *components: Type | Iterable[Type]) -> Self:
+    def __new__(cls, components: Iterable[Type]) -> Self:
         """
         Constructs a new shape with given component types.
         If iterables of types are passed, their types are extracted and inserted
         into the shape at the selected point.
         """
-        _components = sum(
-            ((c,) if isinstance(c, Type) else tuple(c) for c in components), ()
-        )
-        assert validate(_components, tuple[Type, ...])
-        return cls._new(_components)
+        components = tuple(components)
+        assert validate(components, tuple[Type, ...])
+        return cls._new(components)
 
     def __add__(self, rhs: Shape, /) -> Shape:
         """Concatenates two shapes."""
@@ -93,28 +96,25 @@ class Shape:
     def __getitem__(self, index: int | slice, /) -> Type | Shape:
         """Returns the component(s) at the given index(es)."""
         if isinstance(index, slice):
-            return Shape(*self.__components[index])
+            return Shape(self.__components[index])
         assert validate(index, int)
         return self.__components[index]
 
     def __repr__(self) -> str:
-        return f"Shape{self.__components}"
+        return f"Shape({self.__components})"
 
 
 Slot: TypeAlias = int
 """Type alias for (the index of) a slot in a diagram."""
 
-SlotPort: TypeAlias = tuple[Slot, int]
-"""
-Type alias for (the multi-index of) a slot port in a diagram,
-as a pair of the slot and the port within the slot.
-"""
-
 Port: TypeAlias = int
 """Type alias for (the index of) a port in a diagram."""
 
 Wire: TypeAlias = int
-"""Type alias for (the index of) a wire in a diagram."""
+"""
+Type alias for (the index of) a wire in a diagram.
+Each port is connected to exactly one wire, but a wire can connect any number of ports.
+"""
 
 
 class WiringData(TypedDict, total=True):
@@ -129,11 +129,11 @@ class WiringData(TypedDict, total=True):
     wire_types: Sequence[Type]
     """Wire types."""
 
-    slot_mapping: Mapping[SlotPort, Wire]
-    """Mapping of slot ports to wires."""
+    slot_mappings: Sequence[Sequence[Wire]]
+    """Assignment of a wire to each port of each slot."""
 
-    outer_mapping: Mapping[Port, Wire]
-    """Mapping of output ports to wires."""
+    outer_mapping: Sequence[Wire]
+    """Assignment of a wire to each outer port."""
 
 
 class WiringBase(ABC):
@@ -156,13 +156,13 @@ class WiringBase(ABC):
 
     @property
     @abstractmethod
-    def slot_mapping(self) -> Mapping[SlotPort, Wire]:
-        """Mapping of slot ports to (indices of) wires."""
+    def slot_mappings(self) -> tuple[tuple[Wire, ...], ...]:
+        """Assignment of (the index of) a wire to each port of each slot."""
 
     @property
     @abstractmethod
-    def outer_mapping(self) -> Mapping[Port, Wire]:
-        """Mapping of outer ports to (indices of) wires."""
+    def outer_mapping(self) -> tuple[Wire, ...]:
+        """Assignment of (the index of) a wire to each outer port."""
 
     @property
     def num_slots(self) -> int:
@@ -178,22 +178,10 @@ class WiringBase(ABC):
         """Number of ports for the given slot."""
         return len(self.slot_shapes[slot])
 
-    def slot_ports(self, slot: Slot) -> tuple[Wire, ...]:
-        """Tuple of (indices of) wires to which ports for the slot are connected."""
-        num_inputs = self.num_slot_ports(slot)
-        slot_mapping = self.slot_mapping
-        return tuple(slot_mapping[slot, i] for i in range(num_inputs))
-
     @property
     def num_outer_ports(self) -> int:
         """Number of outer ports."""
         return len(self.outer_shape)
-
-    @property
-    def outer_ports(self) -> tuple[Wire, ...]:
-        """Tuple of (indices of) wires to which outer ports are connected."""
-        outer_mapping = self.outer_mapping
-        return tuple(outer_mapping[o] for o in range(self.num_outer_ports))
 
     @property
     def num_wires(self) -> int:
@@ -206,6 +194,7 @@ class WiringBase(ABC):
         return tuple(range(self.num_wires))
 
 
+@final
 class Wiring(WiringBase):
     """An immutable wiring."""
 
@@ -215,53 +204,68 @@ class Wiring(WiringBase):
         slot_shapes: tuple[Shape, ...],
         outer_shape: Shape,
         wire_types: Shape,
-        slot_mapping: MappingProxyType[SlotPort, Wire],
-        outer_mapping: MappingProxyType[Port, Wire],
+        slot_mappings: tuple[tuple[Wire, ...], ...],
+        outer_mapping: tuple[Wire, ...],
     ) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
         self.__slot_shapes = slot_shapes
         self.__outer_shape = outer_shape
         self.__wire_types = wire_types
-        self.__slot_mapping = slot_mapping
+        self.__slot_mappings = slot_mappings
         self.__outer_mapping = outer_mapping
         return self
 
     __slot_shapes: tuple[Shape, ...]
     __outer_shape: Shape
     __wire_types: Shape
-    __slot_mapping: Mapping[SlotPort, Wire]
-    __outer_mapping: Mapping[Port, Wire]
+    __slot_mappings: tuple[tuple[Wire, ...], ...]
+    __outer_mapping: tuple[Wire, ...]
 
     def __new__(cls, data: WiringData) -> Self:
         """Constructs a wiring from the given data."""
         assert validate(data, WiringData)
         # Destructure the data:
         slot_num_ports = tuple(data["num_slot_ports"])
-        num_ports = data["num_outer_ports"]
-        wire_types = Shape(*data["wire_types"])
-        slot_mapping = MappingProxyType(data["slot_mapping"])
-        outer_mapping = MappingProxyType(data["outer_mapping"])
+        num_outer_ports = data["num_outer_ports"]
+        wire_types = Shape(data["wire_types"])
+        slot_mappings = tuple(map(tuple, data["slot_mappings"]))
+        outer_mapping = tuple(data["outer_mapping"])
         # Validate the data:
+        num_slots = len(slot_num_ports)
         num_wires = len(wire_types)
-        if set(slot_mapping.keys()) != {
-            (k, i) for k, num_in in enumerate(slot_num_ports) for i in range(num_in)
-        }:
-            raise ValueError("Incorrect domain for input wiring mapping.")
-        if not all(0 <= w < num_wires for w in slot_mapping.values()):
-            raise ValueError("Incorrect image for input wiring mapping.")
-        if set(outer_mapping.keys()) != set(range(num_ports)):
-            raise ValueError("Incorrect domain for output wiring mapping.")
-        if not all(0 <= w < num_wires for w in outer_mapping.values()):
-            raise ValueError("Incorrect image for output wiring mapping.")
+        if len(slot_mappings) != num_slots:
+            raise ValueError(
+                "Incorrect number of slot mappings:"
+                f" expected {num_slots}, got {len(slot_mappings)}."
+            )
+        for slot in range(num_slots):
+            num_in = slot_num_ports[slot]
+            if len(slot_mappings[slot]) != num_in:
+                raise ValueError(
+                    f"Incorrect number of wires in mapping for slot {slot}:"
+                    f" expected {num_in}, got {len(slot_mappings[slot])}."
+                )
+            for wire in slot_mappings[slot]:
+                if wire not in range(num_wires):
+                    raise ValueError(
+                        f"Invalid wire index {wire} in slot mapping for slot {slot}."
+                    )
+        if len(outer_mapping) != num_outer_ports:
+            raise ValueError(
+                "Incorrect number of wires in outer mapping:"
+                f" expected {num_outer_ports}, got {len(outer_mapping)}."
+            )
+        for wire in outer_mapping:
+            if wire not in range(num_wires):
+                raise ValueError(f"Invalid wire index {wire} in outer mapping.")
         # Create and return the instance:
         slot_shapes = tuple(
-            Shape._new(tuple(wire_types[i] for i in range(num_in)))
-            for num_in in slot_num_ports
+            Shape(wire_types[i] for i in range(num_in)) for num_in in slot_num_ports
         )
-        outer_shape = Shape._new(tuple(wire_types[o] for o in range(num_ports)))
+        outer_shape = Shape(wire_types[o] for o in range(num_outer_ports))
         return cls._new(
-            slot_shapes, outer_shape, wire_types, slot_mapping, outer_mapping
+            slot_shapes, outer_shape, wire_types, slot_mappings, outer_mapping
         )
 
     @property
@@ -277,22 +281,23 @@ class Wiring(WiringBase):
         return self.__wire_types
 
     @property
-    def slot_mapping(self) -> Mapping[SlotPort, Wire]:
-        return self.__slot_mapping
+    def slot_mappings(self) -> tuple[tuple[Wire, ...], ...]:
+        return self.__slot_mappings
 
     @property
-    def outer_mapping(self) -> Mapping[Port, Wire]:
+    def outer_mapping(self) -> tuple[Wire, ...]:
         return self.__outer_mapping
 
 
+@final
 class WiringBuilder(WiringBase):
     """A wiring builder."""
 
     __slot_shapes: list[list[Type]]
     __outer_shape: list[Type]
     __wire_types: list[Type]
-    __slot_mapping: dict[SlotPort, Wire]
-    __outer_mapping: dict[Port, Wire]
+    __slot_mappings: list[list[Wire]]
+    __outer_mapping: list[Wire]
 
     def __new__(cls) -> Self:
         """Constructs a blank wiring builder."""
@@ -300,8 +305,8 @@ class WiringBuilder(WiringBase):
         self.__slot_shapes = []
         self.__outer_shape = []
         self.__wire_types = []
-        self.__slot_mapping = {}
-        self.__outer_mapping = {}
+        self.__slot_mappings = []
+        self.__outer_mapping = []
         return self
 
     @property
@@ -317,12 +322,12 @@ class WiringBuilder(WiringBase):
         return Shape(self.__wire_types)
 
     @property
-    def slot_mapping(self) -> MappingProxyType[SlotPort, Wire]:
-        return MappingProxyType(self.__slot_mapping)
+    def slot_mappings(self) -> tuple[tuple[Wire, ...], ...]:
+        return tuple(map(tuple, self.__slot_mappings))
 
     @property
-    def outer_mapping(self) -> MappingProxyType[Port, Wire]:
-        return MappingProxyType(self.__outer_mapping)
+    def outer_mapping(self) -> tuple[Wire, ...]:
+        return tuple(self.__outer_mapping)
 
     @property
     def wiring(self) -> Wiring:
@@ -331,26 +336,28 @@ class WiringBuilder(WiringBase):
             self.slot_shapes,
             self.outer_shape,
             self.wire_types,
-            self.slot_mapping,
+            self.slot_mappings,
             self.outer_mapping,
         )
 
-    def clone(self) -> WiringBuilder:
-        """Copy of this wiring builder."""
+    def copy(self) -> WiringBuilder:
+        """Returns a deep copy of this wiring builder."""
         clone = WiringBuilder.__new__(WiringBuilder)
         clone.__slot_shapes = [s.copy() for s in self.__slot_shapes]
         clone.__outer_shape = self.__outer_shape.copy()
         clone.__wire_types = self.__wire_types.copy()
-        clone.__slot_mapping = self.__slot_mapping.copy()
+        clone.__slot_mappings = [m.copy() for m in self.__slot_mappings]
         clone.__outer_mapping = self.__outer_mapping.copy()
         return clone
 
     def add_wire(self, t: Type) -> Wire:
         """Adds a new wire with the given type."""
+        assert validate(t, Type)
         return self._add_wires([t])[0]
 
     def add_wires(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
         """Adds new wires with the given types."""
+        assert validate(ts, Sequence[Type])
         return self._add_wires(ts)
 
     def _add_wires(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
@@ -359,64 +366,65 @@ class WiringBuilder(WiringBase):
         wire_types.extend(ts)
         return tuple(range(len_before, len(wire_types)))
 
+    def _validate_wires(self, wires: Sequence[Wire]) -> None:
+        num_wires = self.num_wires
+        for wire in wires:
+            if wire not in range(num_wires):
+                raise ValueError(f"Invalid wire index {wire}.")
+
     def add_outer_port(self, wire: Wire) -> Port:
         """Adds a new outer port, connected to the given wire."""
-        if not 0 <= wire < len(self.__wire_types):
-            raise ValueError(f"Invalid wire index {wire}.")
-        return self._add_outer_ports([wire])[0]
+        assert validate(wire, Wire)
+        self._validate_wires([wire])
+        return self.add_outer_ports([wire])[0]
 
     def add_outer_ports(self, wires: Sequence[Wire]) -> tuple[Port, ...]:
         """Adds new outer ports, connected the given wires."""
-        num_wires = len(self.__wire_types)
-        if not all(0 <= w < num_wires for w in wires):
-            raise ValueError("Invalid wire index.")
+        assert validate(wires, Sequence[Wire])
+        self._validate_wires(wires)
         return self._add_outer_ports(wires)
 
     def _add_outer_ports(self, wires: Sequence[Wire]) -> tuple[Port, ...]:
         outer_shape, wire_types = self.__outer_shape, self.__wire_types
         len_before = len(outer_shape)
-        outer_shape.extend(wire_types[w] for w in wires)
-        new_outputs = tuple(range(len_before, len(outer_shape)))
-        self.__outer_mapping.update(zip(new_outputs, wires))
-        return new_outputs
+        outer_shape.extend(wire_types[wire] for wire in wires)
+        self.__outer_mapping.extend(wires)
+        return tuple(range(len_before, len(outer_shape)))
 
-    @overload
-    def add_slot(self) -> Slot: ...
-    @overload
-    def add_slot(self, wires: Sequence[Wire]) -> tuple[Slot, tuple[SlotPort, ...]]: ...
-    def add_slot(
-        self, wires: Sequence[Wire] | None = None
-    ) -> Slot | tuple[Slot, tuple[SlotPort, ...]]:
+    def add_slot(self, wires: Sequence[Wire] = ()) -> Slot:
         """Adds a new slot."""
-        k = len(self.__slot_shapes)
-        self.__slot_shapes.append([])
-        if wires is None:
-            return k
-        try:
-            new_inputs = self.add_slot_ports(k, wires)
-        except ValueError:
-            self.__slot_shapes.pop()
-            raise
-        return k, new_inputs
+        assert validate(wires, Sequence[Wire])
+        slot_shapes = self.__slot_shapes
+        k = len(slot_shapes)
+        slot_shapes.append([])
+        if wires:
+            try:
+                self._validate_wires(wires)
+                self._add_slot_ports(k, wires)
+            except ValueError:
+                slot_shapes.pop()  # undo the slot addition
+                raise
+        return k
 
-    def add_slot_port(self, slot: Slot, wire: Wire) -> SlotPort:
+    def add_slot_port(self, slot: Slot, wire: Wire) -> Port:
         """Adds a new port for the given slot, connected the given wire."""
-        return self.add_slot_ports(slot, (wire,))[0]
+        assert validate(wire, Wire)
+        if slot not in range(self.num_slots):
+            raise ValueError(f"Invalid slot {slot}.")
+        return self.add_slot_ports(slot, [wire])[0]
 
-    def add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[SlotPort, ...]:
+    def add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[Port, ...]:
         """Adds new ports for the given slot, connected the given wires."""
-        if not 0 <= slot < len(self.__slot_shapes):
-            raise ValueError(f"Invalid inner slot index {slot}.")
-        if not all(0 <= w < len(self.__wire_types) for w in wires):
-            raise ValueError("Invalid wire index.")
+        if slot not in range(self.num_slots):
+            raise ValueError(f"Invalid slot {slot}.")
+        self._validate_wires(wires)
         return self._add_slot_ports(slot, wires)
 
     def _add_slot_ports(
         self, slot: Slot, wires: Sequence[Wire]
-    ) -> tuple[SlotPort, ...]:
+    ) -> tuple[Port, ...]:
         slot_shape, wire_types = self.__slot_shapes[slot], self.__wire_types
         len_before = len(slot_shape)
         slot_shape.extend(wire_types[w] for w in wires)
-        new_inputs = tuple((slot, i) for i in range(len_before, len(slot_shape)))
-        self.__slot_mapping.update(zip(new_inputs, wires))
-        return new_inputs
+        self.__slot_mappings[slot].extend(wires)
+        return tuple(range(len_before, len(slot_shape)))
