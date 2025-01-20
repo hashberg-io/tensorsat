@@ -323,6 +323,26 @@ def literal_list(phi: Formula) -> list[tuple[bool, str]]:
         theta = phi.right_subformula_of_binary_operation()
         return literal_list(psi) + literal_list(theta)
 
+def clause_list(cnf: Formula) -> list[list[tuple[bool, str]]]:
+    """Takes a formula in CNF and returns its list of clauses."""
+    queue: list[Formula] = [cnf]
+    clauses: list[list[tuple[bool, str]]] = []
+
+    while len(queue) > 0:
+        curr = queue.pop()
+
+        if curr.sort == Operation.CONJ:
+            queue.append(curr.left_subformula_of_binary_operation())
+            queue.append(curr.right_subformula_of_binary_operation())
+        elif curr.sort == Operation.DISJ:
+            clauses.append(literal_list(curr))
+        elif curr.sort == Operation.VAR:
+            clauses.append([curr])
+        elif is_negated_variable(curr):
+            clauses.append([curr])
+
+    return clauses
+
 
 falsum: Formula = Formula(Operation.FALSUM)
 truth: Formula = Formula(Operation.TRUTH)
