@@ -127,14 +127,17 @@ def disj(phi: Formula, psi: Formula) -> Formula:
 
 
 def impl(phi: Formula, psi: Formula) -> Formula:
+    """Implication of two formulae `phi` and `psi`."""
     return binary_formula(Operation.IMPL, phi, psi)
 
 
 def biimpl(phi: Formula, psi: Formula) -> Formula:
+    """Bi-implication of two formulae `phi` and `psi`."""
     return binary_formula(Operation.BIIMPL, phi, psi)
 
 
 def show_operation(op: Operation) -> str:
+    """String representation of a given operation `op`."""
     if op == Operation.VAR:
         return "Var"
     elif op == Operation.NEG:
@@ -154,6 +157,7 @@ def show_operation(op: Operation) -> str:
 
 
 def show_formula(phi: Formula) -> str:
+    """String representation of a given formula `phi`."""
     if arity(phi.operation) == 0:
         return f"(Var \"{phi.name}\")"
     elif arity(phi.operation) == 1:
@@ -193,6 +197,7 @@ def eliminate_implications(phi: Formula) -> Formula:
 
 
 def dualize(op: Operation) -> Optional[Operation]:
+    "Maps conjunction to disjunction and vice versa."
     if op == Operation.CONJ:
         return Operation.DISJ
     elif op == Operation.DISJ:
@@ -252,8 +257,8 @@ def demorganize(phi: Formula) -> Formula:
 
 
 def merge(cnf1: Formula, cnf2: Formula) -> Formula:
-    """Construct disjunctions of formulae in a way that preserves the
-       CNF property (for formulae that are already in CNF).
+    """Constructs disjunctions of two CNF formulae in a way that preserves the
+       CNF property.
     """
     if cnf1.operation == Operation.CONJ:
         cnf1a = cnf1.left_subformula_of_binary_operation()
@@ -301,8 +306,13 @@ def is_negated_variable(phi: Formula) -> bool:
 
 
 def literal_list(phi: Formula) -> list[tuple[bool, str]]:
-    """Takes a formula consisting of disjunctions in literals and returns a
-       representation of it is a clause."""
+    """Takes a formula consisting of disjunctions of literals and returns a
+       representation of it as a clause.
+
+       The first component of the pair indicates whether the variable in
+       consideration is negated or not. `False` means negated wheras `True`
+       means not negated.
+    """
     if phi.operation == Operation.VAR:
         return [(True, phi.name)]
     elif is_negated_variable(phi):
@@ -321,7 +331,3 @@ var_p = variable("p")
 var_q = variable("q")
 lem: Formula = disj(variable("p"), neg(variable("p")))
 meet_conj: Formula = impl(conj(var_p, var_q), conj(var_q, var_p))
-
-print(show_formula(eliminate_implications(meet_conj)))
-print(show_formula(demorganize(eliminate_implications(meet_conj))))
-print(show_formula(distribute(demorganize(eliminate_implications(meet_conj)))))
