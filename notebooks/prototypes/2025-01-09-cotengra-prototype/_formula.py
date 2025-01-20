@@ -31,7 +31,7 @@ def arity(op: Operation) -> int:
     elif op == Operation.IMPL or op == Operation.BIIMPL:
         return 2
     else:
-        raise ValueError("Unknown expression sort")
+        raise ValueError("Unknown operation")
 
 
 class Formula:
@@ -53,14 +53,12 @@ class Formula:
         elif arity(op) == 2:
             self.subtrees = [None, None]
 
-    @classmethod
     def set_subformula_of_unary_operation(self, phi):
         if arity(self.operation) == 1:
             self.subtrees[0] = phi
         else:
             raise ValueError("Arity mismatch")
 
-    @classmethod
     def set_subformulae_of_binary_operation(self, phi, psi):
         if arity(self.operation) == 2:
             self.subtrees[0] = phi
@@ -68,21 +66,18 @@ class Formula:
         else:
             raise ValueError("Arity mismatch")
 
-    @classmethod
     def subformula_of_unary_operation(self):
         if arity(self.operation) == 1:
             return self.subtrees[0]
         else:
             raise ValueError("Arity mismatch")
 
-    @classmethod
     def left_subformula_of_binary_operation(self):
         if arity(self.operation) == 2:
             return self.subtrees[0]
         else:
             raise ValueError("Arity mismatch")
 
-    @classmethod
     def right_subformula_of_binary_operation(self):
         if arity(self.operation) == 2:
             return self.subtrees[1]
@@ -171,6 +166,9 @@ def show_formula(phi: Formula) -> str:
         sc: str = show_formula(phi.right_subformula_of_binary_operation())
         return f"({sa} {sb} {sc})"
 
+##############################################################################
+## CNF Transformation
+##############################################################################
 
 def eliminate_implications(phi: Formula) -> Formula:
     """Eliminate implications and bi-implications from a given formula."""
@@ -331,12 +329,12 @@ def clause_list(cnf: Formula) -> list[list[tuple[bool, str]]]:
     while len(queue) > 0:
         curr = queue.pop()
 
-        if curr.sort == Operation.CONJ:
+        if curr.operation == Operation.CONJ:
             queue.append(curr.left_subformula_of_binary_operation())
             queue.append(curr.right_subformula_of_binary_operation())
-        elif curr.sort == Operation.DISJ:
+        elif curr.operation == Operation.DISJ:
             clauses.append(literal_list(curr))
-        elif curr.sort == Operation.VAR:
+        elif curr.operation == Operation.VAR:
             clauses.append([curr])
         elif is_negated_variable(curr):
             clauses.append([curr])
