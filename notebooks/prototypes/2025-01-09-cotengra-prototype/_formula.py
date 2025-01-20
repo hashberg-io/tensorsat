@@ -126,8 +126,6 @@ def disj(phi: Formula, psi: Formula) -> Formula:
     return binary_formula(Operation.DISJ, phi, psi)
 
 
-
-
 def impl(phi: Formula, psi: Formula) -> Formula:
     return binary_formula(Operation.IMPL, phi, psi)
 
@@ -317,7 +315,7 @@ def literal_list(phi: Formula) -> list[tuple[bool, str]]:
 
 
 falsum: Formula = Formula(Operation.FALSUM)
-
+truth: Formula = Formula(Operation.TRUTH)
 
 var_p = variable("p")
 var_q = variable("q")
