@@ -53,7 +53,7 @@ class Formula:
         elif arity(op) == 2:
             self.subtrees = [None, None]
 
-    def set_subformula_of_unary_operation(self, phi):
+    def set_subformula_of_unary_formula(self, phi):
         if arity(self.operation) == 1:
             self.subtrees[0] = phi
         else:
@@ -102,7 +102,7 @@ def binary_formula(op: Operation, phi: Formula, psi: Formula) -> Formula:
 def unary_formula(op: Operation, phi: Formula) -> Formula:
     """Construct a formula with a unary operation."""
     psi = Formula(op)
-    psi.set_subformula_of_unary_operation(phi)
+    psi.set_subformula_of_unary_formula(phi)
     return psi
 
 
