@@ -10,6 +10,7 @@ from typing import Self, TypeAlias
 import numpy as np
 from _tensorsat import CircuitBuilder, RelNet
 from _bincirc import not_, or_, bit_unk
+from _formula import Formula, to_cnf, clause_list
 
 # CNFInstance: TypeAlias = tuple[tuple[int, ...], ...]
 # """
@@ -81,6 +82,34 @@ class CNFInstance:
         if num_vars < max(abs(lit) for clause in clauses for lit in clause):
             raise ValueError("Clauses contain invalid variables.")
         return cls._new(num_vars, clauses)
+
+    @classmethod
+    def from_formula(cls, phi: Formula) -> Self:
+        """Create a CNF instance from an arbitrary formula."""
+        cnf: Formula = to_cnf(phi)
+        named_clauses: list[list[tuple[bool, str]]] = clause_list(cnf)
+
+        # We use these to enumerate the variables occurring in the formula.
+        indices: dict[str, int] = {}
+        i: int = 1
+
+        clauses: list[list[int]] = []
+
+        for named_clause in named_clauses:
+            clause = []
+
+            for lit in named_clause:
+                    name: str = lit[1]
+                    sign: int = 1 if lit[0] else (-1)
+                    if name not in indices:
+                        indices[name] = i
+                        i += 1
+                    clause.append(sign * indices[name])
+
+            clauses.append(clause)
+
+        return cls._new(len(clauses), tuple([tuple(clause) for clause in clauses]))
+
 
     @classmethod
     def _new(cls, num_vars: int, clauses: tuple[Clause, ...]) -> Self:
