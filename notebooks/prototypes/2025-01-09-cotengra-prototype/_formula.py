@@ -66,19 +66,19 @@ class Formula:
         else:
             raise ValueError("Arity mismatch")
 
-    def subformula_of_unary_operation(self):
+    def subformula_of_unary_formula(self):
         if arity(self.operation) == 1:
             return self.subtrees[0]
         else:
             raise ValueError("Arity mismatch")
 
-    def left_subformula_of_binary_operation(self):
+    def left_subformula_of_binary_formula(self):
         if arity(self.operation) == 2:
             return self.subtrees[0]
         else:
             raise ValueError("Arity mismatch")
 
-    def right_subformula_of_binary_operation(self):
+    def right_subformula_of_binary_formula(self):
         if arity(self.operation) == 2:
             return self.subtrees[1]
         else:
@@ -95,7 +95,7 @@ def variable(s: str) -> Formula:
 def binary_formula(op: Operation, phi: Formula, psi: Formula) -> Formula:
     """Construct a formula with a binary operation."""
     theta = Formula(op)
-    theta.set_subformulae_of_binary_operation(phi, psi)
+    theta.set_subformulae_of_binary_formula(phi, psi)
     return theta
 
 
@@ -157,13 +157,13 @@ def show_formula(phi: Formula) -> str:
         return f"(Var \"{phi.name}\")"
     elif arity(phi.operation) == 1:
         s1: str = show_operation(phi.operation)
-        s2: str = show_formula(phi.subformula_of_unary_operation())
+        s2: str = show_formula(phi.subformula_of_unary_formula())
         return f"({s1} {s2})"
     else:
         assert arity(phi.operation) == 2
         sa: str = show_operation(phi.operation)
-        sb: str = show_formula(phi.left_subformula_of_binary_operation())
-        sc: str = show_formula(phi.right_subformula_of_binary_operation())
+        sb: str = show_formula(phi.left_subformula_of_binary_formula())
+        sc: str = show_formula(phi.right_subformula_of_binary_formula())
         return f"({sa} {sb} {sc})"
 
 ##############################################################################
@@ -176,14 +176,14 @@ def eliminate_implications(phi: Formula) -> Formula:
         return phi
     elif arity(phi.operation) == 1:
         if phi.operation == Operation.NEG:
-            phi0 = phi.subformula_of_unary_operation()
+            phi0 = phi.subformula_of_unary_formula()
             return neg(eliminate_implications(phi0))
         else:
             raise ValueError("Unknown logical operation")
     else:
         assert arity(phi.operation) == 2
-        psi = phi.left_subformula_of_binary_operation()
-        theta = phi.right_subformula_of_binary_operation()
+        psi = phi.left_subformula_of_binary_formula()
+        theta = phi.right_subformula_of_binary_formula()
         psi0 = eliminate_implications(psi)
         theta0 = eliminate_implications(theta)
         if phi.operation == Operation.IMPL:
@@ -214,17 +214,17 @@ def demorganize(phi: Formula) -> Formula:
         # Currently, negation is the only unary operation so the check below is
         # redundant. But this might change in the future so I'm keeping this
         # here.
-        psi: Formula = phi.subformula_of_unary_operation()
+        psi: Formula = phi.subformula_of_unary_formula()
         if phi.operation == Operation.NEG:
             if psi.operation == Operation.NEG:
                 # This case means we have just seen a double-negation, which we
                 # get rid of.
-                return demorganize(psi.subformula_of_unary_operation())
+                return demorganize(psi.subformula_of_unary_formula())
             elif psi.operation in [Operation.CONJ, Operation.DISJ]:
                 # This case means we have just seen a formula of the
                 # form `Neg(BinOp(psi, theta))`.
-                theta = psi.left_subformula_of_binary_operation()
-                gamma = psi.right_subformula_of_binary_operation()
+                theta = psi.left_subformula_of_binary_formula()
+                gamma = psi.right_subformula_of_binary_formula()
                 op: Operation = dualize(psi.operation)
                 assert op is not None
                 theta0 = demorganize(neg(theta))
@@ -245,8 +245,8 @@ def demorganize(phi: Formula) -> Formula:
             raise ValueError("Formula contains implication.")
         elif op == Operation.CONJ or phi.operation == Operation.DISJ:
             # Redundant check in case other operations are added in the future.
-            psi: Formula = phi.left_subformula_of_binary_operation()
-            theta: Formula = phi.right_subformula_of_binary_operation()
+            psi: Formula = phi.left_subformula_of_binary_formula()
+            theta: Formula = phi.right_subformula_of_binary_formula()
             psi0 = demorganize(psi)
             theta0 = demorganize(theta)
             return binary_formula(phi.operation, psi0, theta0)
@@ -259,12 +259,12 @@ def merge(cnf1: Formula, cnf2: Formula) -> Formula:
        CNF property.
     """
     if cnf1.operation == Operation.CONJ:
-        cnf1a = cnf1.left_subformula_of_binary_operation()
-        cnf1b = cnf1.right_subformula_of_binary_operation()
+        cnf1a = cnf1.left_subformula_of_binary_formula()
+        cnf1b = cnf1.right_subformula_of_binary_formula()
         return conj(merge(cnf1a, cnf2), merge(cnf1b, cnf2))
     elif cnf2.operation == Operation.CONJ:
-        cnf2a = cnf2.left_subformula_of_binary_operation()
-        cnf2b = cnf2.right_subformula_of_binary_operation()
+        cnf2a = cnf2.left_subformula_of_binary_formula()
+        cnf2b = cnf2.right_subformula_of_binary_formula()
         return conj(merge(cnf1, cnf2a), merge(cnf1, cnf2b))
     else:
         return disj(cnf1, cnf2)
@@ -276,15 +276,15 @@ def distribute(phi: Formula) -> Formula:
     if arity(op) == 0:
         return phi
     elif arity(op) == 1:
-        return unary_formula(op, phi.subformula_of_unary_operation())
+        return unary_formula(op, phi.subformula_of_unary_formula())
     elif arity(op) == 2:
         if op == Operation.CONJ:
-            psi = phi.left_subformula_of_binary_operation()
-            theta = phi.right_subformula_of_binary_operation()
+            psi = phi.left_subformula_of_binary_formula()
+            theta = phi.right_subformula_of_binary_formula()
             return conj(distribute(psi), distribute(theta))
         elif op == Operation.DISJ:
-            psi = phi.left_subformula_of_binary_operation()
-            theta = phi.right_subformula_of_binary_operation()
+            psi = phi.left_subformula_of_binary_formula()
+            theta = phi.right_subformula_of_binary_formula()
             return merge(distribute(psi), distribute(theta))
         else:
             raise ValueError("Unexpected logical operation in `distribute`.")
@@ -297,7 +297,7 @@ def to_cnf(phi: Formula) -> Formula:
 
 def is_negated_variable(phi: Formula) -> bool:
     if phi.operation == Operation.NEG:
-        psi = phi.subformula_of_unary_operation()
+        psi = phi.subformula_of_unary_formula()
         return psi.operation == Operation.VAR
     else:
         return False
@@ -314,11 +314,11 @@ def literal_list(phi: Formula) -> list[tuple[bool, str]]:
     if phi.operation == Operation.VAR:
         return [(True, phi.name)]
     elif is_negated_variable(phi):
-        return [(False, phi.subformula_of_unary_operation().name)]
+        return [(False, phi.subformula_of_unary_formula().name)]
     else:
         assert phi.operation == Operation.DISJ
-        psi = phi.left_subformula_of_binary_operation()
-        theta = phi.right_subformula_of_binary_operation()
+        psi = phi.left_subformula_of_binary_formula()
+        theta = phi.right_subformula_of_binary_formula()
         return literal_list(psi) + literal_list(theta)
 
 def clause_list(cnf: Formula) -> list[list[tuple[bool, str]]]:
@@ -330,8 +330,8 @@ def clause_list(cnf: Formula) -> list[list[tuple[bool, str]]]:
         curr = queue.pop()
 
         if curr.operation == Operation.CONJ:
-            queue.append(curr.left_subformula_of_binary_operation())
-            queue.append(curr.right_subformula_of_binary_operation())
+            queue.append(curr.left_subformula_of_binary_formula())
+            queue.append(curr.right_subformula_of_binary_formula())
         elif curr.operation == Operation.DISJ:
             clauses.append(literal_list(curr))
         elif curr.operation == Operation.VAR:
