@@ -332,12 +332,8 @@ def clause_list(cnf: Formula) -> list[list[tuple[bool, str]]]:
         if curr.operation == Operation.CONJ:
             queue.append(curr.left_subformula_of_binary_formula())
             queue.append(curr.right_subformula_of_binary_formula())
-        elif curr.operation == Operation.DISJ:
+        else:
             clauses.append(literal_list(curr))
-        elif curr.operation == Operation.VAR:
-            clauses.append([curr])
-        elif is_negated_variable(curr):
-            clauses.append([curr])
 
     return clauses
 
