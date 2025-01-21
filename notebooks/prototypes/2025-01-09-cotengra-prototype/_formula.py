@@ -59,7 +59,7 @@ class Formula:
         else:
             raise ValueError("Arity mismatch")
 
-    def set_subformulae_of_binary_operation(self, phi, psi):
+    def set_subformulae_of_binary_formula(self, phi, psi):
         if arity(self.operation) == 2:
             self.subtrees[0] = phi
             self.subtrees[1] = psi
