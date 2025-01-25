@@ -20,6 +20,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from itertools import accumulate
+from types import MappingProxyType
 from typing import (
     Any,
     Self,
@@ -889,3 +890,230 @@ class Diagram(Shaped):
         except AttributeError:
             self.__hash_cache = h = hash((Diagram, self.wiring, self.blocks))
             return h
+
+
+@final
+class DiagramBuilder:
+    """Utility class to build diagrams."""
+
+    __wiring_builder: WiringBuilder
+    __blocks: dict[Slot, Block]
+
+    __slots__ = ("__weakref__", "__wiring_builder", "__blocks")
+
+    def __new__(cls) -> Self:
+        """Creates a blank diagram builder."""
+        self = super().__new__(cls)
+        self.__wiring_builder = WiringBuilder()
+        self.__blocks = {}
+        return self
+
+    def copy(self) -> DiagramBuilder:
+        """Returns a deep copy of this diagram builder."""
+        clone = DiagramBuilder.__new__(DiagramBuilder)
+        clone.__wiring_builder = self.__wiring_builder.copy()
+        clone.__blocks = self.__blocks.copy()
+        return clone
+
+    @property
+    def wiring(self) -> WiringBuilder:
+        """The wiring builder for the diagram."""
+        return self.__wiring_builder
+
+    @property
+    def blocks(self) -> MappingProxyType[Slot, Block]:
+        """Blocks in the diagram."""
+        return MappingProxyType(self.__blocks)
+
+    @property
+    def diagram(self) -> Diagram:
+        """The diagram built thus far."""
+        wiring = self.__wiring_builder.wiring
+        blocks = self.__blocks
+        _blocks = tuple(blocks.get(slot) for slot in wiring.slots)
+        return Diagram._new(wiring, _blocks)
+
+    def set_block(self, slot: Slot, block: Block) -> None:
+        """Sets a block for an existing open slot."""
+        assert validate(block, Block)
+        blocks = self.__blocks
+        if slot not in range(self.wiring.num_slots):
+            raise ValueError(f"Invalid slot {slot}.")
+        if slot in blocks:
+            raise ValueError(f"Slot {slot} is already occupied.")
+        if self.wiring.slot_shapes[slot] != block.shape:
+            raise ValueError(
+                f"Incompatible shape for block at slot {slot}:"
+                f" expected {self.wiring.slot_shapes[slot]}, got {block.shape}."
+            )
+        self.__blocks[slot] = block
+
+    def add_block(self, block: Block, inputs: Mapping[Port, Wire]) -> tuple[Wire, ...]:
+        """
+        Adds a new slot to the diagram with the given block assigned to it.
+        Specifically:
+
+        1. Adds a new slot to the wiring.
+        2. For each block port not having a wire associated to it by ``inputs``, creates
+           a new wire (in port order).
+        3. Adds a new port to the slot for each port in the block: those appearing in
+           ``inputs`` are connected to the specified wire, while the others are connected
+           to the newly created wires.
+        4. Sets the block for the slot.
+        4. Returns the newly created wires (in port order).
+        """
+        wire_types = self.__wiring_builder.__wire_types
+        assert validate(block, Block)
+        assert validate(inputs, Mapping[Port, Wire])
+        block_shape = block.shape
+        for port, wire in inputs.items():
+            try:
+                port_type = block_shape[port]
+            except IndexError:
+                raise ValueError(f"Invalid port {port} for block.")
+            try:
+                if port_type != wire_types[wire]:
+                    raise ValueError(
+                        f"Incompatible wire type for port {port}:"
+                        f" port has type {block_shape[port]}, "
+                        f"wire has type {wire_types[wire]}."
+                    )
+            except IndexError:
+                raise ValueError(f"Invalid wire index {wire}.") from None
+        return self._add_block(block, inputs)
+
+    def _add_block(self, block: Block, inputs: Mapping[Port, Wire]) -> tuple[Wire, ...]:
+        wiring_builder = self.__wiring_builder
+        block_ports, block_shape = block.ports, block.shape
+        output_ports = tuple(port for port in block_ports if port not in inputs)
+        output_port_ts = tuple(block_shape[port] for port in output_ports)
+        output_wires = wiring_builder.add_wires(output_port_ts)
+        port_wire_mapping = {**inputs, **dict(zip(output_ports, output_wires))}
+        slot = wiring_builder.add_slot()
+        wiring_builder.add_slot_ports(
+            slot, [port_wire_mapping[port] for port in block_ports]
+        )
+        return output_wires
+
+    def add_inputs(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
+        """
+        Creates new wires of teh given types,
+        then adds ports connected to those wires.
+        """
+        assert validate(ts, Sequence[Type])
+        return self._add_inputs(ts)
+
+    def _add_inputs(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
+        wiring = self.wiring
+        wires = wiring._add_wires(ts)
+        wiring._add_outer_ports(wires)
+        return wires
+
+    def add_outputs(self, wires: Sequence[Wire]) -> None:
+        """Adds ports connected to the given wires."""
+        assert validate(wires, Sequence[Wire])
+        diag_wires = self.wiring.wires
+        for wire in wires:
+            if wire not in diag_wires:
+                raise ValueError(f"Invalid wire index {wire}.")
+        self._add_outputs(wires)
+
+    def _add_outputs(self, wires: Sequence[Wire]) -> None:
+        self.wiring._add_outer_ports(wires)
+
+    def __getitem__(
+        self, wires: Sequence[Wire] | Mapping[Port, Wire]
+    ) -> SelectedInputWires:
+        """
+        Enables special syntax for addition of blocks to the diagram:
+
+        .. code-block:: python
+            from quetz.langs.rel import bit
+            from quetz.libs.bincirc import and_, or_, xor_
+
+            circ = DiagramBuilder()
+            a, b, c_in = circ.add_inputs(bit*3)
+            x1, = xor_ @ circ[a, b]
+            x2, = and_ @ circ[a, b]
+            x3, = and_ @ circ[x1, c_in]
+            s, = xor_ @ circ[x1, x3]
+            c_out, = or_ @ circ[x2, x3]
+            circ.add_outputs((s, c_out))
+
+        This is achieved by this method returning an object which encodes the
+        association of ports to wires, and supports the application of the ``@``
+        operator with a block as the lhs and the object as the rhs.
+        """
+        return SelectedInputWires(self, wires)
+
+
+@final
+class SelectedInputWires:
+    """
+    Utility class wrapping a selection of input wires in a given diagram builder,
+    to be used for the purposes of adding blocks to the builder.
+
+    Supports usage of the ``@`` operator with a block on the lhs,
+    enabling special syntax for addition of blocks to diagrams.
+    See :meth:`DiagramBuilder.__getitem__`.
+    """
+
+    @classmethod
+    def _new(
+        cls,
+        builder: DiagramBuilder,
+        wires: MappingProxyType[Port, Wire] | tuple[Wire, ...],
+    ) -> Self:
+        """Protected constructor."""
+        self = super().__new__(cls)
+        self.__builder = builder
+        self.__wires = wires
+        return self
+
+    __builder: DiagramBuilder
+    __wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
+
+    __slots__ = ("__weakref__", "__builder", "__wires")
+
+    def __new__(
+        cls, builder: DiagramBuilder, wires: Sequence[Wire] | Mapping[Port, Wire]
+    ) -> Self:
+        assert validate(builder, DiagramBuilder)
+        _wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
+        if isinstance(wires, Mapping):
+            assert validate(wires, Mapping[Port, Wire])
+            _wires = MappingProxyType({**wires})
+        else:
+            assert validate(wires, Sequence[Wire])
+            _wires = tuple(wires)
+        builder_wires = builder.wiring.wires
+        for wire in _wires if isinstance(_wires, tuple) else _wires.values():
+            if wire not in builder_wires:
+                raise ValueError(f"Invalid wire index {wire}.")
+        return cls._new(builder, _wires)
+
+    @property
+    def builder(self) -> DiagramBuilder:
+        """The builder to which the selected input wires belong."""
+        return self.__builder
+
+    @property
+    def wires(self) -> MappingProxyType[Port, Wire] | tuple[Wire, ...]:
+        """
+        The selected input wires, as either:
+
+        - a tuple of wires, implying contiguous port selection starting at index 0
+        - a mapping of ports to wires
+
+        """
+        return self.__wires
+
+    def __rmatmul__(self, block: Block) -> tuple[Wire, ...]:
+        """Adds the given block to the diagram, applied to the selected input wires."""
+        if not isinstance(block, (Box, Diagram)):
+            return NotImplemented
+        if isinstance(self.__wires, MappingProxyType):
+            wires = self.__wires
+        else:
+            wires = MappingProxyType(dict(enumerate(self.__wires)))
+        return self.__builder.add_block(block, wires)
