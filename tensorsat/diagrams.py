@@ -1,8 +1,6 @@
 """
-Hybrid diagrams for compact-closed categories.
+Hybrid diagrams for compact closed categories.
 """
-
-# Part of TensorSAT
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,18 +15,16 @@ Hybrid diagrams for compact-closed categories.
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from itertools import accumulate
 from typing import (
     Any,
-    Protocol,
     Self,
     Type as SubclassOf,
     TypeAlias,
-    TypeVar,
     TypedDict,
     cast,
     final,
@@ -73,7 +69,7 @@ class Type(ABC):
 
 
 @final
-class Shape:
+class Shape(Sequence[Type]):
     """
     A Shape, as a finite tuple of types.
     """
@@ -183,20 +179,65 @@ class WiringData(TypedDict, total=True):
     """Assignment of a wire to each outer port."""
 
 
-class Shaped(Protocol):
-    """Protocol for objects with a shape."""
+class Shaped(ABC):
+    """Interface and mixin properties for objects with a shape."""
+
+    @staticmethod
+    def wrap_shape(shape: Shape) -> Shaped:
+        """Wraps a shape into an anonymous :class:`Shaped` instance."""
+        assert validate(shape, Shape)
+        cls: SubclassOf[Shaped] = final(
+            type.__new__(
+                type,
+                "<anon shaped class>",
+                (Shaped,),
+                {
+                    "shape": property(lambda self: shape),
+                    "__repr__": lambda self: "<anon shaped>",
+                },
+            )
+        )
+        return cls()
 
     __slots__ = ()
 
     @property
+    @abstractmethod
     def shape(self) -> Shape:
         """Shape of the object."""
 
+    @property
+    def num_ports(self) -> int:
+        """Number of ports in the object, aka the length of its shape."""
+        return len(self.shape)
 
-class WiringBase(Shaped, ABC):
-    """Abstract base class for wiring and wiring builder."""
+    @property
+    def ports(self) -> Sequence[Port]:
+        """Sequence of (the indices of) ports in the object."""
+        return range(self.num_ports)
 
-    __slots__ = ("__weakref__",)
+
+class Slotted(ABC):
+    """Interface and mixin properties/methods for objects with shaped slots."""
+
+    @staticmethod
+    def wrap_slot_shapes(slot_shapes: tuple[Shape, ...]) -> Slotted:
+        """Wraps a tuple of shapes into an anonymous :class:`Slotted` instance."""
+        assert validate(slot_shapes, tuple[Shape, ...])
+        cls: SubclassOf[Slotted] = final(
+            type.__new__(
+                type,
+                "<anon slotted class>",
+                (Slotted,),
+                {
+                    "shape": property(lambda self: slot_shapes),
+                    "__repr__": lambda self: "<anon slotted>",
+                },
+            )
+        )
+        return cls()
+
+    __slots__ = ()
 
     @property
     @abstractmethod
@@ -204,9 +245,42 @@ class WiringBase(Shaped, ABC):
         """Shapes for the slots."""
 
     @property
-    @abstractmethod
-    def shape(self) -> Shape:
-        """Outer shape for the wiring."""
+    def num_slots(self) -> int:
+        """Number of slots."""
+        return len(self.slot_shapes)
+
+    @property
+    def slots(self) -> Sequence[Slot]:
+        """Sequence of (the indices of) slots."""
+        return range(self.num_slots)
+
+    def num_slot_ports(self, slot: Slot) -> int:
+        """Number of ports for the given slot."""
+        return len(self.slot_shapes[slot])
+
+    def slot_ports(self, slot: Slot) -> Sequence[Port]:
+        """Sequence of (the indices of) ports for the given slot."""
+        return range(self.num_slot_ports(slot))
+
+    def validate_slot_data(self, data: Mapping[Slot, Shaped], /) -> None:
+        """Validates the shapes for given slot data."""
+        assert validate(data, Mapping[Slot, Shaped])
+        slots, slot_shapes = self.slots, self.slot_shapes
+        for slot, shaped in data.items():
+            if slot not in slots:
+                raise ValueError(f"Invalid slot {slot}.")
+            if shaped.shape != slot_shapes[slot]:
+                raise ValueError(
+                    f"Incompatible shape for data at slot {slot}:"
+                    f" expected slot shape {slot_shapes[slot]}, "
+                    f" got data with shape {shaped.shape}."
+                )
+
+
+class WiringBase(Shaped, Slotted, ABC):
+    """Abstract base class for wiring and wiring builder."""
+
+    __slots__ = ("__weakref__",)
 
     @property
     @abstractmethod
@@ -224,53 +298,14 @@ class WiringBase(Shaped, ABC):
         """Assignment of (the index of) a wire to each outer port."""
 
     @property
-    def num_slots(self) -> int:
-        """Number of slots."""
-        return len(self.slot_shapes)
-
-    @property
-    def slots(self) -> tuple[Slot, ...]:
-        """Sequence of (the indices of) slots."""
-        return tuple(range(self.num_slots))
-
-    def num_slot_ports(self, slot: Slot) -> int:
-        """Number of ports for the given slot."""
-        return len(self.slot_shapes[slot])
-
-    @property
-    def num_outer_ports(self) -> int:
-        """Number of outer ports."""
-        return len(self.shape)
-
-    @property
     def num_wires(self) -> int:
         """Number of wires."""
         return len(self.wire_types)
 
     @property
-    def wires(self) -> tuple[Wire, ...]:
+    def wires(self) -> Sequence[Wire]:
         """Sequence of (the indices of) wires."""
-        return tuple(range(self.num_wires))
-
-
-SlotContentT = TypeVar("SlotContentT")
-"""Type variable for the type of content in a slot."""
-
-SlotContents: TypeAlias = Sequence[SlotContentT | None] | Mapping[Slot, SlotContentT]
-"""Type alias for allowed ways to specify slot contents."""
-
-
-def _slot_contents_to_tuple(
-    num_slots: int, contents: SlotContents[SlotContentT]
-) -> tuple[SlotContentT | None, ...]:
-    if isinstance(contents, Mapping):
-        return tuple(contents.get(k, None) for k in range(num_slots))
-    if len(contents) != num_slots:
-        raise ValueError(
-            "Incorrect number of slot contents:"
-            f" expected {num_slots}, got {len(contents)}."
-        )
-    return tuple(contents)
+        return range(self.num_wires)
 
 
 @final
@@ -375,29 +410,30 @@ class Wiring(WiringBase):
     def outer_mapping(self) -> tuple[Wire, ...]:
         return self.__outer_mapping
 
-    def compose(self, wirings: SlotContents[Wiring]) -> Wiring:
+    def compose(self, wirings: Mapping[Slot, Wiring]) -> Wiring:
         """Composes this wiring with the given wirings for (some of) its slots."""
-        assert validate(wirings, SlotContents[Wiring])  # type: ignore[misc]
-        wirings = _slot_contents_to_tuple(self.num_slots, wirings)
+        assert validate(wirings, Mapping[Slot, Wiring])
+        slots, slot_shapes = self.slots, self.slot_shapes
+        for slot, wiring in wirings.items():
+            if slot not in slots:
+                raise ValueError(f"Invalid slot {slot}.")
+            if wiring is not None and wiring.shape != slot_shapes[slot]:
+                raise ValueError(
+                    f"Incompatible shape in wiring composition for slot {slot}:"
+                    f" expected slot shape {self.slot_shapes[slot]},"
+                    f" got a wiring of shape {wiring.shape}."
+                )
         return self._compose(wirings)
 
-    def _compose(self, wirings: tuple[Wiring | None, ...]) -> Wiring:
-        slot_shapes = self.slot_shapes
-        num_wires = self.num_wires
-        for slot, (slot_shape, wiring) in enumerate(zip(slot_shapes, wirings)):
-            if wiring is not None and wiring.shape != slot_shape:
-                raise ValueError(
-                    f"Incompatible shape in composition for slot {slot}:"
-                    f" expected slot shape {slot_shape},"
-                    f" got wiring shape {wiring.shape}."
-                )
+    def _compose(self, wirings: Mapping[Slot, Wiring]) -> Wiring:
+        slots, num_wires = self.slots, self.num_wires
         _wire_start_idx = list(
             accumulate(
                 [
                     num_wires,
                     *(
-                        wiring.num_wires if wiring is not None else 0
-                        for wiring in wirings
+                        wirings[slot].num_wires if slot in wirings else 0
+                        for slot in slots
                     ),
                 ]
             )
@@ -407,24 +443,24 @@ class Wiring(WiringBase):
             for start, end in zip(_wire_start_idx[:-1], _wire_start_idx[1:])
         ]
         new_wire_types = self.wire_types + Shape._concat(
-            tuple(wiring.wire_types for wiring in wirings if wiring is not None)
+            tuple(wirings[slot].wire_types for slot in slots if slot in wirings)
         )
         new_slots_data: list[tuple[Wiring, Slot, range]] = []
-        for slot, wiring in enumerate(wirings):
-            if wiring is None:
-                new_slots_data.append((self, slot, range(num_wires)))
-            else:
+        for slot in slots:
+            if slot in wirings:
+                wiring = wirings[slot]
                 new_slots_data.extend(
                     (wiring, wiring_slot, wiring_remappings[slot])
                     for wiring_slot in wiring.slots
                 )
+            else:
+                new_slots_data.append((self, slot, range(num_wires)))
         new_slot_shapes = tuple(
-            wiring.slot_shapes[wiring_slot]
-            for slot, (wiring, wiring_slot, remapping) in enumerate(new_slots_data)
+            wiring.slot_shapes[wiring_slot] for wiring, wiring_slot, _ in new_slots_data
         )
         new_slot_mappings = tuple(
             tuple(remapping[w] for w in wiring.slot_mappings[wiring_slot])
-            for slot, (wiring, wiring_slot, remapping) in enumerate(new_slots_data)
+            for wiring, wiring_slot, remapping in new_slots_data
         )
         return Wiring._new(
             new_slot_shapes,
@@ -467,7 +503,7 @@ class Wiring(WiringBase):
 
 @final
 class WiringBuilder(WiringBase):
-    """A wiring builder."""
+    """Utility class to build wirings."""
 
     __slot_shapes: list[list[Type]]
     __shape: list[Type]
@@ -475,12 +511,23 @@ class WiringBuilder(WiringBase):
     __slot_mappings: list[list[Wire]]
     __outer_mapping: list[Wire]
 
+    __slot_shapes_cache: tuple[Shape, ...] | None
+    __shape_cache: Shape | None
+    __wire_types_cache: Shape | None
+    __slot_mappings_cache: tuple[tuple[Wire, ...], ...] | None
+    __outer_mapping_cache: tuple[Wire, ...] | None
+
     __slots__ = (
         "__slot_shapes",
         "__shape",
         "__wire_types",
         "__slot_mappings",
         "__outer_mapping",
+        "__slot_shapes_cache",
+        "__shape_cache",
+        "__wire_types_cache",
+        "__slot_mappings_cache",
+        "__outer_mapping_cache",
     )
 
     def __new__(cls) -> Self:
@@ -495,23 +542,42 @@ class WiringBuilder(WiringBase):
 
     @property
     def slot_shapes(self) -> tuple[Shape, ...]:
-        return tuple(Shape(shape) for shape in self.__slot_shapes)
+        slot_shapes = self.__slot_shapes_cache
+        if slot_shapes is None:
+            self.__slot_shapes_cache = slot_shapes = tuple(
+                Shape._new(tuple(s)) for s in self.__slot_shapes
+            )
+        return slot_shapes
 
     @property
     def shape(self) -> Shape:
-        return Shape(self.__shape)
+        shape = self.__shape_cache
+        if shape is None:
+            self.__shape_cache = shape = Shape._new(tuple(self.__shape))
+        return shape
 
     @property
     def wire_types(self) -> Shape:
-        return Shape(self.__wire_types)
+        wire_types = self.__wire_types_cache
+        if wire_types is None:
+            self.__wire_types_cache = wire_types = Shape._new(tuple(self.__wire_types))
+        return wire_types
 
     @property
     def slot_mappings(self) -> tuple[tuple[Wire, ...], ...]:
-        return tuple(map(tuple, self.__slot_mappings))
+        slot_mappings = self.__slot_mappings_cache
+        if slot_mappings is None:
+            self.__slot_mappings_cache = slot_mappings = tuple(
+                map(tuple, self.__slot_mappings)
+            )
+        return slot_mappings
 
     @property
     def outer_mapping(self) -> tuple[Wire, ...]:
-        return tuple(self.__outer_mapping)
+        outer_mapping = self.__outer_mapping_cache
+        if outer_mapping is None:
+            self.__outer_mapping_cache = outer_mapping = tuple(self.__outer_mapping)
+        return outer_mapping
 
     @property
     def wiring(self) -> Wiring:
@@ -532,6 +598,11 @@ class WiringBuilder(WiringBase):
         clone.__wire_types = self.__wire_types.copy()
         clone.__slot_mappings = [m.copy() for m in self.__slot_mappings]
         clone.__outer_mapping = self.__outer_mapping.copy()
+        clone.__slot_shapes_cache = self.__slot_shapes_cache
+        clone.__shape_cache = self.__shape_cache
+        clone.__wire_types_cache = self.__wire_types_cache
+        clone.__slot_mappings_cache = self.__slot_mappings_cache
+        clone.__outer_mapping_cache = self.__outer_mapping_cache
         return clone
 
     def add_wire(self, t: Type) -> Wire:
@@ -545,6 +616,7 @@ class WiringBuilder(WiringBase):
         return self._add_wires(ts)
 
     def _add_wires(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
+        self.__wire_types_cache = None
         wire_types = self.__wire_types
         len_before = len(wire_types)
         wire_types.extend(ts)
@@ -569,25 +641,20 @@ class WiringBuilder(WiringBase):
         return self._add_outer_ports(wires)
 
     def _add_outer_ports(self, wires: Sequence[Wire]) -> tuple[Port, ...]:
+        self.__shape_cache = None
+        self.__outer_mapping_cache = None
         shape, wire_types = self.__shape, self.__wire_types
         len_before = len(shape)
         shape.extend(wire_types[wire] for wire in wires)
         self.__outer_mapping.extend(wires)
         return tuple(range(len_before, len(shape)))
 
-    def add_slot(self, wires: Sequence[Wire] = ()) -> Slot:
+    def add_slot(self) -> Slot:
         """Adds a new slot."""
-        assert validate(wires, Sequence[Wire])
+        self.__slot_shapes_cache = None
         slot_shapes = self.__slot_shapes
         k = len(slot_shapes)
         slot_shapes.append([])
-        if wires:
-            try:
-                self._validate_wires(wires)
-                self._add_slot_ports(k, wires)
-            except ValueError:
-                slot_shapes.pop()  # undo the slot addition
-                raise
         return k
 
     def add_slot_port(self, slot: Slot, wire: Wire) -> Port:
@@ -605,6 +672,8 @@ class WiringBuilder(WiringBase):
         return self._add_slot_ports(slot, wires)
 
     def _add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[Port, ...]:
+        self.__slot_shapes_cache = None
+        self.__slot_mappings_cache = None
         slot_shape, wire_types = self.__slot_shapes[slot], self.__wire_types
         len_before = len(slot_shape)
         slot_shape.extend(wire_types[w] for w in wires)
@@ -641,13 +710,6 @@ class Box(Shaped, ABC):
             raise TypeError("Cannot instantiate abstract class Box.")
         return super().__new__(cls)
 
-    @property
-    @abstractmethod
-    def shape(self) -> Shape:
-        """
-        The shape of the box.
-        """
-
 
 Block: TypeAlias = Box | "Diagram"
 """
@@ -666,17 +728,6 @@ class Diagram(Shaped):
     to (a subset of) the wiring's slots.
     """
 
-    @staticmethod
-    def _validate_slot_content_shapes(
-        wiring: Wiring, contents: tuple[Shaped | None, ...]
-    ) -> None:
-        for slot, (shape, content) in enumerate(zip(wiring.slot_shapes, contents)):
-            if content is not None and content.shape != shape:
-                raise ValueError(
-                    f"Incompatible shape for block at slot {slot}:"
-                    f" expected slot shape {shape}, got content shape {content.shape}."
-                )
-
     @classmethod
     def _new(cls, wiring: Wiring, blocks: tuple[Block | None, ...]) -> Self:
         """Protected constructor."""
@@ -692,13 +743,12 @@ class Diagram(Shaped):
 
     __slots__ = ("__weakref__", "__wiring", "__blocks", "__hash_cache")
 
-    def __new__(cls, wiring: Wiring, blocks: SlotContents[Block]) -> Self:
+    def __new__(cls, wiring: Wiring, blocks: Mapping[Slot, Block]) -> Self:
         """Constructs a new diagram from a wiring and blocks for (some of) its slots."""
         assert validate(wiring, Wiring)
-        assert validate(blocks, SlotContents[Block])  # type: ignore[misc]
-        blocks = _slot_contents_to_tuple(wiring.num_slots, blocks)
-        Diagram._validate_slot_content_shapes(wiring, blocks)
-        return cls._new(wiring, blocks)
+        wiring.validate_slot_data(blocks)
+        _blocks = tuple(map(blocks.get, wiring.slots))
+        return cls._new(wiring, _blocks)
 
     @property
     def wiring(self) -> Wiring:
@@ -724,6 +774,11 @@ class Diagram(Shaped):
         return tuple(slot for slot, block in enumerate(self.blocks) if block is None)
 
     @property
+    def num_open_slots(self) -> int:
+        """Number of open slots in the diagram."""
+        return self.blocks.count(None)
+
+    @property
     def subdiagram_slots(self) -> tuple[Slot, ...]:
         """Slots of the diagram wiring which have a diagram as a block."""
         return tuple(
@@ -747,40 +802,59 @@ class Diagram(Shaped):
         """Boxes associated to the slots in :prop:`box_slots`."""
         return tuple(block for block in self.blocks if isinstance(block, Box))
 
-    def compose(self, new_blocks: SlotContents[Block | Wiring]) -> Diagram:
+    @property
+    def is_flat(self) -> bool:
+        """Whether the diagram is flat, i.e., it has no sub-diagrams."""
+        return not any(isinstance(block, Diagram) for block in self.blocks)
+
+    @property
+    def depth(self) -> int:
+        """Nesting depth of the diagram."""
+        subdiagrams = self.subdiagrams
+        if not subdiagrams:
+            return 0
+        return 1 + max(diag.depth for diag in subdiagrams)
+
+    def compose(self, new_blocks: Mapping[Slot, Block | Wiring]) -> Diagram:
         """
         Composes this wiring with the given boxes, diagrams and/or wirings
         for (some of) its slots.
         """
-        assert validate(new_blocks, SlotContents[Block | Wiring])  # type: ignore[misc]
+        assert validate(new_blocks, Mapping[Slot, Block | Wiring])
         curr_wiring = self.wiring
-        new_blocks = _slot_contents_to_tuple(curr_wiring.num_slots, new_blocks)
-        Diagram._validate_slot_content_shapes(curr_wiring, new_blocks)
+        curr_wiring.validate_slot_data(new_blocks)
         curr_blocks = self.blocks
-        for slot, (curr_block, new_block) in enumerate(zip(curr_blocks, new_blocks)):
-            if curr_block is not None and new_block is not None:
-                if curr_block is not new_block:
-                    raise ValueError(f"Slot {slot} is already occupied.")
+        for slot in new_blocks.keys():
+            if curr_blocks[slot] is not None:
+                raise ValueError(f"Slot {slot} is not open.")
         merged_wiring = curr_wiring.compose(
-            tuple(block if isinstance(block, Wiring) else None for block in new_blocks)
+            {
+                slot: block
+                for slot, block in new_blocks.items()
+                if isinstance(block, Wiring)
+            }
         )
-        merged_blocks = tuple(
-            (
-                curr_block
-                if curr_block is not None
-                else new_block if isinstance(new_block, (Box, Diagram)) else None
-            )
-            for curr_block, new_block in zip(curr_blocks, new_blocks)
-        )
-        return Diagram._new(merged_wiring, merged_blocks)
+        merged_blocks: list[Block | None] = []
+        for slot, curr_block in enumerate(curr_blocks):
+            if curr_block is not None:
+                merged_blocks.append(curr_block)
+            elif (new_block := new_blocks[slot]) is not None:
+                if isinstance(new_block, (Box, Diagram)):
+                    merged_blocks.append(new_block)
+                else:
+                    merged_blocks.extend([None] * new_block.num_slots)
+            else:
+                merged_blocks.append(None)
+        return Diagram._new(merged_wiring, tuple(merged_blocks))
 
-    def flatten(self) -> Diagram:
+    def flatten(self, *, cache: bool = True) -> Diagram:
         """
         Returns a recursively diagram, obtained by recursively flattening all
         sub-diagrams, composing their wirings into the current wiring, and taking
         all blocks (of this diagrams and its sub-diagrams) as the blocks of the result.
         """
-        return self._flatten({})
+        assert validate(cache, bool)
+        return self._flatten({} if cache else None)
 
     def _flatten(self, cache: dict[Diagram, Diagram] | None) -> Diagram:
         if cache is not None and self in cache:
