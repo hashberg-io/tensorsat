@@ -18,7 +18,7 @@ Hybrid diagrams for compact closed categories.
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from itertools import accumulate
 from types import MappingProxyType
 from typing import (
@@ -729,6 +729,88 @@ class Diagram(Shaped):
     to (a subset of) the wiring's slots.
     """
 
+    @staticmethod
+    def from_recipe(
+        input_types: Sequence[Type],
+    ) -> Callable[
+        [Callable[[DiagramBuilder, tuple[Wire, ...]], Sequence[Wire]]], Diagram
+    ]:
+        """
+        Given an input shape, returns a function decorator which makes it possible
+        to define a diagram by providing a building recipe.
+        For example, the snippet below creates the :class:`Diagram` instance ``hadd``
+        for a half-adder circuit, by wrapping a recipe using a diagram builder
+        internally:
+
+        .. code-block:: python
+
+            from typing import reveal_type
+            from quetz.langs.rel import bit
+            from quetz.libs.bincirc import and_, or_, xor_
+
+            @Diagram.from_recipe(bit*3)
+            def hadd(circ: DiagramBuilder, inputs: Sequence[Wire]) -> Sequence[Wire]:
+                a, b, c_in = inputs
+                x1, = xor_ @ circ[a, b]
+                x2, = and_ @ circ[a, b]
+                x3, = and_ @ circ[x1, c_in]
+                s, = xor_ @ circ[x1, x3]
+                c_out, = or_ @ circ[x2, x3]
+                return s, c_out
+
+            reveal_type(hadd) # Diagram
+
+        The diagram creation process is as follows:
+
+        1. A blank diagram builder is created.
+        2. Inputs of the given types are added to the builder.
+        3. The recipe is called on the builder and input wires.
+        4. The recipe returns the output wires.
+        5. The outputs are added to the builder.
+        6. The diagram is created from the builder and returned.
+
+        """
+        return lambda recipe: DiagramRecipe(recipe)(input_types)
+
+    @staticmethod
+    def recipe(
+        recipe: Callable[[DiagramBuilder, tuple[Wire, ...]], Sequence[Wire]]
+    ) -> DiagramRecipe:
+        """
+        Returns a function decorator which makes it possible to define diagrams
+        by providing a building recipe:
+
+        .. code-block:: python
+
+            @Diagram.recipe
+            def ripply_carry_adder(
+                circ: CircuitBuilder,
+                inputs: Sequence[Wire]
+            ) -> Sequence[Wire]:
+                if len(inputs) % 2 != 1:
+                    raise ValueError("Ripple carry adder expects odd number of inputs.")
+                num_bits = len(inputs) // 2
+                outputs: list[int] = []
+                c = inputs[0]
+                for i in range(num_bits):
+                    a, b = inputs[2 * i + 1 : 2 * i + 3]
+                    s, c = full_adder @ circ[c, a, b]
+                    outputs.append(s)
+                outputs.append(c)
+                return tuple(outputs)
+
+            # ...later on, applying a 2-bit RCA at some point of some circuit...
+            s0, s1, c_out = ripply_carry_adder @ some_circuit[c_in, a0, b0, a1, b1]
+
+        Unlike the :func:`Diagram.from_recipe`, where decoration resulted in a
+        fixed :class:`Diagram` instance, this decorator returns a
+        :class:`DiagramRecipe` object, which creates an actual diagram just-in-time
+        at the point of application to selected diagram builder wires.
+
+        """
+
+        return DiagramRecipe(recipe)
+
     @classmethod
     def _new(cls, wiring: Wiring, blocks: tuple[Block | None, ...]) -> Self:
         """Protected constructor."""
@@ -1117,3 +1199,55 @@ class SelectedInputWires:
         else:
             wires = MappingProxyType(dict(enumerate(self.__wires)))
         return self.__builder.add_block(block, wires)
+
+
+@final
+class DiagramRecipe:
+    """
+    Utility class wrapping diagram building logic, which can be executed on
+    demand for given input types.
+
+    Supports usage of the ``@`` operator with selected input wires on the rhs,
+    analogously to the special block addition syntax for diagram builders.
+
+    See the :func:`Diagram.from_recipe` and :func:`Diagram.recipe` decorators for
+    examples of how this works.
+    """
+
+    __recipe: Callable[[DiagramBuilder, tuple[Wire, ...]], Sequence[Wire]]
+
+    __slots__ = ("__weakref__", "__recipe")
+
+    def __new__(
+        cls, recipe: Callable[[DiagramBuilder, tuple[Wire, ...]], Sequence[Wire]]
+    ) -> Self:
+        """Wraps the given diagram building logic."""
+        self = super().__new__(cls)
+        self.__recipe = recipe
+        return self
+
+    def __call__(self, input_types: Sequence[Type]) -> Diagram:
+        """Executes the recipe for the given input types, returning the diagram."""
+        builder = DiagramBuilder()
+        inputs = builder._add_inputs(input_types)
+        outputs = self.__recipe(builder, inputs)
+        builder._add_outputs(outputs)
+        return builder.diagram
+
+    def __matmul__(self, selected: SelectedInputWires) -> tuple[Wire, ...]:
+        """
+        Executes the recipe for the input types specified by the selected input wires,
+        then adds the diagram resulting from the recipe as a block in the the broader
+        diagram being built, connected to the given input wires, and returns the
+        resulting output wires.
+        """
+        selected_wires = selected.wires
+        num_ports = len(selected_wires)
+        if set(selected_wires) != set(range(num_ports)):
+            raise ValueError("Selected ports must form a contiguous zero-based range.")
+        wire_types = selected.builder.wiring.wire_types
+        input_types = tuple(
+            wire_types[selected_wires[port]] for port in range(num_ports)
+        )
+        diagram = self(input_types)
+        return diagram @ selected
