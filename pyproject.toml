@@ -1,4 +1,10 @@
+[project]
+name = "tensorsat"
+version = "0.0.0"
+description = "A SAT solver using tensor networks."
+dependencies = ["numpy", "hashcons", "typing-validation"]
+
 [tool.mypy]
 
+python_version = "3.13"
 strict = true
-enable_incomplete_feature = ["NewGenericSyntax"]
