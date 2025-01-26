@@ -23,6 +23,7 @@ from itertools import accumulate
 from types import MappingProxyType
 from typing import (
     Any,
+    ClassVar,
     Generic,
     Self,
     Type as SubclassOf,
@@ -33,6 +34,7 @@ from typing import (
     final,
     overload,
 )
+from hashcons import InstanceStore
 
 if __debug__:
     from typing_validation import validate
@@ -88,6 +90,8 @@ TypeT_inv = TypeVar("TypeT_inv", bound=Type)
 class Shape(Generic[TypeT_co]):
     """A Shape, as a finite tuple of types."""
 
+    __store: ClassVar[InstanceStore] = InstanceStore()
+
     @classmethod
     def prod(cls, shapes: Iterable[Shape[TypeT_co]], /) -> Shape[TypeT_co]:
         """Takes the product of multiple shapes, i.e. concatenates their types."""
@@ -106,8 +110,11 @@ class Shape(Generic[TypeT_co]):
     @classmethod
     def _new(cls, components: tuple[TypeT_co, ...]) -> Self:
         """Protected constructor."""
-        self = super().__new__(cls)
-        self.__components = components
+        with Shape.__store.instance(cls, components) as self:
+            if self is None:
+                self = super().__new__(cls)
+                self.__components = components
+                Shape.__store.register(self)
         return self
 
     def __new__(cls, components: Iterable[TypeT_co]) -> Self:
@@ -326,6 +333,8 @@ class WiringBase(Shaped[TypeT_co], Slotted[TypeT_co], ABC):
 class Wiring(WiringBase[TypeT_co]):
     """An immutable wiring."""
 
+    __store: ClassVar[InstanceStore] = InstanceStore()
+
     @classmethod
     def _new(
         cls,
@@ -336,20 +345,29 @@ class Wiring(WiringBase[TypeT_co]):
         outer_mapping: tuple[Wire, ...],
     ) -> Self:
         """Protected constructor."""
-        self = super().__new__(cls)
-        self.__slot_shapes = slot_shapes
-        self.__shape = shape
-        self.__wire_types = wire_types
-        self.__slot_mappings = slot_mappings
-        self.__outer_mapping = outer_mapping
-        return self
+        instance_key = (
+            slot_shapes,
+            shape,
+            wire_types,
+            slot_mappings,
+            outer_mapping,
+        )
+        with Wiring.__store.instance(cls, instance_key) as self:
+            if self is None:
+                self = super().__new__(cls)
+                self.__slot_shapes = slot_shapes
+                self.__shape = shape
+                self.__wire_types = wire_types
+                self.__slot_mappings = slot_mappings
+                self.__outer_mapping = outer_mapping
+                Wiring.__store.register(self)
+            return self
 
     __slot_shapes: tuple[Shape[TypeT_co], ...]
     __shape: Shape[TypeT_co]
     __wire_types: Shape[TypeT_co]
     __slot_mappings: tuple[tuple[Wire, ...], ...]
     __outer_mapping: tuple[Wire, ...]
-    __hash_cache: int
 
     __slots__ = (
         "__slot_shapes",
@@ -357,7 +375,6 @@ class Wiring(WiringBase[TypeT_co]):
         "__wire_types",
         "__slot_mappings",
         "__outer_mapping",
-        "__hash_cache",
     )
 
     def __new__(cls, data: WiringData[TypeT_co]) -> Self:
@@ -483,37 +500,6 @@ class Wiring(WiringBase[TypeT_co]):
             new_slot_mappings,
             self.outer_mapping,
         )
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Wiring):
-            return NotImplemented
-        return all(
-            getattr(self, attr) == getattr(other, attr)
-            for attr in (
-                "slot_shapes",
-                "shape",
-                "wire_types",
-                "slot_mappings",
-                "outer_mapping",
-            )
-        )
-
-    def __hash__(self) -> int:
-        try:
-            return self.__hash_cache
-        except AttributeError:
-            self.__hash_cache = h = hash(
-                (
-                    Wiring,
-                    self.slot_shapes,
-                    self.shape,
-                    self.wire_types,
-                    self.slot_mappings,
-                    self.outer_mapping,
-                )
-            )
-            return h
-
 
 @final
 class WiringBuilder[T:Type](WiringBase[T]):
@@ -724,7 +710,6 @@ class Box(Shaped[TypeT_co], ABC):
             raise TypeError("Cannot instantiate abstract class Box.")
         return super().__new__(cls)
 
-
 type Block[T:Type] = Box[T] | Diagram[T]
 """
 Type alias for a block in a diagram, which can be either:
@@ -740,6 +725,8 @@ class Diagram(Shaped[TypeT_co]):
     A diagram, consisting of a :class:`Wiring` together with :obj:`Block`s associated
     to (a subset of) the wiring's slots.
     """
+
+    __store: ClassVar[InstanceStore] = InstanceStore()
 
     @staticmethod
     def from_recipe[T:Type](
@@ -826,17 +813,18 @@ class Diagram(Shaped[TypeT_co]):
     @classmethod
     def _new(cls, wiring: Wiring[TypeT_co], blocks: tuple[Block[TypeT_co] | None, ...]) -> Self:
         """Protected constructor."""
-        self = super().__new__(cls)
-        self.__wiring = wiring
-        self.__blocks = blocks
-        return self
+        with Diagram.__store.instance(cls, (wiring, blocks)) as self:
+            if self is None:
+                self = super().__new__(cls)
+                self.__wiring = wiring
+                self.__blocks = blocks
+                Diagram.__store.register(self)
+            return self
 
     __wiring: Wiring[TypeT_co]
     __blocks: tuple[Box[TypeT_co] | Diagram[TypeT_co] | None, ...]
 
-    __hash_cache: int
-
-    __slots__ = ("__weakref__", "__wiring", "__blocks", "__hash_cache")
+    __slots__ = ("__weakref__", "__wiring", "__blocks")
 
     def __new__(cls, wiring: Wiring[TypeT_co], blocks: Mapping[Slot, Block[TypeT_co]]) -> Self:
         """Constructs a new diagram from a wiring and blocks for (some of) its slots."""
@@ -972,18 +960,6 @@ class Diagram(Shaped[TypeT_co]):
         if cache is not None:
             cache[self] = flat_diagram
         return self
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Diagram):
-            return NotImplemented
-        return self.wiring == other.wiring and self.blocks == other.blocks
-
-    def __hash__(self) -> int:
-        try:
-            return self.__hash_cache
-        except AttributeError:
-            self.__hash_cache = h = hash((Diagram, self.wiring, self.blocks))
-            return h
 
 
 @final
