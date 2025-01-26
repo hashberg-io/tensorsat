@@ -5,8 +5,6 @@ This includes cases where multiple compact-closed categories coexist in the same
 diagram, and the case where contraction includes selected intermediate rewriting steps.
 """
 
-# TensorSAT - SMT solvers based on hyper-optimised diagrammatic contraction
-
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
