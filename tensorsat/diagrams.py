@@ -31,6 +31,7 @@ from typing import (
     Generic,
     Self,
     Type as SubclassOf,
+    TypeAlias,
     TypeVar,
     TypedDict,
     cast,
@@ -182,13 +183,13 @@ class Shape(Generic[TypeT_co]):
         return hash((Shape, self.__components))
 
 
-type Slot = int
+Slot: TypeAlias = int
 """Type alias for (the index of) a slot in a diagram."""
 
-type Port = int
+Port: TypeAlias = int
 """Type alias for (the index of) a port in a diagram."""
 
-type Wire = int
+Wire: TypeAlias = int
 """
 Type alias for (the index of) a wire in a diagram.
 Each port is connected to exactly one wire, but a wire can connect any number of ports.
@@ -887,7 +888,7 @@ class Diagram(Shaped[TypeT_co]):
         .. code-block:: python
 
             @Diagram.recipe
-            def ripply_carry_adder(
+            def ripple_carry_adder(
                 circ: CircuitBuilder,
                 inputs: Sequence[Wire]
             ) -> Sequence[Wire]:
