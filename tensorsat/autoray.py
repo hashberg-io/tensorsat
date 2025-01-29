@@ -3,11 +3,17 @@ Top-level functions for the TensorSAT package, for use by the :mod:`autoray` pac
 """
 
 from collections.abc import Sequence
-from .diagrams import BoxT_inv
+from .diagrams import Box, BoxT_inv
+
+if __debug__:
+    from typing_validation import validate
 
 
 def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
     """Contracts boxes using einsum notation."""
+    assert validate(contraction, str)
+    assert validate(lhs, Box)
+    assert validate(rhs, Box)
     cls = type(lhs)
     if not isinstance(rhs, cls):
         raise NotImplementedError(
@@ -25,6 +31,8 @@ def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
     return cls.contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
 
 
-def transpose(rel: BoxT_inv, perm: Sequence[int], /) -> BoxT_inv:
+def transpose(box: BoxT_inv, perm: Sequence[int], /) -> BoxT_inv:
     """Rearranges the ports of a box."""
-    return rel.transpose(perm)
+    assert validate(box, Box)
+    assert validate(perm, Sequence[int])
+    return box.transpose(perm)

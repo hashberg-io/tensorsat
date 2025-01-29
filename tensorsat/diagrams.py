@@ -1260,7 +1260,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         self.wiring._add_outer_ports(wires)
 
     def __getitem__(
-        self, wires: Sequence[Wire] | Mapping[Port, Wire]
+        self, wires: Wire | Sequence[Wire] | Mapping[Port, Wire]
     ) -> SelectedInputWires[TypeT_inv]:
         """
         Enables special syntax for addition of blocks to the diagram:
@@ -1316,11 +1316,13 @@ class SelectedInputWires(Generic[TypeT_inv]):
     def __new__(
         cls,
         builder: DiagramBuilder[TypeT_inv],
-        wires: Sequence[Wire] | Mapping[Port, Wire],
+        wires: Wire | Sequence[Wire] | Mapping[Port, Wire],
     ) -> Self:
         assert validate(builder, DiagramBuilder)
         _wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
-        if isinstance(wires, Mapping):
+        if isinstance(wires, Wire):
+            _wires = (wires,)
+        elif isinstance(wires, Mapping):
             assert validate(wires, Mapping[Port, Wire])
             _wires = MappingProxyType({**wires})
         else:
