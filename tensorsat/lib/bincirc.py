@@ -1,4 +1,4 @@
-"""Library of binary operations and binary circuits."""
+"""Library of boxes and diagrams for binary circuits."""
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -19,31 +19,28 @@ from ..diagrams import Diagram, DiagramBuilder, Wire
 from ..lang.fin_rel import FinSet, FinRel
 
 bit = FinSet(2)
-"""Set {0, 1} of binary values."""
+"""The set {0, 1} of binary values."""
 
 not_ = FinRel.from_callable(bit, bit, lambda t: 1 - t[0])
-"""Binary NOT operation."""
+"""The NOT gate."""
 
 and_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] & t[1])
-"""Binary AND operation."""
+"""The AND gate."""
 
 or_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] | t[1])
-"""Binary OR operation."""
+"""The OR gate."""
 
 xor_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] ^ t[1])
-"""Binary XOR operation."""
+"""The XOR gate."""
 
 bit_0 = FinRel.singleton(bit, 0)
-"""Constant binary value 0."""
+"""The constant binary value 0."""
 
 bit_1 = FinRel.singleton(bit, 1)
-"""Constant binary value 1."""
+"""The constant binary value 1."""
 
 bit_unk = FinRel.from_set(bit, {0, 1})
-"""
-Set ``{0, 1}`` containing both binary values.
-Used to indicate that a bit has unknown value.
-"""
+"""Relation representing an unknown binary value."""
 
 
 @Diagram.from_recipe(bit**2)
