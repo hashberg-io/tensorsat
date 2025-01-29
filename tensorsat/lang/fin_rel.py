@@ -50,17 +50,21 @@ def _wrap_el(el_or_point: El | Point, /) -> Point:
     assert validate(el_or_point, Point)
     return el_or_point
 
+
 type ItemOrIterable[T] = T | Iterable[T]
 
-def _extract_sizes(sizes_or_finsets: ItemOrIterable[Size | FinSet], /) -> tuple[Size, ...]:
+
+def _extract_sizes(
+    sizes_or_finsets: ItemOrIterable[Size | FinSet], /
+) -> tuple[Size, ...]:
     if isinstance(sizes_or_finsets, int):
         return (sizes_or_finsets,)
     if isinstance(sizes_or_finsets, FinSet):
         return (sizes_or_finsets.size,)
     return tuple(
-        size if isinstance(size, int) else size.size
-        for size in sizes_or_finsets
+        size if isinstance(size, int) else size.size for size in sizes_or_finsets
     )
+
 
 @final
 class FinSet(Type):
@@ -296,7 +300,7 @@ class FinRel(Box[FinSet]):
         if not all(p in ports for p in input_ports):
             raise ValueError("Invalid input ports.")
         output_ports = [p for p in ports if p not in input_ports]
-        transposed_tensor = np.transpose(self.__tensor, input_ports+output_ports)
+        transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
         matrix = transposed_tensor.reshape(prod(input_ports), prod(output_ports))
         return bool(np.all(np.count_nonzero(matrix, axis=1) == 1))
 

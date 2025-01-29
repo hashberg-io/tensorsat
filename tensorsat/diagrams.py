@@ -854,7 +854,10 @@ class Diagram(Shaped[TypeT_co]):
             from tensorsat.lib.bincirc import and_, or_, xor_
 
             @Diagram.from_recipe(bit**3)
-            def adder(circ: DiagramBuilder, inputs: Sequence[Wire]) -> Sequence[Wire]:
+            def adder(
+                circ: DiagramBuilder[FinSet],
+                inputs: Sequence[Wire]
+            ) -> Sequence[Wire]:
                 a, b, c_in = inputs
                 x1, = xor_ @ circ[a, b]
                 x2, = and_ @ circ[a, b]
@@ -889,7 +892,7 @@ class Diagram(Shaped[TypeT_co]):
 
             @Diagram.recipe
             def ripple_carry_adder(
-                circ: CircuitBuilder,
+                circ: DiagramBuilder[FinSet],
                 inputs: Sequence[Wire]
             ) -> Sequence[Wire]:
                 if len(inputs) % 2 != 1:
