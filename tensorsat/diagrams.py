@@ -73,7 +73,11 @@ class Type:
         return self._spider(num_ports)
 
     @abstractmethod
-    def _spider(self, num_ports: int) -> Box[Self]: ...
+    def _spider(self, num_ports: int) -> Box[Self]:
+        """
+        Protected version of :meth:`Type.spider`, to be implemented by subclasses.
+        It is guaranteed that ``num_ports`` is strictly positive.
+        """
 
     @final
     def __mul__[T: Self, _T: Type](self: T, other: _T | Shape[_T]) -> Shape[T | _T]:
@@ -760,7 +764,15 @@ class Box(Shaped[TypeT_co], ABC):
         rhs: Self,
         rhs_wires: Sequence[Wire],
         out_wires: Sequence[Wire],
-    ) -> Self: ...
+    ) -> Self:
+        """
+        Protected version of :meth:`Box.contract2`, to be implemented by subclasses.
+        It is guaranteed that:
+        - The length of ``lhs_wires`` matches the length of ``lhs.shape``
+        - The length of ``rhs_wires`` matches the length of ``rhs.shape``
+        - Indices in ``out_wires`` are not repeated
+        - Every index in ``out_wires`` appears in ``lhs_wires`` or ``rhs_wires``
+        """
 
     __slots__ = ("__weakref__",)
 
@@ -781,7 +793,11 @@ class Box(Shaped[TypeT_co], ABC):
         return self._transpose(perm)
 
     @abstractmethod
-    def _transpose(self, perm: Sequence[Port]) -> Self: ...
+    def _transpose(self, perm: Sequence[Port]) -> Self:
+        """
+        Protected version of :meth:`Box.transpose`, to be implemented by subclasses.
+        It is guaranteed that ``perm`` is a permutation of ``range(self.ports)``.
+        """
 
     def __mul__(self, other: Self) -> Self:
         """
