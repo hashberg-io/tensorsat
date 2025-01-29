@@ -50,6 +50,11 @@ def _wrap_el(el_or_point: El | Point, /) -> Point:
     assert validate(el_or_point, Point)
     return el_or_point
 
+def _extract_sizes(sizes_or_finsets: Iterable[Size | FinSet], /) -> tuple[Size, ...]:
+    return tuple(
+        size if isinstance(size, int) else size.size
+        for size in sizes_or_finsets
+    )
 
 @final
 class FinSet(Type):
@@ -113,11 +118,12 @@ class FinRel(Box[FinSet]):
     @classmethod
     def from_set(
         cls,
-        shape: Iterable[Size],
+        shape: Iterable[Size | FinSet],
         points: Iterable[El | Point],
     ) -> Self:
         """Constructs a relation from a set of points."""
-        shape = tuple(shape)
+        shape = _extract_sizes(shape)
+        assert validate(shape, tuple[Size, ...])
         data = np.zeros(shape, dtype=np.uint8)
         if any(dim == 0 for dim in data.shape):
             raise ValueError("Zero dimension in shape.")
@@ -135,16 +141,16 @@ class FinRel(Box[FinSet]):
     @classmethod
     def from_mapping(
         cls,
-        input_shape: Iterable[Size],
-        output_shape: Iterable[Size],
+        input_shape: Iterable[Size | FinSet],
+        output_shape: Iterable[Size | FinSet],
         mapping: Mapping[Point, El | Point],
     ) -> Self:
         """
         Constructs a function graph from a mapping of points to points.
         The relation shape is given by ``input_shape + output_shape``.
         """
-        input_shape = tuple(input_shape)
-        output_shape = tuple(output_shape)
+        input_shape = _extract_sizes(input_shape)
+        output_shape = _extract_sizes(output_shape)
         rel = cls.from_set(
             input_shape + output_shape, (k + _wrap_el(v) for k, v in mapping.items())
         )
@@ -155,21 +161,21 @@ class FinRel(Box[FinSet]):
     @classmethod
     def singleton(cls, shape: Iterable[Size], point: El | Point) -> Self:
         """Constructs a singleton relation with the given point."""
-        return cls.from_mapping(Shape(()), shape, {(): point})
+        return cls.from_mapping((), shape, {(): point})
 
     @classmethod
     def from_callable(
         cls,
-        input_shape: Iterable[Size],
-        output_shape: Iterable[Size],
+        input_shape: Iterable[Size | FinSet],
+        output_shape: Iterable[Size | FinSet],
         func: Callable[[Point], El | Point],
     ) -> Self:
         """
         Constructs a function graph from a callable mapping points to points
         The relation shape is given by ``input_shape + output_shape``.
         """
-        input_shape = tuple(input_shape)
-        output_shape = tuple(output_shape)
+        input_shape = _extract_sizes(input_shape)
+        output_shape = _extract_sizes(output_shape)
         mapping = {idx: func(idx) for idx in np.ndindex(input_shape)}
         return cls.from_mapping(input_shape, output_shape, mapping)
 
@@ -177,10 +183,13 @@ class FinRel(Box[FinSet]):
     def from_wiring(
         cls,
         outer_mapping: Sequence[Wire],
-        wire_sizes: Mapping[Port, Size],
+        wire_types: Mapping[Port, Size | FinSet],
     ) -> Self:
         """Creates the spider relation for the given wiring."""
         # 1. Extract and validate wires and their sizes:
+        assert validate(outer_mapping, Sequence[Wire])
+        assert validate(wire_types, Mapping[Port, Size | FinSet])
+        wire_sizes = dict(zip(wire_types.keys(), _extract_sizes(wire_types.values())))
         wires = sorted(set(outer_mapping))
         for wire in wires:
             if wire not in wire_sizes:
