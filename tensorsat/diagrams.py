@@ -21,7 +21,7 @@ wired together (cf. :class:`Wiring`) in such a way as to respect the types
 
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from itertools import accumulate, chain
 from types import MappingProxyType
@@ -54,12 +54,14 @@ class Type:
     same diagram.
     """
 
+    __final__: ClassVar[bool] = False
+
     __slots__ = ("__weakref__",)
 
     def __new__(cls) -> Self:
         """Constructs a new type."""
-        if cls is Type:
-            raise TypeError("Cannot instantiate abstract class Type.")
+        if not cls.__final__:
+            raise TypeError("Only final subclasses of Type can be instantiated.")
         return super().__new__(cls)
 
     @final
@@ -706,10 +708,31 @@ class WiringBuilder[T: Type](WiringBase[T]):
         return tuple(range(len_before, len(slot_shape)))
 
 
-class Box(Shaped[TypeT_co], ABC):
+class BoxMeta(ABCMeta):
+    def __new__(
+        mcs,
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+        **kwargs: Any,
+    ) -> BoxMeta:
+        cls = super().__new__(mcs, name, bases, namespace)
+        if not cls.__abstractmethods__:
+            try:
+                import autoray  # type: ignore
+
+                autoray.register_backend(cls, "tensorsat.autoray")
+            except ModuleNotFoundError:
+                pass
+        return cls
+
+
+class Box(Shaped[TypeT_co], metaclass=BoxMeta):
     """
     Abstract base class for boxes in diagrams.
     """
+
+    __final__: ClassVar[bool] = False
 
     @final
     @classmethod
@@ -788,8 +811,8 @@ class Box(Shaped[TypeT_co], ABC):
 
     def __new__(cls) -> Self:
         """Constructs a new box."""
-        if cls is Box:
-            raise TypeError("Cannot instantiate abstract class Box.")
+        if not cls.__final__:
+            raise TypeError("Only final subclasses of Box can be instantiated.")
         self = super().__new__(cls)
         self.__recipe_used = None
         return self
@@ -1369,7 +1392,7 @@ class DiagramRecipe(Generic[TypeT_inv]):
         outputs = self.__recipe(builder, inputs)
         builder._add_outputs(outputs)
         diagram = builder.diagram
-        diagram._Diagram__recipe_used = self # type: ignore[attr-defined]
+        diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
         return diagram
 
     def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
@@ -1390,12 +1413,14 @@ class DiagramRecipe(Generic[TypeT_inv]):
         diagram = self(input_types)
         return diagram @ selected
 
-BoxT_inv = TypeVar("BoxT_inv", bound=Box[Type], covariant=True)
+
+BoxT_inv = TypeVar("BoxT_inv", bound=Box[Type])
 """
 Invariant type variables for box classes.
 
 (A generic type variable would be perfect here, but Python doesn't have those yet...)
 """
+
 
 @final
 class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
@@ -1431,8 +1456,8 @@ class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
         """
         box = self.__recipe(Shape(shape))
         if not hasattr(box, "_Box__recipe_used"):
-            box._Box__recipe_used = self # type: ignore[attr-defined]
-        assert box._Box__recipe_used is self, ( # type: ignore[attr-defined]
+            box._Box__recipe_used = self  # type: ignore[attr-defined]
+        assert box._Box__recipe_used is self, (  # type: ignore[attr-defined]
             "Box recipe set incorrectly."
         )
         return box
@@ -1454,4 +1479,3 @@ class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
         )
         box = cast(Box[TypeT_inv], self(input_types))
         return box @ selected
-

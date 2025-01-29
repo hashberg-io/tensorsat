@@ -25,6 +25,7 @@ from typing import Any, ClassVar, Self, TypeAlias, final
 import numpy as np
 from hashcons import InstanceStore
 import xxhash
+
 from ..diagrams import Port, Shape, Type, Box, Wire
 
 if __debug__:
