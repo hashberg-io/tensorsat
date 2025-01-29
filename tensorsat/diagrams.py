@@ -61,6 +61,7 @@ class Type:
             raise TypeError("Cannot instantiate abstract class Type.")
         return super().__new__(cls)
 
+    @final
     def spider(self, num_ports: int) -> Box[Self]:
         """
         The box corresponding to a single wire connected to the given number of ports,
@@ -736,11 +737,18 @@ class Box(Shaped[TypeT_co], ABC):
                     out_wires.append(w)
                     excluded.add(w)
         else:
-            if len(out_wires) != len(set(out_wires)):
+            out_wires_set = set(out_wires)
+            if len(out_wires) != len(out_wires_set):
                 raise NotImplementedError("Output wires cannot be repeated.")
                 # TODO: This is not ordinarily handled by einsum,
                 #       but it is pretty natural in the context of the wirings we use,
                 #       so we might wish to add support for it in the future.
+            out_wires_set.difference_update(lhs_wires)
+            out_wires_set.difference_update(rhs_wires)
+            if out_wires_set:
+                raise ValueError(
+                    "Every output wire must appear in LHR or RHS."
+                )
         return cls._contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
 
     @classmethod
@@ -761,6 +769,19 @@ class Box(Shaped[TypeT_co], ABC):
         if cls is Box:
             raise TypeError("Cannot instantiate abstract class Box.")
         return super().__new__(cls)
+
+    @final
+    def transpose(self, perm: Sequence[Port]) -> Self:
+        """Transposes the output ports into the given order."""
+        assert validate(perm, Sequence[Port])
+        if len(perm) != self.num_ports or set(perm) != set(self.ports):
+            raise ValueError(
+                "Input to transpose method must be a permutation of the box ports."
+            )
+        return self._transpose(perm)
+
+    @abstractmethod
+    def _transpose(self, perm: Sequence[Port]) -> Self: ...
 
     def __mul__(self, other: Self) -> Self:
         """
