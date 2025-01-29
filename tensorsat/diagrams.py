@@ -102,7 +102,7 @@ TypeT_inv = TypeVar("TypeT_inv", bound=Type)
 
 
 @final
-class Shape(Generic[TypeT_co]):
+class Shape(Sequence[TypeT_co]):
     """A Shape, as a finite tuple of types."""
 
     _store: ClassVar[InstanceStore] = InstanceStore()
@@ -844,17 +844,17 @@ class Diagram(Shaped[TypeT_co]):
         Given an input shape, returns a function decorator which makes it possible
         to define a diagram by providing a building recipe.
         For example, the snippet below creates the :class:`Diagram` instance ``hadd``
-        for a half-adder circuit, by wrapping a recipe using a diagram builder
+        for a full-adder circuit, by wrapping a recipe using a diagram builder
         internally:
 
         .. code-block:: python
 
             from typing import reveal_type
-            from quetz.langs.rel import bit
-            from quetz.libs.bincirc import and_, or_, xor_
+            from tensorsat.lang.rel import bit
+            from tensorsat.lib.bincirc import and_, or_, xor_
 
-            @Diagram.from_recipe(bit*3)
-            def hadd(circ: DiagramBuilder, inputs: Sequence[Wire]) -> Sequence[Wire]:
+            @Diagram.from_recipe(bit**3)
+            def adder(circ: DiagramBuilder, inputs: Sequence[Wire]) -> Sequence[Wire]:
                 a, b, c_in = inputs
                 x1, = xor_ @ circ[a, b]
                 x2, = and_ @ circ[a, b]
@@ -863,7 +863,7 @@ class Diagram(Shaped[TypeT_co]):
                 c_out, = or_ @ circ[x2, x3]
                 return s, c_out
 
-            reveal_type(hadd) # Diagram
+            reveal_type(adder) # Diagram
 
         The diagram creation process is as follows:
 
@@ -1216,8 +1216,8 @@ class DiagramBuilder(Generic[TypeT_inv]):
         Enables special syntax for addition of blocks to the diagram:
 
         .. code-block:: python
-            from quetz.langs.rel import bit
-            from quetz.libs.bincirc import and_, or_, xor_
+            from tensorsat.lang.rel import bit
+            from tensorsat.lib.bincirc import and_, or_, xor_
 
             circ = DiagramBuilder()
             a, b, c_in = circ.add_inputs(bit*3)
