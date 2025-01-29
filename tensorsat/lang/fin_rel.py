@@ -18,6 +18,7 @@ and relations between them, represented as Boolean tensors (cf. :class:`FinRel`)
 
 from __future__ import annotations
 from collections.abc import Sequence
+from math import prod
 from typing import Any, ClassVar, Self, final
 
 import numpy as np
@@ -105,7 +106,25 @@ class FinRel(Box[FinSet]):
         rhs_wires: Sequence[Wire],
         out_wires: Sequence[Wire],
     ) -> FinRel:
-        raise NotImplementedError()  # TODO: implement this
+        lhs_tensor = lhs.__tensor
+        rhs_tensor = rhs.__tensor
+        contracted_size = prod(
+            dim
+            for dim, w in zip(lhs_tensor.shape, lhs_wires)
+            if w in (set(lhs_wires)&set(rhs_wires))-set(out_wires)
+        )
+        if contracted_size >= 256:
+            dt: np.dtype[Any]
+            if contracted_size < 2**16:
+                dt = np.dtype("uint16")
+            elif contracted_size < 2**32:
+                dt = np.dtype("uint32")
+            else:
+                dt = np.dtype("uint64")
+            lhs_tensor, rhs_tensor = lhs_tensor.astype(dt), rhs_tensor.astype(dt)
+        res_tensor = np.einsum(lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, out_wires)
+        res_tensor = np.sign(res_tensor, dtype=np.uint8)
+        return FinRel._new(res_tensor)
 
     @classmethod
     def _new(
@@ -148,7 +167,7 @@ class FinRel(Box[FinSet]):
         return self.__shape
 
     def _transpose(self, perm: Sequence[Port]) -> Self:
-        raise NotImplementedError()  # TODO: implement
+        return FinRel._new(np.transpose(self.__tensor, perm))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FinRel):
