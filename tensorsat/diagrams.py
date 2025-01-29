@@ -721,7 +721,7 @@ class BoxMeta(ABCMeta):
             try:
                 import autoray  # type: ignore
 
-                autoray.register_backend(cls, "tensorsat.autoray")
+                autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
         return cls
