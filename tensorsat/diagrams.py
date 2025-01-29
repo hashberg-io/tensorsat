@@ -775,13 +775,30 @@ class Box(Shaped[TypeT_co], ABC):
         - Every index in ``out_wires`` appears in ``lhs_wires`` or ``rhs_wires``
         """
 
-    __slots__ = ("__weakref__",)
+    @final
+    @staticmethod
+    def recipe(
+        recipe: Callable[[Shape[TypeT_inv]], BoxT_inv],
+    ) -> BoxRecipe[TypeT_inv, BoxT_inv]:
+        return BoxRecipe(recipe)
+
+    __recipe_used: BoxRecipe[TypeT_co, Self] | None
+
+    __slots__ = ("__weakref__", "__recipe_used")
 
     def __new__(cls) -> Self:
         """Constructs a new box."""
         if cls is Box:
             raise TypeError("Cannot instantiate abstract class Box.")
-        return super().__new__(cls)
+        self = super().__new__(cls)
+        self.__recipe_used = None
+        return self
+
+    @final
+    @property
+    def recipe_used(self) -> BoxRecipe[TypeT_co, Self] | None:
+        """The recipe used to create the box, if any."""
+        return self.__recipe_used
 
     @final
     def transpose(self, perm: Sequence[Port]) -> Self:
@@ -929,13 +946,15 @@ class Diagram(Shaped[TypeT_co]):
                 self = super().__new__(cls)
                 self.__wiring = wiring
                 self.__blocks = blocks
+                self.__recipe_used = None
                 Diagram._store.register(self)
             return self
 
     __wiring: Wiring[TypeT_co]
     __blocks: tuple[Box[TypeT_co] | Diagram[TypeT_co] | None, ...]
+    __recipe_used: DiagramRecipe[TypeT_co] | None
 
-    __slots__ = ("__weakref__", "__wiring", "__blocks")
+    __slots__ = ("__weakref__", "__wiring", "__blocks", "__recipe_used")
 
     def __new__(
         cls, wiring: Wiring[TypeT_co], blocks: Mapping[Slot, Block[TypeT_co]]
@@ -1010,6 +1029,11 @@ class Diagram(Shaped[TypeT_co]):
         if not subdiagrams:
             return 0
         return 1 + max(diag.depth for diag in subdiagrams)
+
+    @property
+    def recipe_used(self) -> DiagramRecipe[TypeT_co] | None:
+        """The recipe used to create the diagram, if any."""
+        return self.__recipe_used
 
     def compose(
         self, new_blocks: Mapping[Slot, Block[TypeT_co] | Wiring[TypeT_co]]
@@ -1344,7 +1368,9 @@ class DiagramRecipe(Generic[TypeT_inv]):
         inputs = builder._add_inputs(input_types)
         outputs = self.__recipe(builder, inputs)
         builder._add_outputs(outputs)
-        return builder.diagram
+        diagram = builder.diagram
+        diagram._Diagram__recipe_used = self # type: ignore[attr-defined]
+        return diagram
 
     def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
         """
@@ -1363,3 +1389,69 @@ class DiagramRecipe(Generic[TypeT_inv]):
         )
         diagram = self(input_types)
         return diagram @ selected
+
+BoxT_inv = TypeVar("BoxT_inv", bound=Box[Type], covariant=True)
+"""
+Invariant type variables for box classes.
+
+(A generic type variable would be perfect here, but Python doesn't have those yet...)
+"""
+
+@final
+class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
+    """
+    Utility class wrapping box building logic, which can be executed on
+    demand for given input types.
+
+    Supports usage of the ``@`` operator with selected input wires on the rhs,
+    analogously to the special block addition syntax for diagram builders.
+
+    See the :func:`Box.recipe` decorators for an example of how this works.
+    """
+
+    __recipe: Callable[[Shape[TypeT_inv]], BoxT_inv]
+
+    __slots__ = ("__weakref__", "__recipe")
+
+    def __new__(
+        cls,
+        recipe: Callable[[Shape[TypeT_inv]], BoxT_inv],
+    ) -> Self:
+        """Wraps the given box building logic."""
+        self = super().__new__(cls)
+        self.__recipe = recipe
+        return self
+
+    def __call__(self, shape: Iterable[TypeT_inv]) -> BoxT_inv:
+        """
+        Creates a box starting from a given shape, which we can think of as the
+        shape of its "input" ports.
+        The shape of the box returned is guaranteed to start with the given types,
+        but may contain further types, corresponding to the "output" ports of the box.
+        """
+        box = self.__recipe(Shape(shape))
+        if not hasattr(box, "_Box__recipe_used"):
+            box._Box__recipe_used = self # type: ignore[attr-defined]
+        assert box._Box__recipe_used is self, ( # type: ignore[attr-defined]
+            "Box recipe set incorrectly."
+        )
+        return box
+
+    def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
+        """
+        Executes the recipe for the input types specified by the selected input wires,
+        then adds the diagram resulting from the recipe as a block in the the broader
+        diagram being built, connected to the given input wires, and returns the
+        resulting output wires.
+        """
+        selected_wires = selected.wires
+        num_ports = len(selected_wires)
+        if set(selected_wires) != set(range(num_ports)):
+            raise ValueError("Selected ports must form a contiguous zero-based range.")
+        wire_types = selected.builder.wiring.wire_types
+        input_types = tuple(
+            wire_types[selected_wires[port]] for port in range(num_ports)
+        )
+        box = cast(Box[TypeT_inv], self(input_types))
+        return box @ selected
+
