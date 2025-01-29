@@ -1,8 +1,9 @@
 """
 TensorSAT is a suite of SAT/SMT solvers based on hyper-optimised contraction of diagrams
-for compact-closed categories (e.g. binary sets and relations, in the case of SAT).
-This includes cases where multiple compact-closed categories coexist in the same hybrid
-diagram, and the case where contraction includes selected intermediate rewriting steps.
+for the compact-closed category of finite sets and relations.
+
+Boxes from multiple languages (cf. :mod:`tensorsat.lang`) are allowed to coexist within
+the same diagram, and hybrid contraction strategies are supported.
 """
 
 # This program is free software: you can redistribute it and/or modify

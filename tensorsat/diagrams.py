@@ -1,5 +1,9 @@
 """
-Diagrams for hybrid tensor-like languages.
+Diagrams for compact-closed languages.
+
+Diagrams (cf. :class:`Diagram`) consist of boxes (cf. :class:`Box`) and/or sub-diagrams
+wired together (cf. :class:`Wiring`) in such a way as to respect the types
+(cf. :class:`Type`) declared by boxes for their ports.
 """
 
 # This program is free software: you can redistribute it and/or modify
@@ -19,7 +23,7 @@ Diagrams for hybrid tensor-like languages.
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from itertools import accumulate
+from itertools import accumulate, chain
 from types import MappingProxyType
 from typing import (
     Any,
@@ -27,7 +31,6 @@ from typing import (
     Generic,
     Self,
     Type as SubclassOf,
-    TypeAlias,
     TypeVar,
     TypedDict,
     cast,
@@ -40,29 +43,15 @@ if __debug__:
     from typing_validation import validate
 
 
-class Type(ABC):
+class Type:
     """
     Abstract base class for types in diagrams.
 
-    Types are primarily used to signal compatibility of contractions, but they can also
-    carry useful additional information, such as the cardinality of a set or the
-    dimensionality of a vector space.
+    Types are used to signal compatibility between boxes, by requiring that ports wired
+    together in a diagram all have the same type.
+    By sharing common types, boxes from multiple languages can be wired together in the
+    same diagram.
     """
-
-    @staticmethod
-    def unique() -> Type:
-        """Returns a unique anonymous type."""
-        cls: SubclassOf[Type] = final(
-            type.__new__(
-                type,
-                "<anon type class>",
-                (Type,),
-                {
-                    "__repr__": lambda self: "<anon type>",
-                },
-            )
-        )
-        return cls()
 
     __slots__ = ("__weakref__",)
 
@@ -72,25 +61,44 @@ class Type(ABC):
             raise TypeError("Cannot instantiate abstract class Type.")
         return super().__new__(cls)
 
+    def spider(self, num_ports: int) -> Box[Self]:
+        """
+        The box corresponding to a single wire connected to the given number of ports,
+        all ports being of this type.
+        """
+        validate(num_ports, int)
+        if num_ports <= 0:
+            raise ValueError("Number of ports must be strictly positive.")
+        return self._spider(num_ports)
+
+    @abstractmethod
+    def _spider(self, num_ports: int) -> Box[Self]:
+        ...
+
+    @final
     def __mul__[T: Self, _T: Type](self: T, other: _T | Shape[_T]) -> Shape[T | _T]:
         """Takes the product of this type with another type or shape."""
         if isinstance(other, Shape):
             return Shape([self, *other])
         return Shape([self, other])
 
+    @final
     def __pow__[T: Self](self: T, rhs: int, /) -> Shape[T]:
         """Repeats a type a given number of times."""
         assert validate(rhs, int)
         return Shape([self] * rhs)
 
 TypeT_co = TypeVar("TypeT_co", bound=Type, covariant=True)
+"""Covariant type variable for a type."""
+
 TypeT_inv = TypeVar("TypeT_inv", bound=Type)
+"""Invariant type variable for a type."""
 
 @final
 class Shape(Generic[TypeT_co]):
     """A Shape, as a finite tuple of types."""
 
-    __store: ClassVar[InstanceStore] = InstanceStore()
+    _store: ClassVar[InstanceStore] = InstanceStore()
 
     @classmethod
     def prod(cls, shapes: Iterable[Shape[TypeT_co]], /) -> Shape[TypeT_co]:
@@ -110,11 +118,11 @@ class Shape(Generic[TypeT_co]):
     @classmethod
     def _new(cls, components: tuple[TypeT_co, ...]) -> Self:
         """Protected constructor."""
-        with Shape.__store.instance(cls, components) as self:
+        with Shape._store.instance(cls, components) as self:
             if self is None:
                 self = super().__new__(cls)
                 self.__components = components
-                Shape.__store.register(self)
+                Shape._store.register(self)
         return self
 
     def __new__(cls, components: Iterable[TypeT_co]) -> Self:
@@ -168,13 +176,13 @@ class Shape(Generic[TypeT_co]):
         return hash((Shape, self.__components))
 
 
-Slot: TypeAlias = int
+type Slot = int
 """Type alias for (the index of) a slot in a diagram."""
 
-Port: TypeAlias = int
+type Port = int
 """Type alias for (the index of) a port in a diagram."""
 
-Wire: TypeAlias = int
+type Wire = int
 """
 Type alias for (the index of) a wire in a diagram.
 Each port is connected to exactly one wire, but a wire can connect any number of ports.
@@ -227,11 +235,13 @@ class Shaped(Generic[TypeT_co], ABC):
     def shape(self) -> Shape[TypeT_co]:
         """Shape of the object."""
 
+    @final
     @property
     def num_ports(self) -> int:
         """Number of ports in the object, aka the length of its shape."""
         return len(self.shape)
 
+    @final
     @property
     def ports(self) -> Sequence[Port]:
         """Sequence of (the indices of) ports in the object."""
@@ -265,24 +275,29 @@ class Slotted(Generic[TypeT_co], ABC):
     def slot_shapes(self) -> tuple[Shape[TypeT_co], ...]:
         """Shapes for the slots."""
 
+    @final
     @property
     def num_slots(self) -> int:
         """Number of slots."""
         return len(self.slot_shapes)
 
+    @final
     @property
     def slots(self) -> Sequence[Slot]:
         """Sequence of (the indices of) slots."""
         return range(self.num_slots)
 
+    @final
     def num_slot_ports(self, slot: Slot) -> int:
         """Number of ports for the given slot."""
         return len(self.slot_shapes[slot])
 
+    @final
     def slot_ports(self, slot: Slot) -> Sequence[Port]:
         """Sequence of (the indices of) ports for the given slot."""
         return range(self.num_slot_ports(slot))
 
+    @final
     def validate_slot_data(self, data: Mapping[Slot, Shaped[TypeT_co]], /) -> None:
         """Validates the shapes for given slot data."""
         assert validate(data, Mapping[Slot, Shaped[Type]])
@@ -318,11 +333,13 @@ class WiringBase(Shaped[TypeT_co], Slotted[TypeT_co], ABC):
     def outer_mapping(self) -> tuple[Wire, ...]:
         """Assignment of (the index of) a wire to each outer port."""
 
+    @final
     @property
     def num_wires(self) -> int:
         """Number of wires."""
         return len(self.wire_types)
 
+    @final
     @property
     def wires(self) -> Sequence[Wire]:
         """Sequence of (the indices of) wires."""
@@ -333,7 +350,7 @@ class WiringBase(Shaped[TypeT_co], Slotted[TypeT_co], ABC):
 class Wiring(WiringBase[TypeT_co]):
     """An immutable wiring."""
 
-    __store: ClassVar[InstanceStore] = InstanceStore()
+    _store: ClassVar[InstanceStore] = InstanceStore()
 
     @classmethod
     def _new(
@@ -352,7 +369,7 @@ class Wiring(WiringBase[TypeT_co]):
             slot_mappings,
             outer_mapping,
         )
-        with Wiring.__store.instance(cls, instance_key) as self:
+        with Wiring._store.instance(cls, instance_key) as self:
             if self is None:
                 self = super().__new__(cls)
                 self.__slot_shapes = slot_shapes
@@ -360,7 +377,7 @@ class Wiring(WiringBase[TypeT_co]):
                 self.__wire_types = wire_types
                 self.__slot_mappings = slot_mappings
                 self.__outer_mapping = outer_mapping
-                Wiring.__store.register(self)
+                Wiring._store.register(self)
             return self
 
     __slot_shapes: tuple[Shape[TypeT_co], ...]
@@ -686,21 +703,56 @@ class Box(Shaped[TypeT_co], ABC):
     Abstract base class for boxes in diagrams.
     """
 
-    @staticmethod
-    def unique[T:Type](shape: Shape[T]) -> Box[T]:
-        """Returns a unique anonymous box."""
-        cls: SubclassOf[Box[T]] = final(
-            type.__new__(
-                type,
-                "<anon box class>",
-                (Box,),
-                {
-                    "shape": property(lambda self: shape),
-                    "__repr__": lambda self: "<anon box>",
-                },
+    @final
+    @classmethod
+    def contract2(
+        cls,
+        lhs: Self,
+        lhs_wires: Sequence[Wire],
+        rhs: Self,
+        rhs_wires: Sequence[Wire],
+        out_wires: Sequence[Wire] | None = None,
+    ) -> Self:
+        assert validate(lhs, cls)
+        assert validate(lhs_wires, Sequence[Wire])
+        assert validate(rhs, cls)
+        assert validate(rhs_wires, Sequence[Wire])
+        assert validate(out_wires, Sequence[Wire] | None)
+        if len(lhs_wires) != len(lhs.shape):
+            raise ValueError(
+                f"Number of wires in lhs ({len(lhs_wires)}) does not match"
+                f" the number of ports in lhs shape ({len(lhs.shape)})."
             )
-        )
-        return cls()
+        if len(rhs_wires) != len(rhs.shape):
+            raise ValueError(
+                f"Number of wires in rhs ({len(rhs_wires)}) does not match"
+                f" the number of ports in rhs shape ({len(rhs.shape)})."
+            )
+        if out_wires is None:
+            excluded = set(lhs_wires)&set(rhs_wires)
+            out_wires = []
+            for w in chain(lhs_wires, rhs_wires):
+                if w not in excluded:
+                    out_wires.append(w)
+                    excluded.add(w)
+        else:
+            if len(out_wires) != len(set(out_wires)):
+                raise NotImplementedError("Output wires cannot be repeated.")
+                # TODO: This is not ordinarily handled by einsum,
+                #       but it is pretty natural in the context of the wirings we use,
+                #       so we might wish to add support for it in the future.
+        return cls._contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
+
+    @classmethod
+    @abstractmethod
+    def _contract2(
+        cls,
+        lhs: Self,
+        lhs_wires: Sequence[Wire],
+        rhs: Self,
+        rhs_wires: Sequence[Wire],
+        out_wires: Sequence[Wire],
+    ) -> Self: ...
 
     __slots__ = ("__weakref__",)
 
@@ -709,6 +761,19 @@ class Box(Shaped[TypeT_co], ABC):
         if cls is Box:
             raise TypeError("Cannot instantiate abstract class Box.")
         return super().__new__(cls)
+
+    def __mul__(self, other: Self) -> Self:
+        """
+        Takes the product of this relation with another relation of the same class.
+        The resulting relation has as its ports the ports of this relation followed
+        by the ports of the other relation, and is of the same class of both.
+        """
+        lhs, rhs = self, other
+        lhs_len, rhs_len = len(lhs.shape), len(rhs.shape)
+        lhs_wires, rhs_wires = range(lhs_len), range(lhs_len, lhs_len+rhs_len)
+        out_wires = range(lhs_len+rhs_len)
+        return type(self)._contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
+
 
 type Block[T:Type] = Box[T] | Diagram[T]
 """
@@ -726,7 +791,7 @@ class Diagram(Shaped[TypeT_co]):
     to (a subset of) the wiring's slots.
     """
 
-    __store: ClassVar[InstanceStore] = InstanceStore()
+    _store: ClassVar[InstanceStore] = InstanceStore()
 
     @staticmethod
     def from_recipe[T:Type](
@@ -813,12 +878,12 @@ class Diagram(Shaped[TypeT_co]):
     @classmethod
     def _new(cls, wiring: Wiring[TypeT_co], blocks: tuple[Block[TypeT_co] | None, ...]) -> Self:
         """Protected constructor."""
-        with Diagram.__store.instance(cls, (wiring, blocks)) as self:
+        with Diagram._store.instance(cls, (wiring, blocks)) as self:
             if self is None:
                 self = super().__new__(cls)
                 self.__wiring = wiring
                 self.__blocks = blocks
-                Diagram.__store.register(self)
+                Diagram._store.register(self)
             return self
 
     __wiring: Wiring[TypeT_co]
