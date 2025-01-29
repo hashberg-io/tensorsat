@@ -249,7 +249,6 @@ class FinRel(Box[FinSet]):
     __tensor: NumpyUInt8Array
     __shape: Shape[FinSet]
     __hash_cache: int
-    __is_function_graph_cache: bool
 
     __slots__ = ("__tensor", "__shape", "__hash_cache", "__is_function_graph_cache")
 
@@ -270,6 +269,21 @@ class FinRel(Box[FinSet]):
 
     def _transpose(self, perm: Sequence[Port]) -> Self:
         return FinRel._new(np.transpose(self.__tensor, perm))
+
+    def is_function_graph(self, input_ports: Sequence[Port], /) -> bool:
+        """
+        Whether the relation is a function graph in the case where the given ports
+        are taken to be inputs and the remaining ports are taken to be outputs.
+        """
+        assert validate(input_ports, Sequence[Port])
+        input_ports = list(input_ports)
+        ports = self.ports
+        if not all(p in ports for p in input_ports):
+            raise ValueError("Invalid input ports.")
+        output_ports = [p for p in ports if p not in input_ports]
+        transposed_tensor = np.transpose(self.__tensor, input_ports+output_ports)
+        matrix = transposed_tensor.reshape(prod(input_ports), prod(output_ports))
+        return bool(np.all(np.count_nonzero(matrix, axis=1) == 1))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FinRel):
