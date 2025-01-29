@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from itertools import product
 from math import prod
-from typing import Any, ClassVar, Self, final
+from typing import Any, ClassVar, Self, TypeAlias, final
 
 import numpy as np
 from hashcons import InstanceStore
@@ -30,13 +30,13 @@ from ..diagrams import Port, Shape, Type, Box, Wire
 if __debug__:
     from typing_validation import validate
 
-type Size = int
+Size: TypeAlias = int
 """Type alias for integers used as sizes of :class:`FinSet`s."""
 
-type El = int
+El: TypeAlias = int
 """Type alias for integers used as elements of :class:`FinSet`s."""
 
-type Point = tuple[El, ...]
+Point: TypeAlias = tuple[El, ...]
 """Type alias for tuples of integers, used as points of :class:`FinRel`s."""
 
 
@@ -50,7 +50,13 @@ def _wrap_el(el_or_point: El | Point, /) -> Point:
     assert validate(el_or_point, Point)
     return el_or_point
 
-def _extract_sizes(sizes_or_finsets: Iterable[Size | FinSet], /) -> tuple[Size, ...]:
+type ItemOrIterable[T] = T | Iterable[T]
+
+def _extract_sizes(sizes_or_finsets: ItemOrIterable[Size | FinSet], /) -> tuple[Size, ...]:
+    if isinstance(sizes_or_finsets, int):
+        return (sizes_or_finsets,)
+    if isinstance(sizes_or_finsets, FinSet):
+        return (sizes_or_finsets.size,)
     return tuple(
         size if isinstance(size, int) else size.size
         for size in sizes_or_finsets
@@ -118,7 +124,7 @@ class FinRel(Box[FinSet]):
     @classmethod
     def from_set(
         cls,
-        shape: Iterable[Size | FinSet],
+        shape: ItemOrIterable[Size | FinSet],
         points: Iterable[El | Point],
     ) -> Self:
         """Constructs a relation from a set of points."""
@@ -141,8 +147,8 @@ class FinRel(Box[FinSet]):
     @classmethod
     def from_mapping(
         cls,
-        input_shape: Iterable[Size | FinSet],
-        output_shape: Iterable[Size | FinSet],
+        input_shape: ItemOrIterable[Size | FinSet],
+        output_shape: ItemOrIterable[Size | FinSet],
         mapping: Mapping[Point, El | Point],
     ) -> Self:
         """
@@ -159,15 +165,15 @@ class FinRel(Box[FinSet]):
         return rel
 
     @classmethod
-    def singleton(cls, shape: Iterable[Size], point: El | Point) -> Self:
+    def singleton(cls, shape: FinSet | Iterable[Size], point: El | Point) -> Self:
         """Constructs a singleton relation with the given point."""
         return cls.from_mapping((), shape, {(): point})
 
     @classmethod
     def from_callable(
         cls,
-        input_shape: Iterable[Size | FinSet],
-        output_shape: Iterable[Size | FinSet],
+        input_shape: ItemOrIterable[Size | FinSet],
+        output_shape: ItemOrIterable[Size | FinSet],
         func: Callable[[Point], El | Point],
     ) -> Self:
         """
