@@ -17,7 +17,8 @@ and relations between them, represented as Boolean tensors (cf. :class:`FinRel`)
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from itertools import product
 from math import prod
 from typing import Any, ClassVar, Self, final
 
@@ -37,6 +38,17 @@ type El = int
 
 type Point = tuple[El, ...]
 """Type alias for tuples of integers, used as points of :class:`FinRel`s."""
+
+
+def _wrap_el(el_or_point: El | Point, /) -> Point:
+    """
+    Wraps an element of a finite set into a singleton point of a relation.
+    If a point is passed, it is returned unchanged.
+    """
+    if isinstance(el_or_point, (int, np.integer)):
+        return (el_or_point,)
+    assert validate(el_or_point, Point)
+    return el_or_point
 
 
 @final
@@ -98,6 +110,96 @@ class FinRel(Box[FinSet]):
     component of the relation corresponds to a component of the tensor.
     """
 
+    @classmethod
+    def from_set(
+        cls,
+        shape: Iterable[Size],
+        points: Iterable[El | Point],
+    ) -> Self:
+        """Constructs a relation from a set of points."""
+        shape = tuple(shape)
+        data = np.zeros(shape, dtype=np.uint8)
+        if any(dim == 0 for dim in data.shape):
+            raise ValueError("Zero dimension in shape.")
+        for point in points:
+            if isinstance(point, int):
+                point = (point,)
+            assert validate(point, Point)
+            if len(point) != len(shape):
+                raise ValueError(f"Length of {point = } is invalid for {shape = }.")
+            if not all(0 <= i < d for i, d in zip(point, data.shape)):
+                raise ValueError(f"Values of {point = } are invalid for {shape = }.")
+            data[point] = 1
+        return cls._new(data)
+
+    @classmethod
+    def from_mapping(
+        cls,
+        input_shape: Iterable[Size],
+        output_shape: Iterable[Size],
+        mapping: Mapping[Point, El | Point],
+    ) -> Self:
+        """
+        Constructs a function graph from a mapping of points to points.
+        The relation shape is given by ``input_shape + output_shape``.
+        """
+        input_shape = tuple(input_shape)
+        output_shape = tuple(output_shape)
+        rel = cls.from_set(
+            input_shape + output_shape, (k + _wrap_el(v) for k, v in mapping.items())
+        )
+        if len(mapping) != prod(input_shape):
+            raise ValueError("Mapping does not cover the entire input space.")
+        return rel
+
+    @classmethod
+    def singleton(cls, shape: Iterable[Size], point: El | Point) -> Self:
+        """Constructs a singleton relation with the given point."""
+        return cls.from_mapping(Shape(()), shape, {(): point})
+
+    @classmethod
+    def from_callable(
+        cls,
+        input_shape: Iterable[Size],
+        output_shape: Iterable[Size],
+        func: Callable[[Point], El | Point],
+    ) -> Self:
+        """
+        Constructs a function graph from a callable mapping points to points
+        The relation shape is given by ``input_shape + output_shape``.
+        """
+        input_shape = tuple(input_shape)
+        output_shape = tuple(output_shape)
+        mapping = {idx: func(idx) for idx in np.ndindex(input_shape)}
+        return cls.from_mapping(input_shape, output_shape, mapping)
+
+    @classmethod
+    def from_wiring(
+        cls,
+        outer_mapping: Sequence[Wire],
+        wire_sizes: Mapping[Port, Size],
+    ) -> Self:
+        """Creates the spider relation for the given wiring."""
+        # 1. Extract and validate wires and their sizes:
+        wires = sorted(set(outer_mapping))
+        for wire in wires:
+            if wire not in wire_sizes:
+                raise ValueError(f"Size missing for wire {wire}.")
+        if any(dim <= 0 for dim in wire_sizes.values()):
+            raise ValueError("Wire sizes must be strictly positive.")
+        # 2. Re-index the wires:
+        _wire_idx = {wire: i for i, wire in enumerate(wires)}
+        outer_mapping = [_wire_idx[node] for node in outer_mapping]
+        wire_sizes = {_wire_idx[node]: wire_sizes[node] for node in wires}
+        # 3. Construct and return the relation:
+        ports = range(len(outer_mapping))
+        shape = tuple(wire_sizes[outer_mapping[port]] for port in ports)
+        subset = frozenset(
+            tuple(values[outer_mapping[port]] for port in ports)
+            for values in product(*(range(wire_sizes[node]) for node in wires))
+        )
+        return cls.from_set(shape, subset)
+
     @staticmethod
     def _contract2(
         lhs: FinRel,
@@ -111,7 +213,7 @@ class FinRel(Box[FinSet]):
         contracted_size = prod(
             dim
             for dim, w in zip(lhs_tensor.shape, lhs_wires)
-            if w in (set(lhs_wires)&set(rhs_wires))-set(out_wires)
+            if w in (set(lhs_wires) & set(rhs_wires)) - set(out_wires)
         )
         if contracted_size >= 256:
             dt: np.dtype[Any]
