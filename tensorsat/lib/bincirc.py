@@ -39,9 +39,6 @@ bit_0 = FinRel.singleton(bit, 0, "bit_0")
 bit_1 = FinRel.singleton(bit, 1, "bit_1")
 """The constant binary value 1."""
 
-bit_unk = FinRel.from_set(bit, {0, 1}, "bit_unk")
-"""Relation representing an unknown binary value."""
-
 
 @Diagram.from_recipe(bit**2)
 def half_adder(circ: DiagramBuilder[FinSet], inputs: Sequence[Wire]) -> Sequence[Wire]:

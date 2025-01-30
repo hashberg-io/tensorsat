@@ -332,7 +332,6 @@ class Diagram(Shaped[TypeT_co]):
             attrs.append(f"from recipe {recipe_used.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
-
 @final
 class DiagramBuilder(Generic[TypeT_inv]):
     """Utility class to build diagrams."""

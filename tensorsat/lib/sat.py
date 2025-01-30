@@ -22,7 +22,7 @@ from typing import Literal, Self, TypeAlias
 import numpy as np
 from ..diagrams import Diagram, DiagramBuilder
 from ..lang.fin_rel import FinSet
-from .bincirc import not_, or_, bit_unk, bit
+from .bincirc import not_, or_, bit
 
 if __debug__:
     from typing_validation import validate
@@ -155,7 +155,7 @@ class CNFInstance:
                 if n % 2 == 1:
                     (new_layer[-1],) = or_ @ circ[new_layer[-1], layer[-1]]
                 layer = new_layer
-            bit_unk @ circ[layer[0]]
+            # bit_unk @ circ[layer[0]]
         return circ.diagram
 
     def __repr__(self) -> str:
