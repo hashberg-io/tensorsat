@@ -96,7 +96,6 @@ TypeT_inv = TypeVar("TypeT_inv", bound=Type)
 """Invariant type variable for a type."""
 
 
-@final
 class Shape(Sequence[TypeT_co]):
     """A Shape, as a finite tuple of types."""
 
@@ -166,9 +165,6 @@ class Shape(Sequence[TypeT_co]):
         assert validate(index, int)
         return self.__components[index]
 
-    def __repr__(self) -> str:
-        return f"Shape({self.__components})"
-
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Shape):
             return NotImplemented
@@ -176,3 +172,6 @@ class Shape(Sequence[TypeT_co]):
 
     def __hash__(self) -> int:
         return hash((Shape, self.__components))
+
+    def __repr__(self) -> str:
+        return f"<Shape {id(self):#x}: {len(self)} components>"
