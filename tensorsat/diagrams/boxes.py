@@ -138,16 +138,19 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
     ) -> BoxRecipe[TypeT_inv, BoxT_inv]:
         return BoxRecipe(recipe)
 
+    __name: str | None
     __recipe_used: BoxRecipe[TypeT_co, Self] | None
 
-    __slots__ = ("__weakref__", "__recipe_used")
+    __slots__ = ("__weakref__", "__recipe_used", "__name")
 
-    def __new__(cls) -> Self:
+    def __new__(cls, name: str | None = None) -> Self:
         """Constructs a new box."""
         if not cls.__final__:
             raise TypeError("Only final subclasses of Box can be instantiated.")
+        assert name is None or name, "Box name must be a non-empty string or None."
         self = super().__new__(cls)
         self.__recipe_used = None
+        self.__name = name
         return self
 
     @final
@@ -155,6 +158,11 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
     def recipe_used(self) -> BoxRecipe[TypeT_co, Self] | None:
         """The recipe used to create the box, if any."""
         return self.__recipe_used
+    @final
+    @property
+    def name(self) -> str | None:
+        """The name of the box, if any was given."""
+        return self.__name
 
     @final
     def transpose(self, perm: Sequence[Port]) -> Self:
@@ -185,6 +193,14 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
         out_wires = range(lhs_len + rhs_len)
         return type(self)._contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
 
+    def __repr__(self) -> str:
+        name = self.__name
+        cls_name = type(self).__name__
+        num_ports = len(self.shape)
+        if name:
+            return f"<{cls_name} {name!r}: {num_ports} ports>"
+        return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
+
 
 BoxT_inv = TypeVar("BoxT_inv", bound=Box[Type])
 """
@@ -207,8 +223,9 @@ class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
     """
 
     __recipe: Callable[[Shape[TypeT_inv]], BoxT_inv]
+    __name: str | None
 
-    __slots__ = ("__weakref__", "__recipe")
+    __slots__ = ("__weakref__", "__recipe", "__name")
 
     def __new__(
         cls,
@@ -217,6 +234,7 @@ class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
         """Wraps the given box building logic."""
         self = super().__new__(cls)
         self.__recipe = recipe
+        self.__name = getattr(recipe, "__name__", None)
         return self
 
     def __call__(self, shape: Iterable[TypeT_inv]) -> BoxT_inv:
@@ -251,3 +269,9 @@ class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
         )
         box = cast(Box[TypeT_inv], self(input_types))
         return box @ selected
+
+    def __repr__(self) -> str:
+        name = self.__name
+        if name is None:
+            return f"<BoxRecipe {id(self):#x}>"
+        return f"<BoxRecipe {id(self):#x} {name!r}>"

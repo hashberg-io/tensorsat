@@ -63,8 +63,8 @@ class CNFInstance:
         clauses: list[tuple[int, ...]] = []
         seen: set[tuple[int, ...]] = set()
         while num_clauses < m:
-            vs = rng.choice(range(n), size=k, replace=False)
-            signs = rng.choice(range(2), size=k)
+            vs = map(int, rng.choice(range(n), size=k, replace=False))
+            signs = map(int, rng.choice(range(2), size=k))
             clause = tuple(
                 sorted((v + 1 if n == 0 else -v - 1 for v, n in zip(vs, signs)))
             )
@@ -157,3 +157,15 @@ class CNFInstance:
                 layer = new_layer
             bit_unk @ circ[layer[0]]
         return circ.diagram
+
+    def __repr__(self) -> str:
+        attrs: list[str] = [
+            f"{self.num_vars} vars",
+            f"{len(self.clauses)} clauses",
+        ]
+        ks = {len(clause) for clause in self.clauses}
+        if len(ks) == 1:
+            attrs.append(f"k={ks.pop()}")
+        else:
+            attrs.extend(f"k in [{min(ks)}..{max(ks)}]")
+        return f"<CNFInstance {id(self):#x}: {", ".join(attrs)}>"

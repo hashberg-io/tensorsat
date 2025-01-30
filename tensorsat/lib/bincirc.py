@@ -21,25 +21,25 @@ from ..lang.fin_rel import FinSet, FinRel
 bit = FinSet(2)
 """The set {0, 1} of binary values."""
 
-not_ = FinRel.from_callable(bit, bit, lambda t: 1 - t[0])
+not_ = FinRel.from_callable(bit, bit, lambda t: 1 - t[0], "not_")
 """The NOT gate."""
 
-and_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] & t[1])
+and_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] & t[1], "and_")
 """The AND gate."""
 
-or_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] | t[1])
+or_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] | t[1], "or_")
 """The OR gate."""
 
-xor_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] ^ t[1])
+xor_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] ^ t[1], "xor_")
 """The XOR gate."""
 
-bit_0 = FinRel.singleton(bit, 0)
+bit_0 = FinRel.singleton(bit, 0, "bit_0")
 """The constant binary value 0."""
 
-bit_1 = FinRel.singleton(bit, 1)
+bit_1 = FinRel.singleton(bit, 1, "bit_1")
 """The constant binary value 1."""
 
-bit_unk = FinRel.from_set(bit, {0, 1})
+bit_unk = FinRel.from_set(bit, {0, 1}, "bit_unk")
 """Relation representing an unknown binary value."""
 
 

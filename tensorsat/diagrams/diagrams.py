@@ -45,6 +45,8 @@ Type alias for a block in a diagram, which can be either:
 
 """
 
+# TODO: Consider making diagrams parametric in BoxT_co as well,
+#       even though we cannot (yet?) make BoxT_co bound to on Box[TypeT_co]
 
 @final
 class Diagram(Shaped[TypeT_co]):
@@ -308,6 +310,28 @@ class Diagram(Shaped[TypeT_co]):
             cache[self] = flat_diagram
         return self
 
+    def __repr__(self) -> str:
+        attrs: list[str] = []
+        num_wires = self.wiring.num_wires
+        num_open_slots = self.num_open_slots
+        num_blocks = len(self.blocks)
+        depth = self.depth
+        num_out_ports = len(self.wiring.outer_mapping)
+        recipe_used = self.recipe_used
+        if num_wires > 0:
+            attrs.append(f"{num_wires} wires")
+        if num_open_slots > 0:
+            attrs.append(f"{num_open_slots} open slots")
+        if num_blocks > 0:
+            attrs.append(f"{num_blocks} blocks")
+        if depth > 0:
+            attrs.append(f"depth {depth}")
+        if num_out_ports > 0:
+            attrs.append(f"{num_out_ports} out ports")
+        if recipe_used and recipe_used.name:
+            attrs.append(f"from recipe {recipe_used.name!r}")
+        return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
+
 
 @final
 class DiagramBuilder(Generic[TypeT_inv]):
@@ -381,8 +405,8 @@ class DiagramBuilder(Generic[TypeT_inv]):
         4. Sets the block for the slot.
         4. Returns the newly created wires (in port order).
         """
-        wire_types = self.__wiring_builder.__wire_types
-        assert validate(block, Block)
+        wire_types = self.__wiring_builder.wire_types
+        assert validate(block, Box[Type] | Diagram[Type])
         assert validate(inputs, Mapping[Port, Wire])
         block_shape = block.shape
         for port, wire in inputs.items():
@@ -414,6 +438,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         wiring_builder.add_slot_ports(
             slot, [port_wire_mapping[port] for port in block_ports]
         )
+        self.__blocks[slot] = block
         return output_wires
 
     def add_inputs(self, ts: Sequence[TypeT_inv]) -> tuple[Wire, ...]:
@@ -466,6 +491,22 @@ class DiagramBuilder(Generic[TypeT_inv]):
         operator with a block as the lhs and the object as the rhs.
         """
         return SelectedInputWires(self, wires)
+
+    def __repr__(self) -> str:
+        attrs: list[str] = []
+        num_wires = self.wiring.num_wires
+        num_blocks = len(self.__blocks)
+        num_open_slots = self.wiring.num_slots-num_blocks
+        num_out_ports = len(self.wiring.outer_mapping)
+        if num_wires > 0:
+            attrs.append(f"{num_wires} wires")
+        if num_open_slots > 0:
+            attrs.append(f"{num_open_slots} open slots")
+        if num_blocks > 0:
+            attrs.append(f"{num_blocks} blocks")
+        if num_out_ports > 0:
+            attrs.append(f"{num_out_ports} out ports")
+        return f"<DiagramBuilder {id(self):#x}: {", ".join(attrs)}>"
 
 
 @final
@@ -543,6 +584,9 @@ class SelectedInputWires(Generic[TypeT_inv]):
             wires = MappingProxyType(dict(enumerate(self.__wires)))
         return self.__builder.add_block(block, wires)
 
+    def __repr__(self) -> str:
+        return f"<DiagramBuilder {id(self.__builder):#x}>[{self.__wires}]"
+
 
 @final
 class DiagramRecipe(Generic[TypeT_inv]):
@@ -558,8 +602,9 @@ class DiagramRecipe(Generic[TypeT_inv]):
     """
 
     __recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]]
+    __name: str | None
 
-    __slots__ = ("__weakref__", "__recipe")
+    __slots__ = ("__weakref__", "__recipe", "__name")
 
     def __new__(
         cls,
@@ -568,7 +613,13 @@ class DiagramRecipe(Generic[TypeT_inv]):
         """Wraps the given diagram building logic."""
         self = super().__new__(cls)
         self.__recipe = recipe
+        self.__name = getattr(recipe, "__name__", None)
         return self
+
+    @property
+    def name(self) -> str | None:
+        """Name of the recipe, if available."""
+        return self.__name
 
     def __call__(self, input_types: Sequence[TypeT_inv]) -> Diagram[TypeT_inv]:
         """Executes the recipe for the given input types, returning the diagram."""
@@ -597,3 +648,9 @@ class DiagramRecipe(Generic[TypeT_inv]):
         )
         diagram = self(input_types)
         return diagram @ selected
+
+    def __repr__(self) -> str:
+        name = self.__name
+        if name is None:
+            return f"<DiagramRecipe {id(self):#x}>"
+        return f"<DiagramRecipe {id(self):#x} {name!r}>"

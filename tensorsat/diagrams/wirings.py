@@ -379,6 +379,19 @@ class Wiring(WiringBase[TypeT_co]):
             self.outer_mapping,
         )
 
+    def __repr__(self) -> str:
+        num_wires = self.num_wires
+        num_slots = self.num_slots
+        num_out_ports = len(self.outer_mapping)
+        attrs: list[str] = []
+        if num_wires > 0:
+            attrs.append(f"{num_wires} wires")
+        if num_slots > 0:
+            attrs.append(f"{num_slots} slots")
+        if num_out_ports > 0:
+            attrs.append(f"{num_out_ports} out ports")
+        return f"<Wiring {id(self):#x}: {", ".join(attrs)}>"
+
 
 @final
 class WiringBuilder[T: Type](WiringBase[T]):
@@ -534,6 +547,7 @@ class WiringBuilder[T: Type](WiringBase[T]):
         slot_shapes = self.__slot_shapes
         k = len(slot_shapes)
         slot_shapes.append([])
+        self.__slot_mappings.append([])
         return k
 
     def add_slot_port(self, slot: Slot, wire: Wire) -> Port:
@@ -558,3 +572,16 @@ class WiringBuilder[T: Type](WiringBase[T]):
         slot_shape.extend(wire_types[w] for w in wires)
         self.__slot_mappings[slot].extend(wires)
         return tuple(range(len_before, len(slot_shape)))
+
+    def __repr__(self) -> str:
+        num_wires = self.num_wires
+        num_slots = self.num_slots
+        num_out_ports = len(self.__outer_mapping)
+        attrs: list[str] = []
+        if num_wires > 0:
+            attrs.append(f"{num_wires} wires")
+        if num_slots > 0:
+            attrs.append(f"{num_slots} slots")
+        if num_out_ports > 0:
+            attrs.append(f"{num_out_ports} out ports")
+        return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
