@@ -203,16 +203,16 @@ class FinRel(Box[FinSet]):
     @classmethod
     def from_wiring(
         cls,
-        outer_mapping: Sequence[Wire],
+        out_mapping: Sequence[Wire],
         wire_types: Mapping[Port, Size | FinSet],
         name: str | None = None,
     ) -> Self:
         """Creates the spider relation for the given wiring."""
         # 1. Extract and validate wires and their sizes:
-        assert validate(outer_mapping, Sequence[Wire])
+        assert validate(out_mapping, Sequence[Wire])
         assert validate(wire_types, Mapping[Port, Size | FinSet])
         wire_sizes = dict(zip(wire_types.keys(), _extract_sizes(wire_types.values())))
-        wires = sorted(set(outer_mapping))
+        wires = sorted(set(out_mapping))
         for wire in wires:
             if wire not in wire_sizes:
                 raise ValueError(f"Size missing for wire {wire}.")
@@ -220,13 +220,13 @@ class FinRel(Box[FinSet]):
             raise ValueError("Wire sizes must be strictly positive.")
         # 2. Re-index the wires:
         _wire_idx = {wire: i for i, wire in enumerate(wires)}
-        outer_mapping = [_wire_idx[node] for node in outer_mapping]
+        out_mapping = [_wire_idx[node] for node in out_mapping]
         wire_sizes = {_wire_idx[node]: wire_sizes[node] for node in wires}
         # 3. Construct and return the relation:
-        ports = range(len(outer_mapping))
-        shape = tuple(wire_sizes[outer_mapping[port]] for port in ports)
+        ports = range(len(out_mapping))
+        shape = tuple(wire_sizes[out_mapping[port]] for port in ports)
         subset = frozenset(
-            tuple(values[outer_mapping[port]] for port in ports)
+            tuple(values[out_mapping[port]] for port in ports)
             for values in product(*(range(wire_sizes[node]) for node in wires))
         )
         return cls.from_set(shape, subset, name)

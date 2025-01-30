@@ -316,7 +316,7 @@ class Diagram(Shaped[TypeT_co]):
         num_open_slots = self.num_open_slots
         num_blocks = len(self.blocks)
         depth = self.depth
-        num_out_ports = len(self.wiring.outer_mapping)
+        num_out_ports = len(self.wiring.out_wires)
         recipe_used = self.recipe_used
         if num_wires > 0:
             attrs.append(f"{num_wires} wires")
@@ -452,7 +452,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
     def _add_inputs(self, ts: Sequence[TypeT_inv]) -> tuple[Wire, ...]:
         wiring = self.wiring
         wires = wiring._add_wires(ts)
-        wiring._add_outer_ports(wires)
+        wiring._add_out_ports(wires)
         return wires
 
     def add_outputs(self, wires: Sequence[Wire]) -> None:
@@ -465,7 +465,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         self._add_outputs(wires)
 
     def _add_outputs(self, wires: Sequence[Wire]) -> None:
-        self.wiring._add_outer_ports(wires)
+        self.wiring._add_out_ports(wires)
 
     def __getitem__(
         self, wires: Wire | Sequence[Wire] | Mapping[Port, Wire]
@@ -497,7 +497,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         num_wires = self.wiring.num_wires
         num_blocks = len(self.__blocks)
         num_open_slots = self.wiring.num_slots-num_blocks
-        num_out_ports = len(self.wiring.outer_mapping)
+        num_out_ports = len(self.wiring.out_wires)
         if num_wires > 0:
             attrs.append(f"{num_wires} wires")
         if num_open_slots > 0:
