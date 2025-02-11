@@ -20,6 +20,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from itertools import accumulate
+from types import MappingProxyType
 from typing import (
     ClassVar,
     Generic,
@@ -213,6 +214,36 @@ class WiringBase(Shaped[TypeT_co], Slotted[TypeT_co], ABC):
         if slot not in range(self.num_slots):
             raise ValueError(f"Invalid slot {slot}.")
         return self.slot_wires_list[slot]
+
+    @final
+    @property
+    def wired_slot_ports(self) -> Mapping[Wire, tuple[tuple[Slot, Port], ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of ``(slot, port)``
+        pairs connected by that wire.
+        """
+        wired_slot_ports: dict[Wire,list[tuple[Slot, Port]]] = {}
+        for slot, wires in enumerate(self.slot_wires_list):
+            for port, wire in enumerate(wires):
+                wired_slot_ports.setdefault(wire, []).append((slot, port))
+        return MappingProxyType({
+            w: tuple(w_slot_ports) for w, w_slot_ports in wired_slot_ports.items()
+        })
+
+    @final
+    @property
+    def wired_slots(self) -> Mapping[Wire, tuple[Slot, ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of slot pairs
+        connected by that wire.
+        """
+        wired_slots: dict[Wire,list[Slot]] = {}
+        for slot, wires in enumerate(self.slot_wires_list):
+            for wire in wires:
+                wired_slots.setdefault(wire, []).append(slot)
+        return MappingProxyType({
+            w: tuple(w_slots) for w, w_slots in wired_slots.items()
+        })
 
 
 @final
