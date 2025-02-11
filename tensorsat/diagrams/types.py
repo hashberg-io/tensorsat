@@ -89,10 +89,10 @@ class Type(ABC):
         return Shape([self] * rhs)
 
 
-TypeT_co = TypeVar("TypeT_co", bound=Type, covariant=True)
+TypeT_co = TypeVar("TypeT_co", bound=Type, covariant=True, default=Type)
 """Covariant type variable for a type."""
 
-TypeT_inv = TypeVar("TypeT_inv", bound=Type)
+TypeT_inv = TypeVar("TypeT_inv", bound=Type, default=Type)
 """Invariant type variable for a type."""
 
 

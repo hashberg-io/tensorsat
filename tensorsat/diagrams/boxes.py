@@ -34,7 +34,7 @@ from typing import (
 if __debug__:
     from typing_validation import validate
 
-from .types import Type, Shape, TypeT_co, TypeT_inv
+from .types import Shape, TypeT_co, TypeT_inv
 from .wirings import Port, Shaped, Wire
 
 if TYPE_CHECKING:
@@ -202,7 +202,7 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
         return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
 
 
-BoxT_inv = TypeVar("BoxT_inv", bound=Box[Type])
+BoxT_inv = TypeVar("BoxT_inv", bound=Box, default=Box)
 """
 Invariant type variables for box classes.
 
