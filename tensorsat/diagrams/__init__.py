@@ -19,6 +19,7 @@ wired together (cf. :class:`Wiring`) in such a way as to respect the types
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 from .types import Type, TypeT_co, TypeT_inv, Shape
 from .boxes import Box, BoxT_inv, BoxRecipe
 from .wirings import (

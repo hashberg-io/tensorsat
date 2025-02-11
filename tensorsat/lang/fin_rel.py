@@ -167,7 +167,7 @@ class FinRel(Box[FinSet]):
         rel = cls.from_set(
             input_shape + output_shape,
             (k + _wrap_el(v) for k, v in mapping.items()),
-            name
+            name,
         )
         if len(mapping) != prod(input_shape):
             raise ValueError("Mapping does not cover the entire input space.")
@@ -260,11 +260,7 @@ class FinRel(Box[FinSet]):
         return FinRel._new(res_tensor)
 
     @classmethod
-    def _new(
-        cls,
-        tensor: NumpyUInt8Array,
-        name: str | None = None
-    ) -> Self:
+    def _new(cls, tensor: NumpyUInt8Array, name: str | None = None) -> Self:
         """
         Protected constructor.
         Presumes that the tensor is already validated, and that it is not going to be

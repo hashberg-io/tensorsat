@@ -48,6 +48,7 @@ Type alias for a block in a diagram, which can be either:
 # TODO: Consider making diagrams parametric in BoxT_co as well,
 #       even though we cannot (yet?) make BoxT_co bound to on Box[TypeT_co]
 
+
 @final
 class Diagram(Shaped[TypeT_co]):
     """
@@ -332,6 +333,7 @@ class Diagram(Shaped[TypeT_co]):
             attrs.append(f"from recipe {recipe_used.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
+
 @final
 class DiagramBuilder(Generic[TypeT_inv]):
     """Utility class to build diagrams."""
@@ -495,7 +497,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         attrs: list[str] = []
         num_wires = self.wiring.num_wires
         num_blocks = len(self.__blocks)
-        num_open_slots = self.wiring.num_slots-num_blocks
+        num_open_slots = self.wiring.num_slots - num_blocks
         num_out_ports = len(self.wiring.out_wires)
         if num_wires > 0:
             attrs.append(f"{num_wires} wires")

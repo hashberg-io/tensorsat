@@ -158,6 +158,7 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
     def recipe_used(self) -> BoxRecipe[TypeT_co, Self] | None:
         """The recipe used to create the box, if any."""
         return self.__recipe_used
+
     @final
     @property
     def name(self) -> str | None:
