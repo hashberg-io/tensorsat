@@ -405,7 +405,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         4. Returns the newly created wires (in port order).
         """
         wire_types = self.__wiring_builder.wire_types
-        assert validate(block, Box[Type] | Diagram[Type])
+        assert validate(block, Box | Diagram)
         assert validate(inputs, Mapping[Port, Wire])
         block_shape = block.shape
         for port, wire in inputs.items():
