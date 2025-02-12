@@ -14,31 +14,49 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from itertools import product
+from types import MappingProxyType
+from typing import Final
 from ..diagrams import Diagram, DiagramBuilder, Wire
 from ..lang.fin_rel import FinSet, FinRel
 
-bit = FinSet(2)
+bit: Final[FinSet] = FinSet(2)
 """The set {0, 1} of binary values."""
 
-not_ = FinRel.from_callable(bit, bit, lambda t: 1 - t[0], "not_")
+not_: Final[FinRel] = FinRel.from_callable(bit, bit, lambda t: 1 - t[0], "not_")
 """The NOT gate."""
 
-and_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] & t[1], "and_")
+and_: Final[FinRel] = FinRel.from_callable(
+    bit * bit, bit, lambda t: t[0] & t[1], "and_"
+)
 """The AND gate."""
 
-or_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] | t[1], "or_")
+or_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda t: t[0] | t[1], "or_")
 """The OR gate."""
 
-xor_ = FinRel.from_callable(bit * bit, bit, lambda t: t[0] ^ t[1], "xor_")
+xor_: Final[FinRel] = FinRel.from_callable(
+    bit * bit, bit, lambda t: t[0] ^ t[1], "xor_"
+)
 """The XOR gate."""
 
-bit_0 = FinRel.singleton(bit, 0, "bit_0")
+bit_0: Final[FinRel] = FinRel.singleton(bit, 0, "bit_0")
 """The constant binary value 0."""
 
-bit_1 = FinRel.singleton(bit, 1, "bit_1")
+bit_1: Final[FinRel] = FinRel.singleton(bit, 1, "bit_1")
 """The constant binary value 1."""
+
+binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
+    {
+        not_: "~",
+        and_: "&",
+        or_: "|",
+        xor_: "^",
+        bit_0: "0",
+        bit_1: "1",
+    }
+)
+"""Labels for binary operations."""
 
 
 @Diagram.from_recipe(bit**2)
