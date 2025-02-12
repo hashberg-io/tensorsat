@@ -8,3 +8,8 @@ dependencies = ["numpy", "hashcons", "typing-validation"]
 
 python_version = "3.13"
 strict = true
+
+[tool.setuptools.packages.find]
+include = ["tensorsat"]
+exclude = ["notebooks", "papers"]
+namespaces = false
