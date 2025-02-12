@@ -17,9 +17,9 @@ Visualisation utilities for diagrams.
 
 from __future__ import annotations
 from collections.abc import Mapping
-from typing import Any, Final, Literal, Self, TypedDict, Unpack, cast, reveal_type
+from typing import Any, Final, Literal, Self, TypedDict, Unpack
 
-from ..diagrams import Block, Slot, Box, Type, Diagram, Wire
+from ..diagrams import Slot, Box, Diagram, Wire
 from ..utils import (
     ValueSetter as OptionSetter,
     apply_setter,
@@ -338,3 +338,4 @@ class DiagramDrawer:
 
 
 draw_diagram: Final[DiagramDrawer] = DiagramDrawer()
+""" Diagram-drawing function, based :func:`networkx.draw_networkx`."""
