@@ -78,17 +78,21 @@ class CNFInstance:
     def from_dimacs(cls, dimacs: str) -> Self:
         """Creates a SAT instance from a DIMACS formatted string."""
         assert validate(dimacs, str)
-        dimacs = dimacs.replace("\r\n", "\n").replace("\n", " ").strip()
-        start_match = re.compile(r"p cnf ([0-9]+) ([0-9]+)").match(dimacs)
+        lines = [
+            stripped_line
+            for line in  dimacs.strip().split("\n")
+            if (stripped_line := line.strip())
+            and not stripped_line.startswith("c")
+        ]
+        start_match = re.compile(r"p cnf ([0-9]+) ([0-9]+)").match(lines[0])
         if not start_match:
             raise ValueError(
                 "DIMACS code must start with 'p cnf <num vars> <num clauses>'."
             )
         num_vars, num_clauses = map(int, start_match.groups())
         clauses = tuple(
-            tuple(map(int, frag.strip().split(" ")))
-            for frag in dimacs[start_match.end() :].split("0")
-            if frag.strip()
+            tuple(map(int, line.split(" ")))[:-1]
+            for line in lines[1:]
         )
         if len(clauses) != num_clauses:
             raise ValueError("Number of clauses does not match the specified number.")
@@ -136,7 +140,7 @@ class CNFInstance:
 
     DiagramModes: TypeAlias = Literal["bintree"]
 
-    def diagram(self, *, mode: CNFInstance.DiagramModes) -> Diagram[FinSet]:
+    def diagram(self, *, mode: CNFInstance.DiagramModes = "bintree") -> Diagram[FinSet]:
         match mode:
             case "bintree":
                 return self._diagram_bintree()
