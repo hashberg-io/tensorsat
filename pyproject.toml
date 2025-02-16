@@ -1,15 +1,46 @@
 [project]
 name = "tensorsat"
-version = "0.0.0"
-description = "A SAT solver using tensor networks."
-dependencies = ["numpy", "hashcons", "typing-validation"]
+version = "0.0.1"
+authors = [{ name = "Hashberg" }]
+description = "A SAT solver based on relational network contraction."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.2.3",
+    "hashcons>=0.1.0",
+    "typing-validation>=1.2.11"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3.13",
+    "Natural Language :: English",
+    "Typing :: Typed",
+]
 
-[tool.mypy]
+[project.urls]
+Documentation = "https://tensorsat.readthedocs.io"
+Repository = "https://github.com/hashberg-io/tensorsat"
+Issues = "https://github.com/hashberg-io/tensorsat/issues"
 
-python_version = "3.13"
-strict = true
+[build-system]
+requires = [
+    "setuptools>=63.4.3",  # see https://github.com/python/mypy/issues/13392#issuecomment-1212727421
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["tensorsat"]
-exclude = ["notebooks", "papers"]
 namespaces = false
+
+[tool.setuptools.package-data]
+tensorsat = ["README.md", "LICENSE"]
+
+[tool.black]
+target-version = ["py313"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
