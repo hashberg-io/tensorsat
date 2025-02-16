@@ -32,7 +32,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["tensorsat"]
+include = ["tensorsat", "tensorsat.*"]
 namespaces = false
 
 [tool.setuptools.package-data]

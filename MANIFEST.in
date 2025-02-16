@@ -1,5 +1,6 @@
 include README.md
 include LICENSE
+include tensorsat/*
 exclude notebooks/*
 exclude paper/*
 exclude examples/*
