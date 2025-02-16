@@ -1,5 +1,10 @@
 # TensorSAT
 
+[![Generic badge](https://img.shields.io/badge/python-3.13+-green.svg)](https://docs.python.org/3.13/)
+[![Checked with Mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](https://github.com/python/mypy)
+[![PyPI version shields.io](https://img.shields.io/pypi/v/tensorsat.svg)](https://pypi.python.org/pypi/tensorsat/)
+[![PyPI status](https://img.shields.io/pypi/status/tensorsat.svg)](https://pypi.python.org/pypi/tensorsat/)
+
 A SAT/SMT Solver based on hyper-optimised tensor network contraction.
 
 ## Contributing
