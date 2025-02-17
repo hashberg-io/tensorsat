@@ -24,26 +24,22 @@ from ..lang.fin_rel import FinSet, FinRel
 bit: Final[FinSet] = FinSet(2)
 """The set {0, 1} of binary values."""
 
-not_: Final[FinRel] = FinRel.from_callable(bit, bit, lambda t: 1 - t[0], "not_")
+not_: Final[FinRel] = FinRel.from_callable(bit, bit, lambda b: 1 - b)
 """The NOT gate."""
 
-and_: Final[FinRel] = FinRel.from_callable(
-    bit * bit, bit, lambda t: t[0] & t[1], "and_"
-)
+and_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a&b)
 """The AND gate."""
 
-or_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda t: t[0] | t[1], "or_")
+or_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a|b)
 """The OR gate."""
 
-xor_: Final[FinRel] = FinRel.from_callable(
-    bit * bit, bit, lambda t: t[0] ^ t[1], "xor_"
-)
+xor_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a^b)
 """The XOR gate."""
 
-bit_0: Final[FinRel] = FinRel.singleton(bit, 0, "bit_0")
+bit_0: Final[FinRel] = FinRel.singleton(bit, 0)
 """The constant binary value 0."""
 
-bit_1: Final[FinRel] = FinRel.singleton(bit, 1, "bit_1")
+bit_1: Final[FinRel] = FinRel.singleton(bit, 1)
 """The constant binary value 1."""
 
 binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(

@@ -113,7 +113,7 @@ class FinSet(Type):
         return f"FinSet({self.__size})"
 
 
-type NumpyUInt8Array = np.ndarray[tuple[Size, ...], np.dtype[np.uint8]]
+NumpyUInt8Array: TypeAlias = np.ndarray[tuple[Size, ...], np.dtype[np.uint8]]
 """Type alias for Numpy's UInt8 arrays."""
 
 
@@ -131,7 +131,6 @@ class FinRel(Box[FinSet]):
         cls,
         shape: ItemOrIterable[Size | FinSet],
         points: Iterable[El | Point],
-        name: str | None = None,
     ) -> Self:
         """Constructs a relation from a set of points."""
         shape = _extract_sizes(shape)
@@ -148,7 +147,7 @@ class FinRel(Box[FinSet]):
             if not all(0 <= i < d for i, d in zip(point, data.shape)):
                 raise ValueError(f"Values of {point = } are invalid for {shape = }.")
             data[point] = 1
-        return cls._new(data, name)
+        return cls._new(data)
 
     @classmethod
     def from_mapping(
@@ -156,7 +155,6 @@ class FinRel(Box[FinSet]):
         input_shape: ItemOrIterable[Size | FinSet],
         output_shape: ItemOrIterable[Size | FinSet],
         mapping: Mapping[Point, El | Point],
-        name: str | None = None,
     ) -> Self:
         """
         Constructs a function graph from a mapping of points to points.
@@ -167,7 +165,6 @@ class FinRel(Box[FinSet]):
         rel = cls.from_set(
             input_shape + output_shape,
             (k + _wrap_el(v) for k, v in mapping.items()),
-            name,
         )
         if len(mapping) != prod(input_shape):
             raise ValueError("Mapping does not cover the entire input space.")
@@ -178,35 +175,37 @@ class FinRel(Box[FinSet]):
         cls,
         shape: FinSet | Iterable[Size],
         point: El | Point,
-        name: str | None = None,
     ) -> Self:
         """Constructs a singleton relation with the given point."""
-        return cls.from_mapping((), shape, {(): point}, name)
+        return cls.from_mapping((), shape, {(): point})
 
     @classmethod
     def from_callable(
         cls,
         input_shape: ItemOrIterable[Size | FinSet],
         output_shape: ItemOrIterable[Size | FinSet],
-        func: Callable[[Point], El | Point],
-        name: str | None = None,
+        func: Callable[..., El | Point],
+        # Without type bounds for ParamSpec or TypeVarTuple,
+        # there is no good way to type this as a function which can take
+        # any fixed number of El arguments, but we don't care how many.
     ) -> Self:
         """
         Constructs a function graph from a callable mapping points to points
         The relation shape is given by ``input_shape + output_shape``.
+
+        The function passed is expected to take exactly as many positional arguments
+        as the length of ``input_shape``, all of type :obj:`El` (i.e. integers).
         """
         input_shape = _extract_sizes(input_shape)
         output_shape = _extract_sizes(output_shape)
-        mapping = {idx: func(idx) for idx in np.ndindex(input_shape)}
-        return cls.from_mapping(input_shape, output_shape, mapping, name)
+        mapping = {idx: func(*idx) for idx in np.ndindex(input_shape)}
+        return cls.from_mapping(input_shape, output_shape, mapping)
 
     @classmethod
     def from_wiring(
         cls,
         out_mapping: Sequence[Wire],
-        wire_types: Mapping[Port, Size | FinSet],
-        name: str | None = None,
-    ) -> Self:
+        wire_types: Mapping[Port, Size | FinSet],    ) -> Self:
         """Creates the spider relation for the given wiring."""
         # 1. Extract and validate wires and their sizes:
         assert validate(out_mapping, Sequence[Wire])
@@ -229,7 +228,7 @@ class FinRel(Box[FinSet]):
             tuple(values[out_mapping[port]] for port in ports)
             for values in product(*(range(wire_sizes[node]) for node in wires))
         )
-        return cls.from_set(shape, subset, name)
+        return cls.from_set(shape, subset)
 
     @staticmethod
     def _contract2(
@@ -260,7 +259,7 @@ class FinRel(Box[FinSet]):
         return FinRel._new(res_tensor)
 
     @classmethod
-    def _new(cls, tensor: NumpyUInt8Array, name: str | None = None) -> Self:
+    def _new(cls, tensor: NumpyUInt8Array) -> Self:
         """
         Protected constructor.
         Presumes that the tensor is already validated, and that it is not going to be
@@ -269,7 +268,7 @@ class FinRel(Box[FinSet]):
         if tensor.flags["OWNDATA"]:
             tensor.setflags(write=False)
             tensor = tensor.view()
-        self = super().__new__(cls, name)
+        self = super().__new__(cls)
         self.__tensor = tensor
         self.__shape = Shape(map(FinSet._new, tensor.shape))
         return self
@@ -280,11 +279,10 @@ class FinRel(Box[FinSet]):
 
     __slots__ = ("__tensor", "__shape", "__hash_cache", "__is_function_graph_cache")
 
-    def __new__(cls, tensor: NumpyUInt8Array, name: str | None = None) -> Self:
+    def __new__(cls, tensor: NumpyUInt8Array) -> Self:
         """Constructs a relation from a Boolean tensor."""
         assert validate(tensor, NumpyUInt8Array)
-        assert validate(name, str | None)
-        return cls._new(tensor, name)
+        return cls._new(tensor)
 
     @property
     def tensor(self) -> NumpyUInt8Array:
