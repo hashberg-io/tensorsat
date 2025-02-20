@@ -602,25 +602,47 @@ class DiagramRecipe(Generic[TypeT_inv]):
     examples of how this works.
     """
 
+    @classmethod
+    def _new(
+        cls,
+        recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]],
+        is_boxed: bool,
+        name: str | None
+    ) -> Self:
+        """Protected constructor."""
+        self = super().__new__(cls)
+        self.__recipe = recipe
+        self.__is_boxed = is_boxed
+        self.__name = name
+        return self
+
     __recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]]
+    __is_boxed: bool
     __name: str | None
 
-    __slots__ = ("__weakref__", "__recipe", "__name")
+    __slots__ = ("__weakref__", "__recipe", "__is_boxed", "__name")
 
     def __new__(
         cls,
         recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]],
     ) -> Self:
         """Wraps the given diagram building logic."""
-        self = super().__new__(cls)
-        self.__recipe = recipe
-        self.__name = getattr(recipe, "__name__", None)
-        return self
+        return cls._new(recipe, True, getattr(recipe, "__name__", None))
 
     @property
     def name(self) -> str | None:
         """Name of the recipe, if available."""
         return self.__name
+
+    @property
+    def unboxed(self) -> DiagramRecipe[TypeT_inv]:
+        """Returns an unboxed version of the recipe."""
+        return DiagramRecipe._new(self.__recipe, False, self.__name)
+
+    @property
+    def boxed(self) -> DiagramRecipe[TypeT_inv]:
+        """Returns an boxed version of the recipe."""
+        return DiagramRecipe._new(self.__recipe, True, self.__name)
 
     def __call__(self, input_types: Sequence[TypeT_inv]) -> Diagram[TypeT_inv]:
         """Executes the recipe for the given input types, returning the diagram."""
@@ -647,8 +669,17 @@ class DiagramRecipe(Generic[TypeT_inv]):
         input_types = tuple(
             wire_types[selected_wires[port]] for port in range(num_ports)
         )
-        diagram = self(input_types)
-        return diagram @ selected
+        if self.__is_boxed:
+            diagram = self(input_types)
+            return diagram @ selected
+        builder = selected.builder
+        inputs = selected.wires
+        if not isinstance(inputs, tuple):
+            raise NotImplementedError(
+                "Unboxed recipe application is only defined"
+                " for contiguous input port selection."
+            )
+        return tuple(self.__recipe(builder, inputs))
 
     def __repr__(self) -> str:
         name = self.__name

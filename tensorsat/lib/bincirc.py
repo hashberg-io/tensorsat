@@ -142,13 +142,11 @@ def wallace_multiplier(
     n = len(inputs) // 2
     a = inputs[:n]
     b = inputs[n:]
-    # layer: list[list[Wire]] = [[] for _ in range(2 * n)]
     layer: dict[int, list[Wire]] = {}
     for i, j in product(range(n), repeat=2):
         _out, = and_ @ circ[a[i], b[j]]
         layer.setdefault(i + j, []).append(_out)
     while any(len(wires) > 1 for wires in layer.values()):
-        # new_layer: list[list[Wire]] = [[] for _ in range(2 * n)]
         new_layer: dict[int, list[Wire]] = {}
         for weight, wires in layer.items():
             num_fulladd, _r = divmod(len(wires), 3)
