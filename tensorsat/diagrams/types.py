@@ -25,6 +25,7 @@ from typing import (
     ClassVar,
     Self,
     TypeVar,
+    cast,
     final,
     overload,
 )
@@ -136,8 +137,10 @@ class Shape(Sequence[TypeT_co]):
         assert validate(components, tuple[Type, ...])
         return cls._new(components)
 
-    def __mul__[T: Type](self, rhs: Shape[T], /) -> Shape[TypeT_co | T]:
+    def __mul__[T: Type](self, rhs: T | Shape[T], /) -> Shape[TypeT_co | T]:
         """Takes the product of two shapes (i.e. concatenates their types)."""
+        if isinstance(rhs, Type):
+            return Shape([*self, cast(T, rhs)])
         assert validate(rhs, Shape)
         return Shape([*self, *rhs])
 
