@@ -17,7 +17,7 @@ and relations between them, represented as Boolean tensors (cf. :class:`FinRel`)
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from itertools import product
 from math import prod
 from typing import Any, ClassVar, Self, TypeAlias, final
@@ -282,6 +282,8 @@ class FinRel(Box[FinSet]):
     def __new__(cls, tensor: NumpyUInt8Array) -> Self:
         """Constructs a relation from a Boolean tensor."""
         assert validate(tensor, NumpyUInt8Array)
+        if not np.all(tensor <= 1):
+            raise ValueError("Values in a Boolean tensor must be 0 or 1.")
         return cls._new(tensor)
 
     @property
@@ -297,20 +299,84 @@ class FinRel(Box[FinSet]):
     def _transpose(self, perm: Sequence[Port]) -> Self:
         return FinRel._new(np.transpose(self.__tensor, perm))
 
+    def to_set(self) -> Iterator[Point]:
+        """
+        Iterates over the subset of points in the relation.
+        An inverse to the constructor :meth:`FinRel.from_subset`.
+        """
+        tensor = self.tensor
+        for idxs in np.ndindex(tensor.shape):
+            if tensor[*idxs]:
+                yield tuple(map(int, idxs))
+
+    def _function_matrix(
+        self,
+        input_ports: tuple[Port, ...],
+        /
+    ) -> tuple[tuple[Port, ...], NumpyUInt8Array]:
+        ports = self.ports
+        if not all(p in ports for p in input_ports):
+            raise ValueError("Invalid input ports.")
+        if len(input_ports) != len(set(input_ports)):
+            raise ValueError("Input ports cannot be repeated.")
+        output_ports = tuple(p for p in ports if p not in input_ports)
+        input_sizes = tuple(s.size for s in self.shape[input_ports])
+        output_sizes = tuple(s.size for s in self.shape[output_ports])
+        transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
+        return (
+            output_ports,
+            transposed_tensor.reshape(prod(input_sizes), prod(output_sizes))
+        )
+
+
     def is_function_graph(self, input_ports: Sequence[Port], /) -> bool:
         """
         Whether the relation is a function graph in the case where the given ports
         are taken to be inputs and the remaining ports are taken to be outputs.
         """
         assert validate(input_ports, Sequence[Port])
-        input_ports = list(input_ports)
-        ports = self.ports
-        if not all(p in ports for p in input_ports):
-            raise ValueError("Invalid input ports.")
-        output_ports = [p for p in ports if p not in input_ports]
-        transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
-        matrix = transposed_tensor.reshape(prod(input_ports), prod(output_ports))
+        _, matrix = self._function_matrix(tuple(input_ports))
         return bool(np.all(np.count_nonzero(matrix, axis=1) == 1))
+
+    def to_mapping(self, input_ports: Sequence[Port], /) -> Mapping[Point, El | Point]:
+        """
+        Returns an input-output mapping for this relation, where the given ports are
+        selected as the input ports.
+        An inverse to the constructor :meth:`FinRel.from_mapping`.
+
+        :raises ValueError: if the relation is not a function graph for the given
+                            selection of input ports (see :meth:`is_function_graph`).
+        """
+        assert validate(input_ports, Sequence[Port])
+        input_ports = tuple(input_ports)
+        output_ports, matrix = self._function_matrix(input_ports)
+        if not np.all(np.count_nonzero(matrix, axis=1) == 1):
+            raise ValueError(
+                "Relation is not a function graph with the given input ports."
+            )
+        input_sizes = tuple(s.size for s in self.shape[input_ports])
+        output_sizes = tuple(s.size for s in self.shape[output_ports])
+        out_points = list(np.ndindex(output_sizes))
+        return {
+            in_point: out_points[np.argmax(col)]
+            for in_point, col in zip(np.ndindex(input_sizes), matrix)
+        }
+
+    def to_callable(self, input_ports: Sequence[Port], /) -> Callable[..., El | Point]:
+        """
+        Returns an input-output callable for this relation, where the given ports are
+        selected as the input ports.
+        An inverse to the constructor :meth:`FinRel.from_callable`.
+
+        :raises ValueError: if the relation is not a function graph for the given
+                            selection of input ports (see :meth:`is_function_graph`).
+        """
+        mapping = self.to_mapping(input_ports)
+        args_list = ", ".join(f"i{i}" for i in input_ports)
+        code = f"func = lambda {args_list}: mapping[({args_list})]"
+        namespace = {"mapping": mapping}
+        exec(code, namespace)
+        return namespace["func"] # type: ignore
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FinRel):
