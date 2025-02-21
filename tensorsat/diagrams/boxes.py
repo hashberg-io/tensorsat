@@ -53,7 +53,6 @@ class BoxMeta(ABCMeta):
         if not cls.__abstractmethods__:
             try:
                 import autoray  # type: ignore
-
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
@@ -93,12 +92,7 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
                 f" the number of ports in rhs shape ({len(rhs.shape)})."
             )
         if out_wires is None:
-            excluded = set(lhs_wires) & set(rhs_wires)
-            out_wires = []
-            for w in chain(lhs_wires, rhs_wires):
-                if w not in excluded:
-                    out_wires.append(w)
-                    excluded.add(w)
+            out_wires = sorted(set(lhs_wires).symmetric_difference(rhs_wires))
         else:
             out_wires_set = set(out_wires)
             if len(out_wires) != len(out_wires_set):
