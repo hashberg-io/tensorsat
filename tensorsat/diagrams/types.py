@@ -161,12 +161,22 @@ class Shape(Sequence[TypeT_co]):
     def __getitem__(self, index: int, /) -> TypeT_co: ...
     @overload
     def __getitem__(self, index: slice, /) -> Shape[TypeT_co]: ...
-    def __getitem__(self, index: int | slice, /) -> TypeT_co | Shape[TypeT_co]:
+    @overload
+    def __getitem__(self, index: Iterable[int], /) -> Shape[TypeT_co]: ...
+    def __getitem__(
+        self,
+        index: int | slice | Iterable[int],
+        /
+    ) -> TypeT_co | Shape[TypeT_co]:
         """Returns the component(s) at the given index(es)."""
         if isinstance(index, slice):
-            return Shape(self.__components[index])
-        assert validate(index, int)
-        return self.__components[index]
+            return Shape._new(self.__components[index])
+        if isinstance(index, int):
+            return self.__components[index]
+        index = list(index)
+        assert validate(index, list[int])
+        components = self.__components
+        return Shape._new(tuple(components[i] for i in index))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Shape):
