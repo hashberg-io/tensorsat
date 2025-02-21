@@ -28,6 +28,7 @@ from typing import (
     Type as SubclassOf,
     TypeAlias,
     TypedDict,
+    Unpack,
     final,
     override,
 )
@@ -294,7 +295,7 @@ class Wiring(WiringBase[TypeT_co]):
         "__out_wires",
     )
 
-    def __new__(cls, data: WiringData[TypeT_co]) -> Self:
+    def __new__(cls, **data: Unpack[WiringData[TypeT_co]]) -> Self:
         """Constructs a wiring from the given data."""
         assert validate(data, WiringData)
         # Destructure the data:
