@@ -56,12 +56,6 @@ Each port is connected to exactly one wire, but a wire can connect any number of
 class WiringData(Generic[TypeT_co], TypedDict, total=True):
     """Data for a wiring."""
 
-    num_slot_ports: Sequence[int]
-    """Number of ports for each slot."""
-
-    num_out_ports: int
-    """Number of outer ports."""
-
     wire_types: Sequence[TypeT_co]
     """Wire types."""
 
@@ -299,36 +293,20 @@ class Wiring(WiringBase[TypeT_co]):
         """Constructs a wiring from the given data."""
         assert validate(data, WiringData)
         # Destructure the data:
-        slot_num_ports = tuple(data["num_slot_ports"])
-        num_out_ports = data["num_out_ports"]
         wire_types = Shape(data["wire_types"])
         slot_wires_list = tuple(map(tuple, data["slot_wires_list"]))
         out_wires = tuple(data["out_wires"])
         # Validate the data:
+        num_out_ports = len(out_wires)
+        slot_num_ports = tuple(map(len, slot_wires_list))
         num_slots = len(slot_num_ports)
         num_wires = len(wire_types)
-        if len(slot_wires_list) != num_slots:
-            raise ValueError(
-                "Incorrect number of slot mappings:"
-                f" expected {num_slots}, got {len(slot_wires_list)}."
-            )
         for slot in range(num_slots):
-            num_in = slot_num_ports[slot]
-            if len(slot_wires_list[slot]) != num_in:
-                raise ValueError(
-                    f"Incorrect number of wires in mapping for slot {slot}:"
-                    f" expected {num_in}, got {len(slot_wires_list[slot])}."
-                )
             for wire in slot_wires_list[slot]:
                 if wire not in range(num_wires):
                     raise ValueError(
                         f"Invalid wire index {wire} in slot mapping for slot {slot}."
                     )
-        if len(out_wires) != num_out_ports:
-            raise ValueError(
-                "Incorrect number of wires in outer mapping:"
-                f" expected {num_out_ports}, got {len(out_wires)}."
-            )
         for wire in out_wires:
             if wire not in range(num_wires):
                 raise ValueError(f"Invalid wire index {wire} in outer mapping.")
