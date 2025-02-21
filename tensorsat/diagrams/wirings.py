@@ -297,9 +297,7 @@ class Wiring(WiringBase[TypeT_co]):
         slot_wires_list = tuple(map(tuple, data["slot_wires_list"]))
         out_wires = tuple(data["out_wires"])
         # Validate the data:
-        num_out_ports = len(out_wires)
-        slot_num_ports = tuple(map(len, slot_wires_list))
-        num_slots = len(slot_num_ports)
+        num_slots = len(slot_wires_list)
         num_wires = len(wire_types)
         for slot in range(num_slots):
             for wire in slot_wires_list[slot]:
@@ -310,11 +308,10 @@ class Wiring(WiringBase[TypeT_co]):
         for wire in out_wires:
             if wire not in range(num_wires):
                 raise ValueError(f"Invalid wire index {wire} in outer mapping.")
-        # Create and return the instance:
         slot_shapes = tuple(
-            Shape(wire_types[i] for i in range(num_in)) for num_in in slot_num_ports
+            Shape(wire_types[i] for i in slot_wires) for slot_wires in slot_wires_list
         )
-        shape = Shape(wire_types[o] for o in range(num_out_ports))
+        shape = Shape(wire_types[o] for o in out_wires)
         return cls._new(slot_shapes, shape, wire_types, slot_wires_list, out_wires)
 
     @property
