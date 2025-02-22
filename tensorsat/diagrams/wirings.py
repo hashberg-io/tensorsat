@@ -18,8 +18,8 @@ Implementation of wirings and their builders for the :mod:`tensorsat.diagrams` m
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections import deque
 from collections.abc import Mapping, Sequence
-from itertools import accumulate
 from types import MappingProxyType
 from typing import (
     ClassVar,
@@ -350,48 +350,77 @@ class Wiring(WiringBase[TypeT_co]):
         return self._compose(wirings)
 
     def _compose(self, wirings: Mapping[Slot, Wiring[TypeT_co]]) -> Wiring[TypeT_co]:
-        slots, num_wires = self.slots, self.num_wires
-        _wire_start_idx = list(
-            accumulate(
-                [
-                    num_wires,
-                    *(
-                        wirings[slot].num_wires if slot in wirings else 0
-                        for slot in slots
-                    ),
-                ]
-            )
-        )
-        wiring_remappings = [
-            range(start, end)
-            for start, end in zip(_wire_start_idx[:-1], _wire_start_idx[1:])
-        ]
-        new_wire_types = self.wire_types * Shape._prod(
-            tuple(wirings[slot].wire_types for slot in slots if slot in wirings)
-        )
-        new_slots_data: list[tuple[Wiring[TypeT_co], Slot, range]] = []
-        for slot in slots:
-            if slot in wirings:
-                wiring = wirings[slot]
-                new_slots_data.extend(
-                    (wiring, wiring_slot, wiring_remappings[slot])
-                    for wiring_slot in wiring.slots
-                )
+        # 1. Build bipartite graph connecting slot wires of the outer wiring
+        #    to outer wires of the wirings plugged into the slots:
+        slot_wires_list = self.slot_wires_list
+        fwd_mapping: dict[Wire, list[tuple[Slot, Wire]]] = {}
+        bwd_mapping: dict[tuple[Slot, Wire], list[Wire]] = {}
+        for slot, wiring in wirings.items():
+            for self_w, wiring_w in zip(slot_wires_list[slot], wiring.out_wires):
+                fwd_mapping.setdefault(self_w, []).append((slot, wiring_w))
+                bwd_mapping.setdefault((slot, wiring_w), []).append(self_w)
+        # 2. Compute connected component representatives for the bipartite graph,
+        #    selecting as representatives the lowest index wire from the outer wiring
+        #    appearing in the connected component:
+        fwd_cc_repr: dict[Wire, Wire] = {}
+        bwd_cc_repr: dict[tuple[Slot, Wire], Wire] = {}
+        _wire_q = deque(sorted(fwd_mapping.keys()))
+        while _wire_q:
+            cc_repr = _wire_q.popleft()
+            if cc_repr in fwd_cc_repr:
+                continue
+            fwd_cc_q: deque[Wire] = deque([cc_repr])
+            bwd_cc_q: deque[tuple[Slot, Wire]] = deque([])
+            while fwd_cc_q:
+                while fwd_cc_q:
+                    w = fwd_cc_q.popleft()
+                    if w in fwd_cc_repr:
+                        continue
+                    fwd_cc_repr[w] = cc_repr
+                    bwd_cc_q.extend(sw for sw in fwd_mapping[w] if sw not in bwd_cc_repr)
+                while bwd_cc_q:
+                    sw = bwd_cc_q.popleft()
+                    if sw in bwd_cc_repr:
+                        continue
+                    bwd_cc_repr[sw] = cc_repr
+                    fwd_cc_q.extend(w for w in bwd_mapping[sw] if w not in fwd_cc_repr)
+        # 3. Remap wire indices after fusion (and store new wire types at the same time):
+        wire_remap: dict[Wire, Wire] = {}
+        slot_wire_remap: dict[tuple[Slot, Wire], Wire] = {}
+        wire_types: list[TypeT_co] = []
+        self_wire_types = self.wire_types
+        for w in self.wires:
+            if w in fwd_cc_repr and w != (w_repr := fwd_cc_repr[w]):
+                wire_remap[w] = wire_remap[w_repr]
             else:
-                new_slots_data.append((self, slot, range(num_wires)))
-        new_slot_shapes = tuple(
-            wiring.slot_shapes[wiring_slot] for wiring, wiring_slot, _ in new_slots_data
+                wire_remap[w] = len(wire_types)
+                wire_types.append(self_wire_types[w])
+        for slot, wiring in wirings.items():
+            wiring_wire_types = wiring.wire_types
+            for w in wiring.wires:
+                if (sw := (slot, w)) in bwd_cc_repr and sw != (sw_repr := bwd_cc_repr[sw]):
+                    slot_wire_remap[sw] = wire_remap[sw_repr]
+                else:
+                    slot_wire_remap[sw] = len(wire_types)
+                    wire_types.append(wiring_wire_types[w])
+        # 4(a). Compute new slot wires for slots left open in outer wiring:
+        slot_wires_list = tuple(
+            tuple(wire_remap[w] for w in slot_wires)
+            for slot, slot_wires in enumerate(self.slot_wires_list)
+            if slot not in wirings
         )
-        new_slot_wires_list = tuple(
-            tuple(remapping[w] for w in wiring.slot_wires_list[wiring_slot])
-            for wiring, wiring_slot, remapping in new_slots_data
-        )
-        return Wiring._new(
-            new_slot_shapes,
-            self.shape,
-            new_wire_types,
-            new_slot_wires_list,
-            self.out_wires,
+        # 4(b). Compute new slot wires for slots of inner wirings:
+        for slot, wiring in wirings.items():
+            slot_wires_list += tuple(
+                tuple(slot_wire_remap[(slot, w)] for w in _slot_wires)
+                for _slot_wires in wiring.slot_wires_list
+            )
+        # 5. Compute new outer wires and return new wiring
+        out_wires = tuple(wire_remap[w] for w in self.out_wires)
+        return Wiring(
+            wire_types=wire_types,
+            slot_wires_list=slot_wires_list,
+            out_wires=out_wires
         )
 
     def __repr__(self) -> str:
@@ -400,11 +429,11 @@ class Wiring(WiringBase[TypeT_co]):
         num_out_ports = len(self.out_wires)
         attrs: list[str] = []
         if num_wires > 0:
-            attrs.append(f"{num_wires} wires")
+            attrs.append(f"{num_wires} wire{'s' if num_wires!=1 else ''}")
         if num_slots > 0:
-            attrs.append(f"{num_slots} slots")
+            attrs.append(f"{num_slots} slot{'s' if num_slots!=1 else ''}")
         if num_out_ports > 0:
-            attrs.append(f"{num_out_ports} out ports")
+            attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
         return f"<Wiring {id(self):#x}: {", ".join(attrs)}>"
 
 
@@ -602,9 +631,9 @@ class WiringBuilder[T: Type](WiringBase[T]):
         num_out_ports = len(self.__out_wires)
         attrs: list[str] = []
         if num_wires > 0:
-            attrs.append(f"{num_wires} wires")
+            attrs.append(f"{num_wires} wire{'s' if num_wires!=1 else ''}")
         if num_slots > 0:
-            attrs.append(f"{num_slots} slots")
+            attrs.append(f"{num_slots} slot{'s' if num_slots!=1 else ''}")
         if num_out_ports > 0:
-            attrs.append(f"{num_out_ports} out ports")
+            attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
         return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
