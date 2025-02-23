@@ -164,9 +164,7 @@ class Shape(Sequence[TypeT_co]):
     @overload
     def __getitem__(self, index: Iterable[int], /) -> Shape[TypeT_co]: ...
     def __getitem__(
-        self,
-        index: int | slice | Iterable[int],
-        /
+        self, index: int | slice | Iterable[int], /
     ) -> TypeT_co | Shape[TypeT_co]:
         """Returns the component(s) at the given index(es)."""
         if isinstance(index, slice):

@@ -607,7 +607,7 @@ class DiagramRecipe(Generic[TypeT_inv]):
         cls,
         recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]],
         is_boxed: bool,
-        name: str | None
+        name: str | None,
     ) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)

@@ -27,13 +27,13 @@ bit: Final[FinSet] = FinSet(2)
 not_: Final[FinRel] = FinRel.from_callable(bit, bit, lambda b: 1 - b)
 """The NOT gate."""
 
-and_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a&b)
+and_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a & b)
 """The AND gate."""
 
-or_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a|b)
+or_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a | b)
 """The OR gate."""
 
-xor_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a^b)
+xor_: Final[FinRel] = FinRel.from_callable(bit * bit, bit, lambda a, b: a ^ b)
 """The XOR gate."""
 
 bit_0: Final[FinRel] = FinRel.singleton(bit, 0)
@@ -144,7 +144,7 @@ def wallace_multiplier(
     b = inputs[n:]
     layer: dict[int, list[Wire]] = {}
     for i, j in product(range(n), repeat=2):
-        _out, = and_ @ circ[a[i], b[j]]
+        (_out,) = and_ @ circ[a[i], b[j]]
         layer.setdefault(i + j, []).append(_out)
     while any(len(wires) > 1 for wires in layer.values()):
         new_layer: dict[int, list[Wire]] = {}

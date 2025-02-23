@@ -205,7 +205,8 @@ class FinRel(Box[FinSet]):
     def from_wiring(
         cls,
         out_mapping: Sequence[Wire],
-        wire_types: Mapping[Port, Size | FinSet],    ) -> Self:
+        wire_types: Mapping[Port, Size | FinSet],
+    ) -> Self:
         """Creates the spider relation for the given wiring."""
         # 1. Extract and validate wires and their sizes:
         assert validate(out_mapping, Sequence[Wire])
@@ -310,9 +311,7 @@ class FinRel(Box[FinSet]):
                 yield tuple(map(int, idxs))
 
     def _function_matrix(
-        self,
-        input_ports: tuple[Port, ...],
-        /
+        self, input_ports: tuple[Port, ...], /
     ) -> tuple[tuple[Port, ...], NumpyUInt8Array]:
         ports = self.ports
         if not all(p in ports for p in input_ports):
@@ -325,9 +324,8 @@ class FinRel(Box[FinSet]):
         transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
         return (
             output_ports,
-            transposed_tensor.reshape(prod(input_sizes), prod(output_sizes))
+            transposed_tensor.reshape(prod(input_sizes), prod(output_sizes)),
         )
-
 
     def is_function_graph(self, input_ports: Sequence[Port], /) -> bool:
         """
@@ -376,7 +374,7 @@ class FinRel(Box[FinSet]):
         code = f"func = lambda {args_list}: mapping[({args_list})]"
         namespace = {"mapping": mapping}
         exec(code, namespace)
-        return namespace["func"] # type: ignore
+        return namespace["func"]  # type: ignore
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FinRel):

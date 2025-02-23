@@ -15,9 +15,10 @@
 
 
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from math import comb
 import re
+from types import MappingProxyType
 from typing import Literal, Self, TypeAlias
 import numpy as np
 from ..diagrams import Diagram, DiagramBuilder
@@ -80,9 +81,8 @@ class CNFInstance:
         assert validate(dimacs, str)
         lines = [
             stripped_line
-            for line in  dimacs.strip().split("\n")
-            if (stripped_line := line.strip())
-            and not stripped_line.startswith("c")
+            for line in dimacs.strip().split("\n")
+            if (stripped_line := line.strip()) and not stripped_line.startswith("c")
         ]
         start_match = re.compile(r"p cnf ([0-9]+) ([0-9]+)").match(lines[0])
         if not start_match:
@@ -90,10 +90,7 @@ class CNFInstance:
                 "DIMACS code must start with 'p cnf <num vars> <num clauses>'."
             )
         num_vars, num_clauses = map(int, start_match.groups())
-        clauses = tuple(
-            tuple(map(int, line.split(" ")))[:-1]
-            for line in lines[1:]
-        )
+        clauses = tuple(tuple(map(int, line.split(" ")))[:-1] for line in lines[1:])
         if len(clauses) != num_clauses:
             raise ValueError("Number of clauses does not match the specified number.")
         if num_vars < max(abs(lit) for clause in clauses for lit in clause):
@@ -140,7 +137,11 @@ class CNFInstance:
 
     DiagramModes: TypeAlias = Literal["bintree"]
 
-    def diagram(self, *, mode: CNFInstance.DiagramModes = "bintree") -> Diagram[FinSet]:
+    def diagram(
+        self,
+        *,
+        mode: CNFInstance.DiagramModes = "bintree",
+    ) -> Diagram[FinSet]:
         match mode:
             case "bintree":
                 return self._diagram_bintree()

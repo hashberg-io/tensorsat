@@ -377,7 +377,9 @@ class Wiring(WiringBase[TypeT_co]):
                     if w in fwd_cc_repr:
                         continue
                     fwd_cc_repr[w] = cc_repr
-                    bwd_cc_q.extend(sw for sw in fwd_mapping[w] if sw not in bwd_cc_repr)
+                    bwd_cc_q.extend(
+                        sw for sw in fwd_mapping[w] if sw not in bwd_cc_repr
+                    )
                 while bwd_cc_q:
                     sw = bwd_cc_q.popleft()
                     if sw in bwd_cc_repr:
@@ -398,7 +400,9 @@ class Wiring(WiringBase[TypeT_co]):
         for slot, wiring in wirings.items():
             wiring_wire_types = wiring.wire_types
             for w in wiring.wires:
-                if (sw := (slot, w)) in bwd_cc_repr and sw != (sw_repr := bwd_cc_repr[sw]):
+                if (sw := (slot, w)) in bwd_cc_repr and sw != (
+                    sw_repr := bwd_cc_repr[sw]
+                ):
                     slot_wire_remap[sw] = wire_remap[sw_repr]
                 else:
                     slot_wire_remap[sw] = len(wire_types)
@@ -418,9 +422,7 @@ class Wiring(WiringBase[TypeT_co]):
         # 5. Compute new outer wires and return new wiring
         out_wires = tuple(wire_remap[w] for w in self.out_wires)
         return Wiring(
-            wire_types=wire_types,
-            slot_wires_list=slot_wires_list,
-            out_wires=out_wires
+            wire_types=wire_types, slot_wires_list=slot_wires_list, out_wires=out_wires
         )
 
     def __repr__(self) -> str:

@@ -19,7 +19,6 @@ Implementation of boxes and box recipes for the :mod:`tensorsat.diagrams` module
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
-from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,7 +34,7 @@ if __debug__:
     from typing_validation import validate
 
 from .types import Shape, TypeT_co, TypeT_inv
-from .wirings import Port, Shaped, Wire
+from .wirings import Port, Shaped, Wire, Wiring
 
 if TYPE_CHECKING:
     from .diagrams import SelectedInputWires
@@ -53,6 +52,7 @@ class BoxMeta(ABCMeta):
         if not cls.__abstractmethods__:
             try:
                 import autoray  # type: ignore
+
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass

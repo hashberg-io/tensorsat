@@ -129,12 +129,6 @@ def diagram_to_nx_graph(diagram: Diagram) -> nx.Graph:
     return graph
 
 
-# TODO: Reorganise options, grouping sizesm colors, labels, etc,
-#       because this is how they are used.
-#       Remember to deep-copy the respective dictionaries when setting defaults:
-#       it might be helpful to have a function that does such nested typed dict update.
-
-
 class NodeOptionSetters[T](TypedDict, total=False):
 
     box: OptionSetter[Slot | Box | tuple[Slot, Box], T]
