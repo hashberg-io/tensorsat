@@ -75,8 +75,8 @@ labelled by the triple ``(kind, index, data)``.
 
 def diagram_to_nx_graph(
     diagram: Diagram,
-    *,
-    simplify_wires: bool = False
+    # *,
+    # simplify_wires: bool = False
 ) -> nx.Graph:
     """Utility function converting a diagram to a NetworkX graph."""
     assert validate(diagram, Diagram)
@@ -100,52 +100,56 @@ def diagram_to_nx_graph(
         assert False, "Slot must be open, filled with a box, or filled with a diagram."
 
     wiring = diagram.wiring
-    wired_slots = wiring.wired_slots
-    out_wires = set(wiring.out_wires)
-    if simplify_wires:
-        simple_wires = {
-            w: w_slots
-            for w, w_slots in wired_slots.items()
-            if len(w_slots) + int(w in out_wires) == 2
-        }
-    else:
-        simple_wires = {}
+    # wired_slots = wiring.wired_slots
+    # out_wires = set(wiring.out_wires)
+    # if simplify_wires:
+    #     simple_wires = {
+    #         w: w_slots
+    #         for w, w_slots in wired_slots.items()
+    #         if len(w_slots) + int(w in out_wires) == 2
+    #         # FIXME: incorrect^^^^^^^^^^^^^^^^^^^ w may connect to multiple out ports
+    #     }
+    # else:
+    #     simple_wires = {}
     graph = nx.Graph()
-    graph.add_nodes_from(
-        [("wire", w, None) for w in wiring.wires if w not in simple_wires]
-    )
-    graph.add_nodes_from([("out_port", w, None) for w in wiring.out_wires])
+    graph.add_nodes_from([
+            ("wire", w, None)
+            for w in wiring.wires
+            # if w not in simple_wires
+    ])
+    graph.add_nodes_from([("out_port", p, None) for p in wiring.ports])
     graph.add_nodes_from(list(map(slot_node, wiring.slots)))
     graph.add_edges_from(
         [
             (("wire", w, None), slot_node(slot))
             for slot, slot_wires in enumerate(wiring.slot_wires_list)
             for w in slot_wires
-            if w not in simple_wires
+            # if w not in simple_wires
         ]
     )
     graph.add_edges_from(
         [
-            (("wire", w, None), ("out_port", w, None))
-            for w in wiring.out_wires
-            if w not in simple_wires
+            (("wire", w, None), ("out_port", p, None))
+            for p, w in enumerate(wiring.out_wires)
+            # if w not in simple_wires
         ]
     )
-    if simplify_wires:
-        graph.add_edges_from(
-            [
-                (("out_port" if w in out_wires else "wire", w, None), slot_node(w_slots[0]))
-                for w, w_slots in simple_wires.items()
-                if len(w_slots) == 1
-            ]
-        )
-        graph.add_edges_from(
-            [
-                (slot_node(w_slots[0]), slot_node(w_slots[1]))
-                for w, w_slots in simple_wires.items()
-                if len(w_slots) == 2
-            ]
-        )
+    # if simplify_wires:
+    #     graph.add_edges_from(
+    #         [
+    #             (("out_port" if w in out_wires else "wire", w, None), slot_node(w_slots[0]))
+    #             # FIXME:      this should be the port index ^
+    #             for w, w_slots in simple_wires.items()
+    #             if len(w_slots) == 1
+    #         ]
+    #     )
+    #     graph.add_edges_from(
+    #         [
+    #             (slot_node(w_slots[0]), slot_node(w_slots[1]))
+    #             for w, w_slots in simple_wires.items()
+    #             if len(w_slots) == 2
+    #         ]
+    #     )
     return graph
 
 class NodeOptionSetters[T](TypedDict, total=False):
@@ -159,7 +163,7 @@ class NodeOptionSetters[T](TypedDict, total=False):
     subdiagram: OptionSetter[Slot | Diagram | tuple[Slot, Diagram], T]
     """Option value setter for nodes corresponding to subdiagrams."""
 
-    out_port: OptionSetter[Wire, T]
+    out_port: OptionSetter[Port, T]
     """Option value setter for nodes corresponding to out ports."""
 
     wire: OptionSetter[Wire, T]
@@ -323,7 +327,8 @@ class DiagramDrawer:
         match layout:
             case "kamada_kawai":
                 assert validate(layout_kwargs, KamadaKawaiLayoutKWArgs)
-                graph = diagram_to_nx_graph(diagram, simplify_wires=True)
+                # graph = diagram_to_nx_graph(diagram, simplify_wires=True)
+                graph = diagram_to_nx_graph(diagram)
                 pos = nx.kamada_kawai_layout(graph, **layout_kwargs)
             case "bfs":
                 assert validate(layout_kwargs, BFSLayoutKWArgs)
