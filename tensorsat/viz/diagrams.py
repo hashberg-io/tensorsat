@@ -1,5 +1,10 @@
 """
 Visualisation utilities for diagrams.
+
+.. warning::
+
+    This module is subject to frequent breaking changes.
+
 """
 
 # This program is free software: you can redistribute it and/or modify
@@ -44,9 +49,14 @@ except ModuleNotFoundError:
 if __debug__:
     from typing_validation import validate
 
-
 DiagramGraphNodeKind = Literal["box", "open_slot", "subdiagram", "out_port", "wire"]
+"""Type alias for possible kinds of nodes in the NetworkX graph for a diagram."""
+
+DIAGRAM_GRAPH_NODE_KIND: Final[tuple[DiagramGraphNodeKind, ...]] = (
+    "box", "open_slot", "subdiagram", "out_port", "wire"
+)
 """Possible kinds of nodes in the NetworkX graph for a diagram."""
+
 
 DiagramGraphNode = (
     tuple[Literal["box"], int, Box]  # ("box", slot, box)
@@ -60,8 +70,11 @@ Type alias for a node in the NetworkX graph representing a diagram,
 labelled by the triple ``(kind, index, data)``.
 """
 
-
-def diagram_to_nx_graph(diagram: Diagram) -> nx.Graph:
+def diagram_to_nx_graph(
+    diagram: Diagram,
+    *,
+    simplify_wires: bool = False
+) -> nx.Graph:
     """Utility function converting a diagram to a NetworkX graph."""
     assert validate(diagram, Diagram)
     box_slots = set(diagram.box_slots)
@@ -86,11 +99,14 @@ def diagram_to_nx_graph(diagram: Diagram) -> nx.Graph:
     wiring = diagram.wiring
     wired_slots = wiring.wired_slots
     out_wires = set(wiring.out_wires)
-    simple_wires = {
-        w: w_slots
-        for w, w_slots in wired_slots.items()
-        if len(w_slots) + int(w in out_wires) == 2
-    }
+    if simplify_wires:
+        simple_wires = {
+            w: w_slots
+            for w, w_slots in wired_slots.items()
+            if len(w_slots) + int(w in out_wires) == 2
+        }
+    else:
+        simple_wires = {}
     graph = nx.Graph()
     graph.add_nodes_from(
         [("wire", w, None) for w in wiring.wires if w not in simple_wires]
@@ -107,27 +123,27 @@ def diagram_to_nx_graph(diagram: Diagram) -> nx.Graph:
     )
     graph.add_edges_from(
         [
-            (("out_port" if w in out_wires else "wire", w, None), slot_node(w_slots[0]))
-            for w, w_slots in simple_wires.items()
-            if len(w_slots) == 1
-        ]
-    )
-    graph.add_edges_from(
-        [
-            (slot_node(w_slots[0]), slot_node(w_slots[1]))
-            for w, w_slots in simple_wires.items()
-            if len(w_slots) == 2
-        ]
-    )
-    graph.add_edges_from(
-        [
             (("wire", w, None), ("out_port", w, None))
             for w in wiring.out_wires
             if w not in simple_wires
         ]
     )
+    if simplify_wires:
+        graph.add_edges_from(
+            [
+                (("out_port" if w in out_wires else "wire", w, None), slot_node(w_slots[0]))
+                for w, w_slots in simple_wires.items()
+                if len(w_slots) == 1
+            ]
+        )
+        graph.add_edges_from(
+            [
+                (slot_node(w_slots[0]), slot_node(w_slots[1]))
+                for w, w_slots in simple_wires.items()
+                if len(w_slots) == 2
+            ]
+        )
     return graph
-
 
 class NodeOptionSetters[T](TypedDict, total=False):
 
@@ -145,7 +161,6 @@ class NodeOptionSetters[T](TypedDict, total=False):
 
     wire: OptionSetter[Wire, T]
     """Option value setter for nodes corresponding to wires."""
-
 
 class DrawDiagramOptions(TypedDict, total=False):
     """Options for diagram drawing."""
@@ -171,6 +186,11 @@ class DrawDiagramOptions(TypedDict, total=False):
     font_size: int
     """Font size."""
 
+    layout: Literal["kamada_kawai", "bfs"]
+    """Diagram layout."""
+
+    layout_kwargs: Mapping[str, Any] # typing could be better, but requires tagged union
+    """Arguments to diagram layout."""
 
 class DiagramDrawer:
     """
@@ -181,14 +201,7 @@ class DiagramDrawer:
     __defaults: DrawDiagramOptions
 
     def __new__(cls) -> Self:
-        """
-        Instantiates a new diagram drawer, with default values for options.
-
-        .. warning::
-
-            Default option values are currently subject to change without notice.
-
-        """
+        """Instantiates a new diagram drawer, with default values for options."""
         self = super().__new__(cls)
         self.__defaults = {
             "node_size": {
@@ -220,14 +233,16 @@ class DiagramDrawer:
                 "wire": 0,
             },
             "node_border_color": {
-                "box": "lightgray",
-                "open_slot": "lightgray",
-                "subdiagram": "lightgray",
+                "box": "gray",
+                "open_slot": "gray",
+                "subdiagram": "gray",
                 "out_port": "lightgray",
                 "wire": "lightgray",
             },
             "edge_thickness": 1,
             "font_size": 6,
+            "layout": "kamada_kawai",
+            "layout_kwargs": {},
         }
         return self
 
@@ -255,25 +270,47 @@ class DiagramDrawer:
     def __call__(
         self,
         diagram: Diagram,
-        pos: str | Mapping[DiagramGraphNode, tuple[int, int]] = "kamada_kawai",
         **options: Unpack[DrawDiagramOptions],
     ) -> None:
         """Draws the given diagram using NetworkX."""
         assert validate(diagram, Diagram)
-        assert validate(pos, str | Mapping[DiagramGraphNode, tuple[int, int]])
         # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
         # Include default options:
-        options = dict_deep_update(dict_deep_copy(self.__defaults), options)
-        # Create NetworkX graph for the diagram:
-        graph = diagram_to_nx_graph(diagram)
-        # If layout function is passed, use it to generate node positions:
-        if isinstance(pos, str):
-            try:
-                layout_fun = getattr(nx, pos + "_layout")
-            except AttributeError:
-                raise ValueError(f"No NetworkX layout called: {pos}_layout.")
-            pos = layout_fun(graph)
-
+        _options = dict_deep_update(dict_deep_copy(self.__defaults), options)
+        # Create NetworkX graph for diagram + layout:
+        graph: nx.Graph
+        pos: dict[DiagramGraphNode, tuple[float, float]]
+        match _options["layout"]:
+            case "kamada_kawai":
+                graph = diagram_to_nx_graph(diagram, simplify_wires=True)
+                pos = nx.kamada_kawai_layout(graph, **_options["layout_kwargs"])
+            case "bfs":
+                sources = _options["layout_kwargs"].get("sources")
+                if sources is None:
+                    raise KeyError(
+                        "Value for 'sources' must be set in 'layout_kwargs' option"
+                        " when 'bfs' layout is selected, specifying the list of output"
+                        " port indices to be used as source nodes for the search."
+                    )
+                out_ports = diagram.ports
+                if not all(s in out_ports for s in sources):
+                    raise ValueError("Sources must be valid output ports for diagram.")
+                graph = diagram_to_nx_graph(diagram)
+                layers_list = list(nx.bfs_layers(graph, sources=[
+                    ("out_port", i, None) for i in sorted(sources)
+                ]))
+                layers = dict(enumerate(layers_list))
+                reachable_nodes = frozenset(
+                    node
+                    for layer_nodes in layers.values()
+                    for node in layer_nodes
+                )
+                nodes_to_remove = [
+                    node for node in graph.nodes if node not in reachable_nodes
+                ]
+                if any(nodes_to_remove):
+                    graph.remove_nodes_from(nodes_to_remove)
+                pos = nx.multipartite_layout(graph, subset_key=layers)
         # Define utility function to apply option setter to node:
         def _apply[T](setter: NodeOptionSetters[T], node: DiagramGraphNode) -> T | None:
             match node[0]:
@@ -302,31 +339,31 @@ class DiagramDrawer:
 
         # Set options for nx.draw_networkx:
         draw_networkx_options: dict[str, Any] = {}
-        node_size_options = options["node_size"]
+        node_size_options = _options["node_size"]
         draw_networkx_options["node_size"] = [
             _apply(node_size_options, node) for node in graph.nodes
         ]
-        node_color_options = options["node_color"]
+        node_color_options = _options["node_color"]
         draw_networkx_options["node_color"] = [
             _apply(node_color_options, node) for node in graph.nodes
         ]
-        node_label_options = options["node_label"]
+        node_label_options = _options["node_label"]
         draw_networkx_options["labels"] = {
             node: label
             for node in graph.nodes
             if (label := _apply(node_label_options, node)) is not None
         }
-        node_border_color_options = options["node_border_color"]
+        node_border_color_options = _options["node_border_color"]
         draw_networkx_options["edgecolors"] = [
             _apply(node_border_color_options, node) for node in graph.nodes
         ]
-        node_border_thickness_options = options["node_border_thickness"]
+        node_border_thickness_options = _options["node_border_thickness"]
         draw_networkx_options["linewidths"] = [
             _apply(node_border_thickness_options, node) for node in graph.nodes
         ]
-        draw_networkx_options["edge_color"] = options["node_color"]["wire"]
-        draw_networkx_options["width"] = options["edge_thickness"]
-        draw_networkx_options["font_size"] = options["font_size"]
+        draw_networkx_options["edge_color"] = _options["node_color"]["wire"]
+        draw_networkx_options["width"] = _options["edge_thickness"]
+        draw_networkx_options["font_size"] = _options["font_size"]
         # Draw diagram using nx.draw_networkx:
         nx.draw_networkx(graph, pos, **draw_networkx_options)
 
