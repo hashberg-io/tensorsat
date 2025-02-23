@@ -161,7 +161,7 @@ class Diagram(Shaped[TypeT_co]):
 
     __wiring: Wiring[TypeT_co]
     __blocks: tuple[Box[TypeT_co] | Diagram[TypeT_co] | None, ...]
-    __recipe_used: DiagramRecipe[TypeT_co] | None
+    __recipe_used: tuple[DiagramRecipe[TypeT_co], tuple[TypeT_co, ...]] | None
 
     __slots__ = ("__weakref__", "__wiring", "__blocks", "__recipe_used")
 
@@ -240,7 +240,7 @@ class Diagram(Shaped[TypeT_co]):
         return 1 + max(diag.depth for diag in subdiagrams)
 
     @property
-    def recipe_used(self) -> DiagramRecipe[TypeT_co] | None:
+    def recipe_used(self) -> tuple[DiagramRecipe[TypeT_co], tuple[TypeT_co, ...]] | None:
         """The recipe used to create the diagram, if any."""
         return self.__recipe_used
 
@@ -329,8 +329,10 @@ class Diagram(Shaped[TypeT_co]):
             attrs.append(f"depth {depth}")
         if num_out_ports > 0:
             attrs.append(f"{num_out_ports} out ports")
-        if recipe_used and recipe_used.name:
-            attrs.append(f"from recipe {recipe_used.name!r}")
+        if recipe_used:
+            recipe, _ = recipe_used
+            if recipe.name:
+                attrs.append(f"from recipe {recipe.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
 
@@ -651,7 +653,7 @@ class DiagramRecipe(Generic[TypeT_inv]):
         outputs = self.__recipe(builder, inputs)
         builder._add_outputs(outputs)
         diagram = builder.diagram
-        diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
+        diagram._Diagram__recipe_used = (self, tuple(input_types)) # type: ignore[attr-defined]
         return diagram
 
     def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
