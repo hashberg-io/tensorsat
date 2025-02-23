@@ -21,10 +21,12 @@ Visualisation utilities for diagrams.
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from collections.abc import Mapping
-from typing import Any, Final, Literal, Self, TypedDict, Unpack
+from collections.abc import Sequence
+from types import MappingProxyType
+from typing import Any, Final, Literal, Self, TypedDict, Unpack, overload
+from numpy.typing import ArrayLike
 
-from ..diagrams import Slot, Box, Diagram, Wire
+from ..diagrams import Slot, Box, Diagram, Wire, Port
 from ..utils import (
     ValueSetter as OptionSetter,
     apply_setter,
@@ -34,6 +36,7 @@ from ..utils import (
 
 try:
     import matplotlib.pyplot as plt  # noqa: F401
+    from matplotlib.axes import Axes
 except ModuleNotFoundError:
     raise ModuleNotFoundError(
         "For diagram visualisation, 'matplotlib' must be installed."
@@ -162,6 +165,18 @@ class NodeOptionSetters[T](TypedDict, total=False):
     wire: OptionSetter[Wire, T]
     """Option value setter for nodes corresponding to wires."""
 
+
+class KamadaKawaiLayoutKWArgs(TypedDict, total=False):
+    dist: Any
+    pos: Any
+    weight: str
+    scale: int
+    center: ArrayLike
+    dim: int
+
+class BFSLayoutKWArgs(TypedDict, total=True):
+    sources: Sequence[Port]
+
 class DrawDiagramOptions(TypedDict, total=False):
     """Options for diagram drawing."""
 
@@ -186,11 +201,6 @@ class DrawDiagramOptions(TypedDict, total=False):
     font_size: int
     """Font size."""
 
-    layout: Literal["kamada_kawai", "bfs"]
-    """Diagram layout."""
-
-    layout_kwargs: Mapping[str, Any] # typing could be better, but requires tagged union
-    """Arguments to diagram layout."""
 
 class DiagramDrawer:
     """
@@ -241,8 +251,6 @@ class DiagramDrawer:
             },
             "edge_thickness": 1,
             "font_size": 6,
-            "layout": "kamada_kawai",
-            "layout_kwargs": {},
         }
         return self
 
@@ -267,31 +275,61 @@ class DiagramDrawer:
         instance.set_defaults(**defaults)
         return instance
 
+    @overload
     def __call__(
         self,
         diagram: Diagram,
+        *,
+        ax: Axes | None = None,
+        figsize: tuple[float, float] | None = None,
+        layout: Literal["kamada_kawai"],
+        layout_kwargs: KamadaKawaiLayoutKWArgs = {},
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None: ...
+
+    @overload
+    def __call__(
+        self,
+        diagram: Diagram,
+        *,
+        ax: Axes | None = None,
+        figsize: tuple[float, float] | None = None,
+        layout: Literal["bfs"],
+        layout_kwargs: BFSLayoutKWArgs,
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None: ...
+
+    def __call__(
+        self,
+        diagram: Diagram,
+        *,
+        layout: str,
+        layout_kwargs: Any = MappingProxyType({}),
+        ax: Axes | None = None,
+        figsize: tuple[float, float] | None = None,
         **options: Unpack[DrawDiagramOptions],
     ) -> None:
         """Draws the given diagram using NetworkX."""
         assert validate(diagram, Diagram)
         # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
         # Include default options:
-        _options = dict_deep_update(dict_deep_copy(self.__defaults), options)
+        _options: DrawDiagramOptions = dict_deep_update(
+            dict_deep_copy(self.__defaults),
+            options
+        )
         # Create NetworkX graph for diagram + layout:
         graph: nx.Graph
         pos: dict[DiagramGraphNode, tuple[float, float]]
-        match _options["layout"]:
+        match layout:
             case "kamada_kawai":
+                assert validate(layout_kwargs, KamadaKawaiLayoutKWArgs)
                 graph = diagram_to_nx_graph(diagram, simplify_wires=True)
-                pos = nx.kamada_kawai_layout(graph, **_options["layout_kwargs"])
+                pos = nx.kamada_kawai_layout(graph, **layout_kwargs)
             case "bfs":
-                sources = _options["layout_kwargs"].get("sources")
-                if sources is None:
-                    raise KeyError(
-                        "Value for 'sources' must be set in 'layout_kwargs' option"
-                        " when 'bfs' layout is selected, specifying the list of output"
-                        " port indices to be used as source nodes for the search."
-                    )
+                assert validate(layout_kwargs, BFSLayoutKWArgs)
+                sources = layout_kwargs["sources"]
+                if not sources:
+                    raise ValueError("At least one source must be selected for BFS layout.")
                 out_ports = diagram.ports
                 if not all(s in out_ports for s in sources):
                     raise ValueError("Sources must be valid output ports for diagram.")
@@ -311,6 +349,8 @@ class DiagramDrawer:
                 if any(nodes_to_remove):
                     graph.remove_nodes_from(nodes_to_remove)
                 pos = nx.multipartite_layout(graph, subset_key=layers)
+            case _:
+                raise ValueError(f"Invalid layout choice {layout!r}.")
         # Define utility function to apply option setter to node:
         def _apply[T](setter: NodeOptionSetters[T], node: DiagramGraphNode) -> T | None:
             match node[0]:
@@ -364,8 +404,14 @@ class DiagramDrawer:
         draw_networkx_options["edge_color"] = _options["node_color"]["wire"]
         draw_networkx_options["width"] = _options["edge_thickness"]
         draw_networkx_options["font_size"] = _options["font_size"]
-        # Draw diagram using nx.draw_networkx:
-        nx.draw_networkx(graph, pos, **draw_networkx_options)
+        # Draw diagram using Matplotlib and nx.draw_networkx:
+        if ax is None:
+            plt.figure(figsize=figsize)
+        nx.draw_networkx(graph, pos, ax=ax, **draw_networkx_options)
+        if ax is None:
+            plt.gca().invert_yaxis()
+            plt.axis("off")
+            plt.show()
 
 
 draw_diagram: Final[DiagramDrawer] = DiagramDrawer()
