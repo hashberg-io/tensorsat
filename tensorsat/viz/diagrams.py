@@ -75,8 +75,8 @@ labelled by the triple ``(kind, index, data)``.
 
 def diagram_to_nx_graph(
     diagram: Diagram,
-    # *,
-    # simplify_wires: bool = False
+    *,
+    simplify_wires: bool = False
 ) -> nx.Graph:
     """Utility function converting a diagram to a NetworkX graph."""
     assert validate(diagram, Diagram)
@@ -100,22 +100,36 @@ def diagram_to_nx_graph(
         assert False, "Slot must be open, filled with a box, or filled with a diagram."
 
     wiring = diagram.wiring
-    # wired_slots = wiring.wired_slots
-    # out_wires = set(wiring.out_wires)
-    # if simplify_wires:
-    #     simple_wires = {
-    #         w: w_slots
-    #         for w, w_slots in wired_slots.items()
-    #         if len(w_slots) + int(w in out_wires) == 2
-    #         # FIXME: incorrect^^^^^^^^^^^^^^^^^^^ w may connect to multiple out ports
-    #     }
-    # else:
-    #     simple_wires = {}
+    wired_slots = wiring.wired_slots
+    out_wires = wiring.out_wires
+    if simplify_wires:
+        slot_slot_wires = {
+            w: w_slots
+            for w, w_slots in wired_slots.items()
+            if len(w_slots) == 2 and w not in out_wires
+        }
+        slot_port_wires = {
+            w: (w_slots[0], out_wires.index(w))
+            for w, w_slots in wired_slots.items()
+            if len(w_slots) == 1 and out_wires.count(w) == 1
+        }
+        port_port_wires = {
+            w: (_i := out_wires.index(w), out_wires.index(w, _i+1))
+            for w, w_slots in wired_slots.items()
+            if len(w_slots) == 0 and out_wires.count(w) == 2
+        }
+        simple_wires = (
+            set(slot_slot_wires)
+            |set(slot_port_wires)
+            |set(port_port_wires)
+        )
+    else:
+        simple_wires = set()
     graph = nx.Graph()
     graph.add_nodes_from([
             ("wire", w, None)
             for w in wiring.wires
-            # if w not in simple_wires
+            if w not in simple_wires
     ])
     graph.add_nodes_from([("out_port", p, None) for p in wiring.ports])
     graph.add_nodes_from(list(map(slot_node, wiring.slots)))
@@ -124,32 +138,29 @@ def diagram_to_nx_graph(
             (("wire", w, None), slot_node(slot))
             for slot, slot_wires in enumerate(wiring.slot_wires_list)
             for w in slot_wires
-            # if w not in simple_wires
+            if w not in simple_wires
         ]
     )
     graph.add_edges_from(
         [
             (("wire", w, None), ("out_port", p, None))
             for p, w in enumerate(wiring.out_wires)
-            # if w not in simple_wires
+            if w not in simple_wires
         ]
     )
-    # if simplify_wires:
-    #     graph.add_edges_from(
-    #         [
-    #             (("out_port" if w in out_wires else "wire", w, None), slot_node(w_slots[0]))
-    #             # FIXME:      this should be the port index ^
-    #             for w, w_slots in simple_wires.items()
-    #             if len(w_slots) == 1
-    #         ]
-    #     )
-    #     graph.add_edges_from(
-    #         [
-    #             (slot_node(w_slots[0]), slot_node(w_slots[1]))
-    #             for w, w_slots in simple_wires.items()
-    #             if len(w_slots) == 2
-    #         ]
-    #     )
+    if simplify_wires:
+        graph.add_edges_from(
+            [
+                (("out_port", port, None), slot_node(slot))
+                for w, (slot, port) in slot_port_wires.items()
+            ]
+        )
+        graph.add_edges_from(
+            [
+                (slot_node(w_slots[0]), slot_node(w_slots[1]))
+                for w, w_slots in slot_slot_wires.items()
+            ]
+        )
     return graph
 
 class NodeOptionSetters[T](TypedDict, total=False):
@@ -284,10 +295,11 @@ class DiagramDrawer:
         self,
         diagram: Diagram,
         *,
+        layout: Literal["kamada_kawai"] = "kamada_kawai",
+        layout_kwargs: KamadaKawaiLayoutKWArgs = {},
+        simplify_wires: bool = True,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
-        layout: Literal["kamada_kawai"],
-        layout_kwargs: KamadaKawaiLayoutKWArgs = {},
         **options: Unpack[DrawDiagramOptions],
     ) -> None: ...
 
@@ -296,22 +308,11 @@ class DiagramDrawer:
         self,
         diagram: Diagram,
         *,
-        ax: Axes | None = None,
-        figsize: tuple[float, float] | None = None,
         layout: Literal["bfs"],
         layout_kwargs: BFSLayoutKWArgs,
-        **options: Unpack[DrawDiagramOptions],
-    ) -> None: ...
-
-    @overload
-    def __call__(
-        self,
-        diagram: Diagram,
-        *,
+        simplify_wires: bool = True,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
-        layout: None = None,
-        layout_kwargs: Any = MappingProxyType({}),
         **options: Unpack[DrawDiagramOptions],
     ) -> None: ...
 
@@ -319,8 +320,9 @@ class DiagramDrawer:
         self,
         diagram: Diagram,
         *,
-        layout: str | None = None,
+        layout: str = "kamada_kawai",
         layout_kwargs: Any = MappingProxyType({}),
+        simplify_wires: bool = True,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
         **options: Unpack[DrawDiagramOptions],
@@ -334,15 +336,11 @@ class DiagramDrawer:
             options
         )
         # Create NetworkX graph for diagram + layout:
-        graph: nx.Graph
+        graph = diagram_to_nx_graph(diagram, simplify_wires=simplify_wires)
         pos: dict[DiagramGraphNode, tuple[float, float]]
-        if layout is None:
-            layout = "kamada_kawai"
         match layout:
             case "kamada_kawai":
                 assert validate(layout_kwargs, KamadaKawaiLayoutKWArgs)
-                # graph = diagram_to_nx_graph(diagram, simplify_wires=True)
-                graph = diagram_to_nx_graph(diagram)
                 pos = nx.kamada_kawai_layout(
                     graph,
                     **cast(KamadaKawaiLayoutKWArgs, layout_kwargs)
@@ -357,7 +355,6 @@ class DiagramDrawer:
                     )
                 elif not all(s in out_ports for s in sources):
                     raise ValueError("Sources must be valid ports for diagram.")
-                graph = diagram_to_nx_graph(diagram)
                 layers_list = list(nx.bfs_layers(graph, sources=[
                     ("out_port", i, None) for i in sorted(sources)
                 ]))
