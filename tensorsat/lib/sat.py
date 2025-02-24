@@ -33,6 +33,8 @@ A SAT clause, as a tuple of non-zero integers representing the literals in the c
 with the integer sign determining whether the literal is positive or negative.
 """
 
+CNFDiagramMode: TypeAlias = Literal["bintree"]
+"""Type alias for available diagram creation modes in :class:`CNFInstance`."""
 
 class CNFInstance:
     """A SAT instance in CNF form."""
@@ -134,15 +136,10 @@ class CNFInstance:
         ]
         return "\n".join(lines)
 
-    DiagramModes: TypeAlias = Literal["bintree"] # TODO: move this outside
-
-    # TODO: Add assignment: Mapping[int, bool | Literal["?"]] = MappingProxyType({})
-    #       argument to diagram method, allowing easy specification of bool inputs.
-
     def diagram(
         self,
         *,
-        mode: CNFInstance.DiagramModes = "bintree",
+        mode: CNFDiagramMode = "bintree",
     ) -> Diagram[FinSet]:
         match mode:
             case "bintree":

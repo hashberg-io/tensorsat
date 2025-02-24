@@ -44,6 +44,8 @@ if TYPE_CHECKING:
 #       Make it possible to subclass concrete Box classes, to allow overlapping langs.
 #       It makes sense to consider alternative parametrisations for boxes in diff langs.
 
+# TODO: consider introducing box labels, for builtin boxes
+
 class BoxMeta(ABCMeta):
     def __new__(
         mcs,
@@ -61,10 +63,6 @@ class BoxMeta(ABCMeta):
             except ModuleNotFoundError:
                 pass
         return cls
-
-
-# TODO: consider introducing box labels, for builtin boxes
-
 
 class Box(Shaped[TypeT_co], metaclass=BoxMeta):
     """
