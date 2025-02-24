@@ -400,10 +400,8 @@ class Wiring(WiringBase[TypeT_co]):
         for slot, wiring in wirings.items():
             wiring_wire_types = wiring.wire_types
             for w in wiring.wires:
-                if (sw := (slot, w)) in bwd_cc_repr and sw != (
-                    sw_repr := bwd_cc_repr[sw]
-                ):
-                    slot_wire_remap[sw] = wire_remap[sw_repr]
+                if (sw := (slot, w)) in bwd_cc_repr:
+                    slot_wire_remap[sw] = wire_remap[bwd_cc_repr[sw]]
                 else:
                     slot_wire_remap[sw] = len(wire_types)
                     wire_types.append(wiring_wire_types[w])
