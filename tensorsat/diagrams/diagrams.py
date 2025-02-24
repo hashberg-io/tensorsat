@@ -281,7 +281,7 @@ class Diagram(Shaped[TypeT_co]):
 
     def flatten(self, *, cache: bool = True) -> Diagram[TypeT_co]:
         """
-        Returns a recursively diagram, obtained by recursively flattening all
+        Returns a flat diagram, obtained by recursively flattening all
         sub-diagrams, composing their wirings into the current wiring, and taking
         all blocks (of this diagrams and its sub-diagrams) as the blocks of the result.
         """
@@ -310,7 +310,7 @@ class Diagram(Shaped[TypeT_co]):
         flat_diagram = Diagram._new(flat_wiring, tuple(flat_blocks))
         if cache is not None:
             cache[self] = flat_diagram
-        return self
+        return flat_diagram
 
     def __repr__(self) -> str:
         attrs: list[str] = []
