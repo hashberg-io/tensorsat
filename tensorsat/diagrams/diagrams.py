@@ -155,17 +155,15 @@ class Diagram(Shaped[TypeT_co]):
         self.__wiring = wiring
         self.__blocks = blocks
         self.__recipe_used = None
-        self.__input_ports = None
         return self
 
     __wiring: Wiring[TypeT_co]
     __blocks: tuple[Box[TypeT_co] | Diagram[TypeT_co] | None, ...]
     __recipe_used: DiagramRecipe[TypeT_co] | None
-    __input_ports: tuple[Port, ...] | None
     __hash_cache: int
 
     __slots__ = (
-        "__weakref__", "__wiring", "__blocks", "__recipe_used", "__input_ports", "__hash_cache"
+        "__weakref__", "__wiring", "__blocks", "__recipe_used", "__hash_cache"
     )
 
     def __new__(
@@ -246,22 +244,6 @@ class Diagram(Shaped[TypeT_co]):
     def recipe_used(self) -> DiagramRecipe[TypeT_co] | None:
         """The recipe used to create the diagram, if any."""
         return self.__recipe_used
-
-    @property
-    def input_ports(self) -> tuple[Port, ...] | None:
-        """Ports designated as inputs in this diagram, if any."""
-        return self.__input_ports
-
-    def with_input_ports(self, input_ports: Sequence[Port], /) -> Diagram[TypeT_co]:
-        """Returns a copy of this diagram, with the given ports selected as inputs."""
-        assert validate(input_ports, Sequence[Port])
-        ports = self.ports
-        if any(p not in ports for p in input_ports):
-            raise ValueError("Invalid ports selected.")
-        diagram = Diagram._new(self.__wiring, self.__blocks)
-        diagram.__recipe_used = self.__recipe_used
-        diagram.__input_ports = tuple(input_ports)
-        return diagram
 
     def compose(
         self, new_blocks: Mapping[Slot, Block[TypeT_co] | Wiring[TypeT_co]]
@@ -373,16 +355,17 @@ class DiagramBuilder(Generic[TypeT_inv]):
 
     __wiring_builder: WiringBuilder[TypeT_inv]
     __blocks: dict[Slot, Block[TypeT_inv]]
-    __input_ports: list[Port]
 
-    __slots__ = ("__weakref__", "__wiring_builder", "__blocks", "__input_ports")
+    __slots__ = (
+        "__weakref__",
+        "__wiring_builder", "__blocks"
+    )
 
     def __new__(cls) -> Self:
         """Creates a blank diagram builder."""
         self = super().__new__(cls)
         self.__wiring_builder = WiringBuilder()
         self.__blocks = {}
-        self.__input_ports = []
         return self
 
     def copy(self) -> DiagramBuilder[TypeT_inv]:
@@ -390,7 +373,6 @@ class DiagramBuilder(Generic[TypeT_inv]):
         clone: DiagramBuilder[TypeT_inv] = DiagramBuilder.__new__(DiagramBuilder)
         clone.__wiring_builder = self.__wiring_builder.copy()
         clone.__blocks = self.__blocks.copy()
-        clone.__input_ports = self.__input_ports.copy()
         return clone
 
     @property
@@ -410,7 +392,6 @@ class DiagramBuilder(Generic[TypeT_inv]):
         blocks = self.__blocks
         _blocks = tuple(blocks.get(slot) for slot in wiring.slots)
         diagram = Diagram._new(wiring, _blocks)
-        diagram._Diagram__input_ports = tuple(self.__input_ports) # type: ignore[attr-defined]
         return diagram
 
     def set_block(self, slot: Slot, block: Block[TypeT_inv]) -> None:
@@ -491,8 +472,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
     def _add_inputs(self, ts: Sequence[TypeT_inv]) -> tuple[Wire, ...]:
         wiring = self.wiring
         wires = wiring._add_wires(ts)
-        input_ports = wiring._add_out_ports(wires)
-        self.__input_ports.extend(input_ports)
+        wiring._add_out_ports(wires)
         return wires
 
     def add_outputs(self, wires: Sequence[Wire]) -> None:

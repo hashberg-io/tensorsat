@@ -178,7 +178,7 @@ class KamadaKawaiLayoutKWArgs(TypedDict, total=False):
     center: ArrayLike
     dim: int
 
-class LayeredLayoutKWArgs(TypedDict, total=False):
+class BFSLayoutKWArgs(TypedDict, total=True):
     sources: Sequence[Port]
 
 class DrawDiagramOptions(TypedDict, total=False):
@@ -298,8 +298,8 @@ class DiagramDrawer:
         *,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
-        layout: Literal["layered"],
-        layout_kwargs: LayeredLayoutKWArgs,
+        layout: Literal["bfs"],
+        layout_kwargs: BFSLayoutKWArgs,
         **options: Unpack[DrawDiagramOptions],
     ) -> None: ...
 
@@ -337,7 +337,7 @@ class DiagramDrawer:
         graph: nx.Graph
         pos: dict[DiagramGraphNode, tuple[float, float]]
         if layout is None:
-            layout = "kamada_kawai" if diagram.input_ports is None else "layered"
+            layout = "kamada_kawai"
         match layout:
             case "kamada_kawai":
                 assert validate(layout_kwargs, KamadaKawaiLayoutKWArgs)
@@ -347,18 +347,11 @@ class DiagramDrawer:
                     graph,
                     **cast(KamadaKawaiLayoutKWArgs, layout_kwargs)
                 )
-            case "layered":
+            case "bfs":
                 out_ports = diagram.ports
-                assert validate(layout_kwargs, LayeredLayoutKWArgs)
-                sources = cast(LayeredLayoutKWArgs, layout_kwargs).get("sources")
-                if sources is None:
-                    if diagram.input_ports is None:
-                        raise ValueError(
-                            "Cannot automatically select source nodes for layered layout:"
-                            " diagram doesn't have input ports selected."
-                        )
-                    sources = diagram.input_ports
-                elif not sources:
+                assert validate(layout_kwargs, BFSLayoutKWArgs)
+                sources = cast(BFSLayoutKWArgs, layout_kwargs).get("sources")
+                if not sources:
                     raise ValueError(
                         "At least one source port must be selected for layered layout."
                     )
