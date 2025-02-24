@@ -134,7 +134,10 @@ class CNFInstance:
         ]
         return "\n".join(lines)
 
-    DiagramModes: TypeAlias = Literal["bintree"]
+    DiagramModes: TypeAlias = Literal["bintree"] # TODO: move this outside
+
+    # TODO: Add assignment: Mapping[int, bool | Literal["?"]] = MappingProxyType({})
+    #       argument to diagram method, allowing easy specification of bool inputs.
 
     def diagram(
         self,
