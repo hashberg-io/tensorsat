@@ -405,22 +405,20 @@ class Wiring(WiringBase[TypeT_co]):
                 else:
                     slot_wire_remap[sw] = len(wire_types)
                     wire_types.append(wiring_wire_types[w])
-        # 4(a). Compute new slot wires for slots left open in outer wiring:
-        slot_wires_list = tuple(
-            tuple(wire_remap[w] for w in slot_wires)
-            for slot, slot_wires in enumerate(self.slot_wires_list)
-            if slot not in wirings
-        )
-        # 4(b). Compute new slot wires for slots of inner wirings:
-        for slot, wiring in wirings.items():
-            slot_wires_list += tuple(
-                tuple(slot_wire_remap[(slot, w)] for w in _slot_wires)
-                for _slot_wires in wiring.slot_wires_list
-            )
+        # 4. Compute new slot wires:
+        new_slot_wires_list: list[tuple[Wire, ...]] = []
+        for slot in self.slots:
+            if slot in wirings:
+                new_slot_wires_list.extend(
+                    tuple(slot_wire_remap[(slot, w)] for w in _slot_wires)
+                    for _slot_wires in wirings[slot].slot_wires_list
+                )
+            else:
+                new_slot_wires_list.append(tuple(wire_remap[w] for w in self.slot_wires_list[slot]))
         # 5. Compute new outer wires and return new wiring
         out_wires = tuple(wire_remap[w] for w in self.out_wires)
         return Wiring(
-            wire_types=wire_types, slot_wires_list=slot_wires_list, out_wires=out_wires
+            wire_types=wire_types, slot_wires_list=new_slot_wires_list, out_wires=out_wires
         )
 
     def __repr__(self) -> str:
