@@ -682,8 +682,10 @@ class DiagramRecipe(Generic[TypeT_inv]):
         """
         selected_wires = selected.wires
         num_ports = len(selected_wires)
-        if set(selected_wires) != set(range(num_ports)):
-            raise ValueError("Selected ports must form a contiguous zero-based range.")
+        if isinstance(selected_wires, Mapping) and set(selected_wires) != set(range(num_ports)):
+                raise NotImplementedError(
+                    "At present, selected ports must form a contiguous zero-based range."
+                )
         wire_types = selected.builder.wiring.wire_types
         input_types = tuple(
             wire_types[selected_wires[port]] for port in range(num_ports)
