@@ -15,10 +15,9 @@
 
 
 from __future__ import annotations
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from math import comb
 import re
-from types import MappingProxyType
 from typing import Literal, Self, TypeAlias
 import numpy as np
 from ..diagrams import Diagram, DiagramBuilder

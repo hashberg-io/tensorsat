@@ -14,10 +14,14 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from itertools import product
 from types import MappingProxyType
 from typing import Final
+
+if __debug__:
+    from typing_validation import validate
+
 from ..diagrams import Diagram, DiagramBuilder, Wire
 from ..lang.fin_rel import FinSet, FinRel
 
@@ -55,111 +59,83 @@ binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
 """Labels for binary operations."""
 
 
-@Diagram.from_recipe(bit**2)
-def half_adder(circ: DiagramBuilder[FinSet], inputs: Sequence[Wire]) -> Sequence[Wire]:
+@Diagram.from_recipe
+def half_adder(diag: DiagramBuilder[FinSet]) -> None:
     """
     Diagram for a half adder circuit.
     See https://en.wikipedia.org/wiki/Adder_(electronics)#Half_adder
     """
-    a, b = inputs
-    (s,) = xor_ @ circ[a, b]
-    (c,) = and_ @ circ[a, b]
-    return s, c
+    a, b = diag.add_inputs(bit**2)
+    (s,) = xor_ @ diag[a, b]
+    (c,) = and_ @ diag[a, b]
+    diag.add_outputs([s, c])
 
 
-@Diagram.from_recipe(bit**3)
-def full_adder(circ: DiagramBuilder[FinSet], inputs: Sequence[Wire]) -> Sequence[Wire]:
+@Diagram.from_recipe
+def full_adder(diag: DiagramBuilder[FinSet]) -> None:
     """
     Diagram for a full adder circuit.
     See https://en.wikipedia.org/wiki/Adder_(electronics)#Full_adder
     """
-    a, b, c_in = inputs
-    (x1,) = xor_ @ circ[a, b]
-    (x2,) = and_ @ circ[a, b]
-    (x3,) = and_ @ circ[x1, c_in]
-    (s,) = xor_ @ circ[x1, x3]
-    (c_out,) = or_ @ circ[x2, x3]
-    return s, c_out
-
+    a, b, c_in = diag.add_inputs(bit**3)
+    (x1,) = xor_ @ diag[a, b]
+    (x2,) = and_ @ diag[a, b]
+    (x3,) = and_ @ diag[x1, c_in]
+    (s,) = xor_ @ diag[x1, x3]
+    (c_out,) = or_ @ diag[x2, x3]
+    diag.add_outputs([s, c_out])
 
 @Diagram.recipe
-def rc_adder(circ: DiagramBuilder[FinSet], inputs: Sequence[Wire]) -> Sequence[Wire]:
+def rc_adder(diag: DiagramBuilder[FinSet], num_bits: int) -> None:
     """
-    Recipe to create a ripple carry adder.
-    The recipe can be called on given input types to create a diagram:
-
-    .. code-block:: python
-
-        rc_adder_2bit: Diagram[FinSet] = rc_adder(bit**5)
-
-    Alternatively, the recipe can be applied to wires in a circuit builder,
-    obtaining the output wires for the builder sub-circuit in return:
-
-    .. code-block:: python
-
-        s0, s1, c_out = rc_adder @ some_circuit[c_in, a0, b0, a1, b1]
-
+    Recipe to create a ripple carry adder circuit,
+    given the number ``num_bits`` of bits for each summand.
     See https://en.wikipedia.org/wiki/Adder_(electronics)#Ripple-carry_adder
     """
-    if len(inputs) % 2 != 1:
-        raise ValueError("Ripple carry adder expects odd number of inputs.")
-    num_bits = len(inputs) // 2
-    outputs: list[int] = []
+    assert validate(num_bits, int)
+    if num_bits <= 0:
+        raise ValueError("Number of bits must be positive.")
+    inputs = diag.add_inputs(bit**(2*num_bits+1))
+    outputs: list[Wire] = []
     c = inputs[0]
     for i in range(num_bits):
         a, b = inputs[2 * i + 1 : 2 * i + 3]
-        s, c = full_adder @ circ[c, a, b]
+        s, c = full_adder @ diag[c, a, b]
         outputs.append(s)
     outputs.append(c)
-    return tuple(outputs)
+    diag.add_outputs(outputs)
 
 
 @Diagram.recipe
-def wallace_multiplier(
-    circ: DiagramBuilder[FinSet], inputs: Sequence[Wire]
-) -> Sequence[Wire]:
+def wallace_multiplier(diag: DiagramBuilder[FinSet], num_bits: int) -> None:
     """
-    Recipe to create a Wallace multiplier.
-    The recipe can be called on given input types to create a diagram:
-
-    .. code-block:: python
-
-        rc_adder_2bit: Diagram[FinSet] = wallace_multiplier(bit**4)
-
-    Alternatively, the recipe can be applied to wires in a circuit builder,
-    obtaining the output wires for the builder sub-circuit in return:
-
-    .. code-block:: python
-
-        c0, c1, c2, c3 = wallace_multiplier @ some_circuit[a0, a1, b0, b1]
-
+    Recipe to create a Wallace multiplier circuit,
+    given the number ``num_bits`` of bits for each factor.
     See https://en.wikipedia.org/wiki/Wallace_tree
     """
-    if len(inputs) % 2 != 0:
-        raise ValueError("Wallace multiplier expects even number of inputs.")
-    if not inputs:
-        return ()
-    n = len(inputs) // 2
-    a = inputs[:n]
-    b = inputs[n:]
+    assert validate(num_bits, int)
+    if num_bits <= 0:
+        raise ValueError("Number of bits must be positive.")
+    a = diag.add_inputs(bit**num_bits)
+    b = diag.add_inputs(bit**num_bits)
     layer: dict[int, list[Wire]] = {}
-    for i, j in product(range(n), repeat=2):
-        (_out,) = and_ @ circ[a[i], b[j]]
+    for i, j in product(range(num_bits), repeat=2):
+        (_out,) = and_ @ diag[a[i], b[j]]
         layer.setdefault(i + j, []).append(_out)
     while any(len(wires) > 1 for wires in layer.values()):
         new_layer: dict[int, list[Wire]] = {}
         for weight, wires in layer.items():
             num_fulladd, _r = divmod(len(wires), 3)
             for idx in range(num_fulladd):
-                s, c_out = full_adder @ circ[*wires[3 * idx : 3 * idx + 3]]
+                s, c_out = full_adder @ diag[*wires[3 * idx : 3 * idx + 3]]
                 new_layer.setdefault(weight, []).append(s)
                 new_layer.setdefault(weight + 1, []).append(c_out)
             if _r == 2:
-                s, c_out = half_adder @ circ[*wires[-2:]]
+                s, c_out = half_adder @ diag[*wires[-2:]]
                 new_layer.setdefault(weight, []).append(s)
                 new_layer.setdefault(weight + 1, []).append(c_out)
             elif _r == 1:
                 new_layer.setdefault(weight, []).append(wires[-1])
         layer = new_layer
     assert all(len(wires) == 1 for wires in layer.values())
-    return tuple(wires[0] for wires in layer.values())
+    diag.add_outputs(wires[0] for wires in layer.values())

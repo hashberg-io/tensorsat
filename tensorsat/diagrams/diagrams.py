@@ -17,15 +17,18 @@ Implementation of diagrams and their builders for the :mod:`tensorsat.diagrams` 
 
 
 from __future__ import annotations
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import (
     Any,
+    Concatenate,
     Generic,
+    ParamSpec,
     Self,
     cast,
     final,
 )
+from weakref import WeakValueDictionary
 
 if __debug__:
     from typing_validation import validate
@@ -47,6 +50,59 @@ Type alias for a block in a diagram, which can be either:
 # TODO: Consider making diagrams parametric in BoxT_co as well,
 #       even though we cannot (yet?) make BoxT_co bound to on Box[TypeT_co]
 
+RecipeParams = ParamSpec("RecipeParams")
+"""Parameter specification variable for the parameters of a recipe."""
+
+class DiagramRecipe(Generic[RecipeParams, TypeT_inv]):
+    """A Recipe to produce diagrams from given perameters."""
+
+    __diagrams: WeakValueDictionary[Any, Diagram[TypeT_inv]]
+    __recipe: Callable[Concatenate[DiagramBuilder[TypeT_inv], RecipeParams], None]
+
+    __slots__ = ("__weakref__", "__diagrams", "__recipe")
+
+    def __new__(
+        cls,
+        recipe: Callable[Concatenate[DiagramBuilder[TypeT_inv], RecipeParams], None]
+    ) -> Self:
+        self = super().__new__(cls)
+        self.__recipe = recipe
+        self.__diagrams = WeakValueDictionary()
+        return self
+
+    @property
+    def name(self) -> str:
+        """The name of this recipe."""
+        return self.__recipe.__name__
+
+    def __call__(
+        self,
+        *args: RecipeParams.args,
+        **kwargs: RecipeParams.kwargs
+    ) -> Diagram[TypeT_inv]:
+        """
+        Returns the diagram constructed by the recipe on given arguments.
+
+        :meta public:
+        """
+        key = (args, frozenset(kwargs.items()))
+        if key in self.__diagrams:
+            return self.__diagrams[key]
+        builder: DiagramBuilder[TypeT_inv] = DiagramBuilder()
+        self.__recipe(builder, *args, **kwargs)
+        diagram = builder.diagram
+        diagram._Diagram__recipe_used = self # type: ignore[attr-defined]
+        self.__diagrams[key] = diagram
+        return diagram
+
+    def __repr__(self) -> str:
+        """Representation of the recipe."""
+        recipe = self.__recipe
+        mod = recipe.__module__
+        name = recipe.__name__
+        return f"Diagram.recipe({mod}.{name})"
+
+
 
 @final
 class Diagram(Shaped[TypeT_co]):
@@ -56,90 +112,68 @@ class Diagram(Shaped[TypeT_co]):
     """
 
     @staticmethod
-    def from_recipe[
-        T: Type
-    ](
-        input_types: Sequence[T],
-    ) -> Callable[
-        [Callable[[DiagramBuilder[T], tuple[Wire, ...]], Sequence[Wire]]], Diagram[T]
-    ]:
+    def from_recipe(
+        recipe: Callable[[DiagramBuilder[TypeT_inv]], None],
+    ) -> Diagram[TypeT_inv]:
         """
-        Given an input shape, returns a function decorator which makes it possible
-        to define a diagram by providing a building recipe.
-        For example, the snippet below creates the :class:`Diagram` instance ``hadd``
-        for a full-adder circuit, by wrapping a recipe using a diagram builder
-        internally:
+        A function decorator to create a diagram from a diagram-building recipe.
+
+        For example, the snippet below creates the :class:`Diagram` instance
+        ``full_adder`` for a full-adder circuit:
 
         .. code-block:: python
 
-            from typing import reveal_type
-            from tensorsat.lang.rel import bit
-            from tensorsat.lib.bincirc import and_, or_, xor_
+            from tensorsat.lang.fin_rel import FinSet
+            from tensorsat.lib.bincirc import bit, and_, or_, xor_
 
-            @Diagram.from_recipe(bit**3)
-            def adder(
-                circ: DiagramBuilder[FinSet],
-                inputs: Sequence[Wire]
-            ) -> Sequence[Wire]:
-                a, b, c_in = inputs
-                x1, = xor_ @ circ[a, b]
-                x2, = and_ @ circ[a, b]
-                x3, = and_ @ circ[x1, c_in]
-                s, = xor_ @ circ[x1, x3]
-                c_out, = or_ @ circ[x2, x3]
-                return s, c_out
-
-            reveal_type(adder) # Diagram
-
-        The diagram creation process is as follows:
-
-        1. A blank diagram builder is created.
-        2. Inputs of the given types are added to the builder.
-        3. The recipe is called on the builder and input wires.
-        4. The recipe returns the output wires.
-        5. The outputs are added to the builder.
-        6. The diagram is created from the builder and returned.
+            @Diagram.from_recipe
+            def full_adder(diag: DiagramBuilder[FinSet]) -> None:
+                a, b, c_in = diag.add_inputs()
+                x1, = xor_ @ diag[a, b]
+                x2, = and_ @ diag[a, b]
+                x3, = and_ @ diag[x1, c_in]
+                s, = xor_ @ diag[x1, x3]
+                c_out, = or_ @ diag[x2, x3]
+                diag.add_outputs(s, c_out)
 
         """
-        return lambda recipe: DiagramRecipe(recipe)(input_types)
+        builder: DiagramBuilder[TypeT_inv] = DiagramBuilder()
+        recipe(builder)
+        diagram = builder.diagram
+        # TODO: store recipe name, if available
+        return diagram
 
     @staticmethod
     def recipe(
-        recipe: Callable[[DiagramBuilder[TypeT_co], tuple[Wire, ...]], Sequence[Wire]]
-    ) -> DiagramRecipe[TypeT_co]:
+        recipe: Callable[Concatenate[DiagramBuilder[TypeT_inv], RecipeParams], None],
+    ) -> Callable[RecipeParams, Diagram[TypeT_inv]]:
         """
-        Returns a function decorator which makes it possible to define diagrams
-        by providing a building recipe:
+        A function decorator to create a parametric diagram factory from a
+        diagram-building recipe taking additional parameters.
+
+        For example, the snippet below creates a function returning a ripple-carry adder
+        diagram given the number ``n`` of bits for each of its two arguments.
 
         .. code-block:: python
 
+            from tensorsat.lang.fin_rel import FinSet
+            from tensorsat.lib.bincirc import bit, and_, or_, xor_
+
             @Diagram.recipe
-            def ripple_carry_adder(
-                circ: DiagramBuilder[FinSet],
-                inputs: Sequence[Wire]
-            ) -> Sequence[Wire]:
-                if len(inputs) % 2 != 1:
-                    raise ValueError("Ripple carry adder expects odd number of inputs.")
-                num_bits = len(inputs) // 2
-                outputs: list[int] = []
+            def rc_adder(diag: DiagramBuilder[FinSet], num_bits: int) -> None:
+                inputs = diag.add_inputs(bit**(2*num_bits+1))
+                outputs: list[Wire] = []
                 c = inputs[0]
                 for i in range(num_bits):
                     a, b = inputs[2 * i + 1 : 2 * i + 3]
-                    s, c = full_adder @ circ[c, a, b]
+                    s, c = full_adder @ diag[c, a, b]
                     outputs.append(s)
                 outputs.append(c)
-                return tuple(outputs)
+                diag.add_outputs(outputs)
 
-            # ...later on, applying a 2-bit RCA at some point of some circuit...
-            s0, s1, c_out = ripply_carry_adder @ some_circuit[c_in, a0, b0, a1, b1]
-
-        Unlike the :func:`Diagram.from_recipe`, where decoration resulted in a
-        fixed :class:`Diagram` instance, this decorator returns a
-        :class:`DiagramRecipe` object, which creates an actual diagram just-in-time
-        at the point of application to selected diagram builder wires.
-
+        Note that the results of calls to recipes are automatically cached,
+        and that the parameters are expected to be hashable.
         """
-
         return DiagramRecipe(recipe)
 
     @classmethod
@@ -150,12 +184,12 @@ class Diagram(Shaped[TypeT_co]):
         self = super().__new__(cls)
         self.__wiring = wiring
         self.__blocks = blocks
-        self.__recipe_used = None
+        # self.__recipe_used = None
         return self
 
     __wiring: Wiring[TypeT_co]
     __blocks: tuple[Box[TypeT_co] | Diagram[TypeT_co] | None, ...]
-    __recipe_used: DiagramRecipe[TypeT_co] | None
+    __recipe_used: DiagramRecipe[Any, TypeT_co] | None
     __hash_cache: int
 
     __slots__ = ("__weakref__", "__wiring", "__blocks", "__recipe_used", "__hash_cache")
@@ -235,9 +269,11 @@ class Diagram(Shaped[TypeT_co]):
         return 1 + max(diag.depth for diag in subdiagrams)
 
     @property
-    def recipe_used(self) -> DiagramRecipe[TypeT_co] | None:
-        """The recipe used to create the diagram, if any."""
+    def recipe_used(self) -> DiagramRecipe[Any, TypeT_co] | None:
+        """The recipe used to construct this diagram, if any. """
         return self.__recipe_used
+
+    # TODO: store recipe params used
 
     def compose(
         self, new_blocks: Mapping[Slot, Block[TypeT_co] | Wiring[TypeT_co]]
@@ -313,7 +349,7 @@ class Diagram(Shaped[TypeT_co]):
         num_blocks = len(self.blocks)
         depth = self.depth
         num_ports = len(self.wiring.out_wires)
-        recipe = self.recipe_used
+        # recipe = self.recipe_used
         if num_wires > 0:
             attrs.append(f"{num_wires} wires")
         if num_open_slots > 0:
@@ -324,8 +360,8 @@ class Diagram(Shaped[TypeT_co]):
             attrs.append(f"depth {depth}")
         if num_ports > 0:
             attrs.append(f"{num_ports} ports")
-        if recipe and recipe.name:
-            attrs.append(f"from recipe {recipe.name!r}")
+        # if recipe and recipe.name:
+        #     attrs.append(f"from recipe {recipe.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
     def __eq__(self, other: Any) -> bool:
@@ -452,30 +488,32 @@ class DiagramBuilder(Generic[TypeT_inv]):
         self.__blocks[slot] = block
         return output_wires
 
-    def add_inputs(self, ts: Sequence[TypeT_inv]) -> tuple[Wire, ...]:
+    def add_inputs(self, ts: Iterable[TypeT_inv]) -> tuple[Wire, ...]:
         """
         Creates new wires of the given types,
         then adds ports connected to those wires.
         """
-        assert validate(ts, Sequence[TypeT_inv])
+        ts = tuple(ts)
+        assert validate(ts, tuple[TypeT_inv, ...])
         return self._add_inputs(ts)
 
-    def _add_inputs(self, ts: Sequence[TypeT_inv]) -> tuple[Wire, ...]:
+    def _add_inputs(self, ts: tuple[TypeT_inv, ...]) -> tuple[Wire, ...]:
         wiring = self.wiring
         wires = wiring._add_wires(ts)
         wiring._add_out_ports(wires)
         return wires
 
-    def add_outputs(self, wires: Sequence[Wire]) -> None:
+    def add_outputs(self, wires: Iterable[Wire]) -> None:
         """Adds ports connected to the given wires."""
-        assert validate(wires, Sequence[Wire])
+        wires = tuple(wires)
+        assert validate(wires, tuple[Wire, ...])
         diag_wires = self.wiring.wires
         for wire in wires:
             if wire not in diag_wires:
                 raise ValueError(f"Invalid wire index {wire}.")
         self._add_outputs(wires)
 
-    def _add_outputs(self, wires: Sequence[Wire]) -> None:
+    def _add_outputs(self, wires: tuple[Wire, ...]) -> None:
         self.wiring._add_out_ports(wires)
 
     def __getitem__(
@@ -597,110 +635,3 @@ class SelectedInputWires(Generic[TypeT_inv]):
 
     def __repr__(self) -> str:
         return f"<DiagramBuilder {id(self.__builder):#x}>[{self.__wires}]"
-
-
-@final
-class DiagramRecipe(Generic[TypeT_inv]):
-    """
-    Utility class wrapping diagram building logic, which can be executed on
-    demand for given input types.
-
-    Supports usage of the ``@`` operator with selected input wires on the rhs,
-    analogously to the special block addition syntax for diagram builders.
-
-    See the :func:`Diagram.from_recipe` and :func:`Diagram.recipe` decorators for
-    examples of how this works.
-    """
-
-    @classmethod
-    def _new(
-        cls,
-        recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]],
-        is_boxed: bool,
-        name: str | None,
-    ) -> Self:
-        """Protected constructor."""
-        self = super().__new__(cls)
-        self.__recipe = recipe
-        # self.__is_boxed = is_boxed
-        self.__name = name
-        return self
-
-    __recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]]
-    # __is_boxed: bool
-    __name: str | None
-
-    __slots__ = ("__weakref__", "__recipe", "__name")
-
-    def __new__(
-        cls,
-        recipe: Callable[[DiagramBuilder[TypeT_inv], tuple[Wire, ...]], Sequence[Wire]],
-    ) -> Self:
-        """Wraps the given diagram building logic."""
-        return cls._new(recipe, True, getattr(recipe, "__name__", None))
-
-    @property
-    def name(self) -> str | None:
-        """Name of the recipe, if available."""
-        return self.__name
-
-    # FIXME: Boxed application only works for Diagram.recipe, not Diagram.from_recipe.
-    #        It should be implemented uniformly for both diagrams and recipes,
-    #        as a wrapper which affects the composition process in __matmul__.
-
-    # @property
-    # def unboxed(self) -> DiagramRecipe[TypeT_inv]:
-    #     """Returns an unboxed version of the recipe."""
-    #     return DiagramRecipe._new(self.__recipe, False, self.__name)
-
-    # @property
-    # def boxed(self) -> DiagramRecipe[TypeT_inv]:
-    #     """Returns an boxed version of the recipe."""
-    #     return DiagramRecipe._new(self.__recipe, True, self.__name)
-
-    def __call__(self, input_types: Sequence[TypeT_inv]) -> Diagram[TypeT_inv]:
-        """Executes the recipe for the given input types, returning the diagram."""
-        builder: DiagramBuilder[TypeT_inv] = DiagramBuilder()
-        inputs = builder._add_inputs(input_types)
-        outputs = self.__recipe(builder, inputs)
-        builder._add_outputs(outputs)
-        diagram = builder.diagram
-        diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
-        return diagram
-
-    def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
-        """
-        Executes the recipe for the input types specified by the selected input wires,
-        then adds the diagram resulting from the recipe as a block in the the broader
-        diagram being built, connected to the given input wires, and returns the
-        resulting output wires.
-        """
-        selected_wires = selected.wires
-        num_ports = len(selected_wires)
-        if isinstance(selected_wires, Mapping) and set(selected_wires) != set(
-            range(num_ports)
-        ):
-            raise NotImplementedError(
-                "At present, selected ports must form a contiguous zero-based range."
-            )
-        wire_types = selected.builder.wiring.wire_types
-        input_types = tuple(
-            wire_types[selected_wires[port]] for port in range(num_ports)
-        )
-        # if self.__is_boxed:
-        diagram = self(input_types)
-        return diagram @ selected
-        # builder = selected.builder
-        # inputs = selected.wires
-        # if not isinstance(inputs, tuple):
-        #     raise NotImplementedError(
-        #         "Unboxed recipe application is only defined"
-        #         " for contiguous input port selection."
-        #     )
-        # return tuple(self.__recipe(builder, inputs))
-
-    def __repr__(self) -> str:
-        name = self.__name
-        if name is None:
-            return f"<DiagramRecipe {id(self):#x}>"
-        return f"<DiagramRecipe {id(self):#x} {name!r}>"

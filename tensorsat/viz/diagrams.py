@@ -26,9 +26,7 @@ from types import MappingProxyType
 from typing import Any, Final, Literal, Self, TypedDict, Unpack, cast, overload
 from numpy.typing import ArrayLike
 
-from tensorsat.diagrams.diagrams import DiagramRecipe
-
-from ..diagrams import Slot, Box, Diagram, Wire, Port
+from ..diagrams import Slot, Box, Diagram, Wire, Port, DiagramRecipe
 from ..utils import (
     ValueSetter as OptionSetter,
     apply_setter,
@@ -173,7 +171,7 @@ class NodeOptionSetters[T](TypedDict, total=False):
     open_slot: OptionSetter[Slot, T]
     """Option value setter for nodes corresponding to open slots."""
 
-    subdiagram: OptionSetter[Slot | Diagram | tuple[Slot, Diagram] | DiagramRecipe, T]
+    subdiagram: OptionSetter[Slot | Diagram | tuple[Slot, Diagram] | DiagramRecipe[Any, Any], T]
     """Option value setter for nodes corresponding to subdiagrams."""
 
     out_port: OptionSetter[Port, T]
@@ -414,9 +412,8 @@ class DiagramDrawer:
                         res = apply_setter(setter["subdiagram"], subdiag)
                     if res is None:
                         res = apply_setter(setter["subdiagram"], (slot_idx, subdiag))
-                    recipe = cast(Diagram, subdiag).recipe_used
-                    if res is None and recipe is not None:
-                        res = apply_setter(setter["subdiagram"], recipe)
+                    if res is None and cast(Diagram, subdiag).recipe_used is not None:
+                        res = apply_setter(setter["subdiagram"], cast(Diagram, subdiag).recipe_used)
                     return cast(T | None, res)
                 case "out_port":
                     _, port_idx, _ = node
