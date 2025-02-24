@@ -26,6 +26,8 @@ from types import MappingProxyType
 from typing import Any, Final, Literal, Self, TypedDict, Unpack, cast, overload
 from numpy.typing import ArrayLike
 
+from tensorsat.diagrams.diagrams import DiagramRecipe
+
 from ..diagrams import Slot, Box, Diagram, Wire, Port
 from ..utils import (
     ValueSetter as OptionSetter,
@@ -77,7 +79,7 @@ def diagram_to_nx_graph(
     diagram: Diagram,
     *,
     simplify_wires: bool = False
-) -> nx.Graph:
+) -> nx.MultiGraph:
     """Utility function converting a diagram to a NetworkX graph."""
     assert validate(diagram, Diagram)
     box_slots = set(diagram.box_slots)
@@ -125,7 +127,7 @@ def diagram_to_nx_graph(
         )
     else:
         simple_wires = set()
-    graph = nx.Graph()
+    graph = nx.MultiGraph()
     graph.add_nodes_from([
             ("wire", w, None)
             for w in wiring.wires
@@ -171,7 +173,7 @@ class NodeOptionSetters[T](TypedDict, total=False):
     open_slot: OptionSetter[Slot, T]
     """Option value setter for nodes corresponding to open slots."""
 
-    subdiagram: OptionSetter[Slot | Diagram | tuple[Slot, Diagram], T]
+    subdiagram: OptionSetter[Slot | Diagram | tuple[Slot, Diagram] | DiagramRecipe, T]
     """Option value setter for nodes corresponding to subdiagrams."""
 
     out_port: OptionSetter[Port, T]
@@ -191,6 +193,8 @@ class KamadaKawaiLayoutKWArgs(TypedDict, total=False):
 
 class BFSLayoutKWArgs(TypedDict, total=True):
     sources: Sequence[Port]
+
+# TODO: implement a circuit layout, using FinFunc data to layer circuits causally.
 
 class DrawDiagramOptions(TypedDict, total=False):
     """Options for diagram drawing."""
@@ -214,7 +218,18 @@ class DrawDiagramOptions(TypedDict, total=False):
     """Thickness of edges for wires."""
 
     font_size: int
-    """Font size."""
+    """Font size for node labels."""
+
+    font_color: str
+    """Font color for node labels."""
+
+    edge_font_size: int
+    """Font size for edge labels."""
+
+    edge_font_color: str
+    """Font color for edge labels."""
+
+    # TODO: consider implementing custom edge labels
 
 
 class DiagramDrawer:
@@ -266,6 +281,9 @@ class DiagramDrawer:
             },
             "edge_thickness": 1,
             "font_size": 6,
+            "font_color": "black",
+            "edge_font_size": 6,
+            "edge_font_color": "black",
         }
         return self
 
@@ -374,28 +392,37 @@ class DiagramDrawer:
                 raise ValueError(f"Invalid layout choice {layout!r}.")
         # Define utility function to apply option setter to node:
         def _apply[T](setter: NodeOptionSetters[T], node: DiagramGraphNode) -> T | None:
+            res: Any
             match node[0]:
                 case "box":
-                    res: T | None
-                    res = apply_setter(setter["box"], node[1])  # type: ignore
+                    _, box_idx, box = node
+                    res = apply_setter(setter["box"], box_idx)
                     if res is None:
-                        res = apply_setter(setter["box"], node[2])  # type: ignore
+                        res = apply_setter(setter["box"], box)
                     if res is None:
-                        res = apply_setter(setter["box"], (node[1], node[2]))  # type: ignore
-                    return res
+                        res = apply_setter(setter["box"], (box_idx, box))
+                    return cast(T|None, res)
                 case "open_slot":
-                    return apply_setter(setter["open_slot"], node[1])
+                    _, slot_idx, _ = node
+                    res = apply_setter(setter["open_slot"], slot_idx)
+                    return cast(T|None, res)
                 case "subdiagram":
-                    res = apply_setter(setter["subdiagram"], node[1])  # type: ignore
+                    _, slot_idx, subdiag = node
+                    res = apply_setter(setter["subdiagram"], slot_idx)
                     if res is None:
-                        res = apply_setter(setter["subdiagram"], node[2])  # type: ignore
+                        res = apply_setter(setter["subdiagram"], subdiag)
                     if res is None:
-                        res = apply_setter(setter["subdiagram"], (node[1], node[2]))  # type: ignore
-                    return res
+                        res = apply_setter(setter["subdiagram"], (slot_idx, subdiag))
+                    recipe = cast(Diagram, subdiag).recipe_used
+                    if res is None and recipe is not None:
+                        res = apply_setter(setter["subdiagram"], recipe)
+                    return cast(T|None, res)
                 case "out_port":
-                    return apply_setter(setter["out_port"], node[1])
+                    _, port_idx, _ = node
+                    return apply_setter(setter["out_port"], port_idx)
                 case "wire":
-                    return apply_setter(setter["wire"], node[1])
+                    _, wire_idx, _ = node
+                    return apply_setter(setter["wire"], wire_idx)
             raise NotImplementedError()
 
         # Set options for nx.draw_networkx:
@@ -425,10 +452,21 @@ class DiagramDrawer:
         draw_networkx_options["edge_color"] = _options["node_color"]["wire"]
         draw_networkx_options["width"] = _options["edge_thickness"]
         draw_networkx_options["font_size"] = _options["font_size"]
+        draw_networkx_options["font_color"] = _options["font_color"]
         # Draw diagram using Matplotlib and nx.draw_networkx:
+        edge_counts = {(u, v): i+1 for u, v, i in sorted(graph.edges)}
         if ax is None:
             plt.figure(figsize=figsize)
         nx.draw_networkx(graph, pos, ax=ax, **draw_networkx_options)
+        if any(count > 1 for count in edge_counts.values()):
+            draw_networkx_edge_options: dict[str, Any] = {}
+            draw_networkx_edge_options["font_size"] = _options["edge_font_size"]
+            draw_networkx_edge_options["font_color"] = _options["edge_font_color"]
+            nx.draw_networkx_edge_labels(graph, pos, {
+                edge: str(count)
+                for edge, count in edge_counts.items()
+                if count > 1
+            }, **draw_networkx_edge_options)
         if ax is None:
             plt.gca().invert_yaxis()
             plt.axis("off")
