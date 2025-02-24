@@ -197,7 +197,7 @@ class BFSLayoutKWArgs(TypedDict, total=True):
 # TODO: implement a circuit layout, using FinFunc data to layer circuits causally.
 
 class DrawDiagramOptions(TypedDict, total=False):
-    """Options for diagram drawing."""
+    """Style options for diagram drawing."""
 
     node_size: NodeOptionSetters[int]
     """Node size for different kinds of nodes."""
@@ -229,7 +229,8 @@ class DrawDiagramOptions(TypedDict, total=False):
     edge_font_color: str
     """Font color for edge labels."""
 
-    # TODO: consider implementing custom edge labels
+    simplify_wires: bool
+    """Whether to simplify wires which could be represented by simple edges."""
 
 
 class DiagramDrawer:
@@ -284,6 +285,7 @@ class DiagramDrawer:
             "font_color": "black",
             "edge_font_size": 6,
             "edge_font_color": "black",
+            "simplify_wires": True,
         }
         return self
 
@@ -315,7 +317,6 @@ class DiagramDrawer:
         *,
         layout: Literal["kamada_kawai"] = "kamada_kawai",
         layout_kwargs: KamadaKawaiLayoutKWArgs = {},
-        simplify_wires: bool = True,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
         **options: Unpack[DrawDiagramOptions],
@@ -328,7 +329,6 @@ class DiagramDrawer:
         *,
         layout: Literal["bfs"],
         layout_kwargs: BFSLayoutKWArgs,
-        simplify_wires: bool = True,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
         **options: Unpack[DrawDiagramOptions],
@@ -340,7 +340,6 @@ class DiagramDrawer:
         *,
         layout: str = "kamada_kawai",
         layout_kwargs: Any = MappingProxyType({}),
-        simplify_wires: bool = True,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
         **options: Unpack[DrawDiagramOptions],
@@ -354,7 +353,7 @@ class DiagramDrawer:
             options
         )
         # Create NetworkX graph for diagram + layout:
-        graph = diagram_to_nx_graph(diagram, simplify_wires=simplify_wires)
+        graph = diagram_to_nx_graph(diagram, simplify_wires=_options["simplify_wires"])
         pos: dict[DiagramGraphNode, tuple[float, float]]
         match layout:
             case "kamada_kawai":
@@ -455,6 +454,8 @@ class DiagramDrawer:
         draw_networkx_options["font_color"] = _options["font_color"]
         # Draw diagram using Matplotlib and nx.draw_networkx:
         edge_counts = {(u, v): i+1 for u, v, i in sorted(graph.edges)}
+        if figsize is not None and ax is not None:
+            raise ValueError("Options 'ax' and 'figsize' cannot both be set.")
         if ax is None:
             plt.figure(figsize=figsize)
         nx.draw_networkx(graph, pos, ax=ax, **draw_networkx_options)
@@ -473,5 +474,62 @@ class DiagramDrawer:
             plt.show()
 
 
+    @overload
+    def s(
+        self,
+        *diagrams: Diagram,
+        layout: Literal["kamada_kawai"] = "kamada_kawai",
+        layout_kwargs: KamadaKawaiLayoutKWArgs = {},
+        figsize: tuple[float, float],
+        subplots: tuple[int, int] | None = None,
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None: ...
+
+    @overload
+    def s(
+        self,
+        *diagrams: Diagram,
+        layout: Literal["bfs"],
+        layout_kwargs: BFSLayoutKWArgs,
+        figsize: tuple[float, float],
+        subplots: tuple[int, int] | None = None,
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None: ...
+
+    def s(
+        self,
+        *diagrams: Diagram,
+        layout: str = "kamada_kawai",
+        layout_kwargs: Any = MappingProxyType({}),
+        figsize: tuple[float, float],
+        subplots: tuple[int, int] | None = None,
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None:
+        assert validate(diagrams, tuple[Diagram, ...])
+        # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
+        # Include default options:
+        _options: DrawDiagramOptions = dict_deep_update(
+            dict_deep_copy(self.__defaults),
+            options
+        )
+        if subplots is not None:
+            nrows, ncols = subplots
+        else:
+            nrows, ncols = 1, len(diagrams)
+        plt.figure(figsize=figsize)
+        for idx, diagram in enumerate(diagrams):
+            plt.subplot(nrows, ncols, idx+1)
+            self(
+                diagram,
+                layout=layout,
+                layout_kwargs=layout_kwargs,
+                ax=plt.gca(),
+                **options
+            ) # type: ignore
+            plt.gca().invert_yaxis()
+        plt.tight_layout()
+        plt.show()
+
 draw_diagram: Final[DiagramDrawer] = DiagramDrawer()
 """ Diagram-drawing function, based :func:`networkx.draw_networkx`."""
+
