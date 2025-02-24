@@ -273,8 +273,6 @@ class Diagram(Shaped[TypeT_co]):
         """The recipe used to construct this diagram, if any. """
         return self.__recipe_used
 
-    # TODO: store recipe params used
-
     def compose(
         self, new_blocks: Mapping[Slot, Block[TypeT_co] | Wiring[TypeT_co]]
     ) -> Diagram[TypeT_co]:
@@ -342,6 +340,11 @@ class Diagram(Shaped[TypeT_co]):
             cache[self] = flat_diagram
         return flat_diagram
 
+    # TODO: implement diagrammatic contraction
+    # ContractionPath = Any # dummy
+    # def contract(self, path: ContractionPath | None = None) -> Diagram[TypeT_co]:
+    #     raise NotImplementedError()
+
     def __repr__(self) -> str:
         attrs: list[str] = []
         num_wires = self.wiring.num_wires
@@ -349,7 +352,7 @@ class Diagram(Shaped[TypeT_co]):
         num_blocks = len(self.blocks)
         depth = self.depth
         num_ports = len(self.wiring.out_wires)
-        # recipe = self.recipe_used
+        recipe = self.recipe_used
         if num_wires > 0:
             attrs.append(f"{num_wires} wires")
         if num_open_slots > 0:
@@ -360,8 +363,8 @@ class Diagram(Shaped[TypeT_co]):
             attrs.append(f"depth {depth}")
         if num_ports > 0:
             attrs.append(f"{num_ports} ports")
-        # if recipe and recipe.name:
-        #     attrs.append(f"from recipe {recipe.name!r}")
+        if recipe:
+            attrs.append(f"from recipe {recipe.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
     def __eq__(self, other: Any) -> bool:

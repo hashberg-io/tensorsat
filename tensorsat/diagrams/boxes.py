@@ -39,6 +39,10 @@ from .wirings import Port, Shaped, Wire
 if TYPE_CHECKING:
     from .diagrams import SelectedInputWires
 
+# TODO: Improve BoxMeta to track boxes.
+#       Automate registration of concrete Box subclasses into their language (module).
+#       Make it possible to subclass concrete Box classes, to allow overlapping langs.
+#       It makes sense to consider alternative parametrisations for boxes in diff langs.
 
 class BoxMeta(ABCMeta):
     def __new__(

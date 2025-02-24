@@ -37,6 +37,10 @@ if __debug__:
 if TYPE_CHECKING:
     from .boxes import Box
 
+# TODO: Create TypeMeta to track types.
+#       Automate registration of concrete Type subclasses into their language (module).
+#       Make it possible to subclass concrete Type classes, to allow overlapping langs.
+#       It makes sense to consider alternative parametrisations for types in diff langs.
 
 class Type(ABC):
     """
