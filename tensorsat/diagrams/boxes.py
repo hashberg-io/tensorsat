@@ -34,7 +34,7 @@ if __debug__:
     from typing_validation import validate
 
 from .types import Shape, TypeT_co, TypeT_inv
-from .wirings import Port, Shaped, Wire, Wiring
+from .wirings import Port, Shaped, Wire
 
 if TYPE_CHECKING:
     from .diagrams import SelectedInputWires
@@ -57,6 +57,9 @@ class BoxMeta(ABCMeta):
             except ModuleNotFoundError:
                 pass
         return cls
+
+
+# TODO: consider introducing box labels, for builtin boxes
 
 
 class Box(Shaped[TypeT_co], metaclass=BoxMeta):

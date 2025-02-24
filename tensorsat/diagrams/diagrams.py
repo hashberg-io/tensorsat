@@ -21,13 +21,11 @@ from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
 from typing import (
     Any,
-    ClassVar,
     Generic,
     Self,
     cast,
     final,
 )
-from hashcons import InstanceStore
 
 if __debug__:
     from typing_validation import validate
@@ -146,9 +144,7 @@ class Diagram(Shaped[TypeT_co]):
 
     @classmethod
     def _new(
-        cls,
-        wiring: Wiring[TypeT_co],
-        blocks: tuple[Block[TypeT_co] | None, ...]
+        cls, wiring: Wiring[TypeT_co], blocks: tuple[Block[TypeT_co] | None, ...]
     ) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
@@ -162,9 +158,7 @@ class Diagram(Shaped[TypeT_co]):
     __recipe_used: DiagramRecipe[TypeT_co] | None
     __hash_cache: int
 
-    __slots__ = (
-        "__weakref__", "__wiring", "__blocks", "__recipe_used", "__hash_cache"
-    )
+    __slots__ = ("__weakref__", "__wiring", "__blocks", "__recipe_used", "__hash_cache")
 
     def __new__(
         cls, wiring: Wiring[TypeT_co], blocks: Mapping[Slot, Block[TypeT_co]]
@@ -331,7 +325,7 @@ class Diagram(Shaped[TypeT_co]):
         if num_ports > 0:
             attrs.append(f"{num_ports} ports")
         if recipe and recipe.name:
-                attrs.append(f"from recipe {recipe.name!r}")
+            attrs.append(f"from recipe {recipe.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
     def __eq__(self, other: Any) -> bool:
@@ -356,10 +350,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
     __wiring_builder: WiringBuilder[TypeT_inv]
     __blocks: dict[Slot, Block[TypeT_inv]]
 
-    __slots__ = (
-        "__weakref__",
-        "__wiring_builder", "__blocks"
-    )
+    __slots__ = ("__weakref__", "__wiring_builder", "__blocks")
 
     def __new__(cls) -> Self:
         """Creates a blank diagram builder."""
@@ -674,7 +665,7 @@ class DiagramRecipe(Generic[TypeT_inv]):
         outputs = self.__recipe(builder, inputs)
         builder._add_outputs(outputs)
         diagram = builder.diagram
-        diagram._Diagram__recipe_used = self # type: ignore[attr-defined]
+        diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
         return diagram
 
     def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
@@ -686,10 +677,12 @@ class DiagramRecipe(Generic[TypeT_inv]):
         """
         selected_wires = selected.wires
         num_ports = len(selected_wires)
-        if isinstance(selected_wires, Mapping) and set(selected_wires) != set(range(num_ports)):
-                raise NotImplementedError(
-                    "At present, selected ports must form a contiguous zero-based range."
-                )
+        if isinstance(selected_wires, Mapping) and set(selected_wires) != set(
+            range(num_ports)
+        ):
+            raise NotImplementedError(
+                "At present, selected ports must form a contiguous zero-based range."
+            )
         wire_types = selected.builder.wiring.wire_types
         input_types = tuple(
             wire_types[selected_wires[port]] for port in range(num_ports)

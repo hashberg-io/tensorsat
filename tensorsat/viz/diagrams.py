@@ -58,7 +58,11 @@ DiagramGraphNodeKind = Literal["box", "open_slot", "subdiagram", "out_port", "wi
 """Type alias for possible kinds of nodes in the NetworkX graph for a diagram."""
 
 DIAGRAM_GRAPH_NODE_KIND: Final[tuple[DiagramGraphNodeKind, ...]] = (
-    "box", "open_slot", "subdiagram", "out_port", "wire"
+    "box",
+    "open_slot",
+    "subdiagram",
+    "out_port",
+    "wire",
 )
 """Possible kinds of nodes in the NetworkX graph for a diagram."""
 
@@ -75,10 +79,9 @@ Type alias for a node in the NetworkX graph representing a diagram,
 labelled by the triple ``(kind, index, data)``.
 """
 
+
 def diagram_to_nx_graph(
-    diagram: Diagram,
-    *,
-    simplify_wires: bool = False
+    diagram: Diagram, *, simplify_wires: bool = False
 ) -> nx.MultiGraph:
     """Utility function converting a diagram to a NetworkX graph."""
     assert validate(diagram, Diagram)
@@ -116,23 +119,19 @@ def diagram_to_nx_graph(
             if len(w_slots) == 1 and out_wires.count(w) == 1
         }
         port_port_wires = {
-            w: (_i := out_wires.index(w), out_wires.index(w, _i+1))
+            w: (_i := out_wires.index(w), out_wires.index(w, _i + 1))
             for w, w_slots in wired_slots.items()
             if len(w_slots) == 0 and out_wires.count(w) == 2
         }
         simple_wires = (
-            set(slot_slot_wires)
-            |set(slot_port_wires)
-            |set(port_port_wires)
+            set(slot_slot_wires) | set(slot_port_wires) | set(port_port_wires)
         )
     else:
         simple_wires = set()
     graph = nx.MultiGraph()
-    graph.add_nodes_from([
-            ("wire", w, None)
-            for w in wiring.wires
-            if w not in simple_wires
-    ])
+    graph.add_nodes_from(
+        [("wire", w, None) for w in wiring.wires if w not in simple_wires]
+    )
     graph.add_nodes_from([("out_port", p, None) for p in wiring.ports])
     graph.add_nodes_from(list(map(slot_node, wiring.slots)))
     graph.add_edges_from(
@@ -165,6 +164,7 @@ def diagram_to_nx_graph(
         )
     return graph
 
+
 class NodeOptionSetters[T](TypedDict, total=False):
 
     box: OptionSetter[Slot | Box | tuple[Slot, Box], T]
@@ -191,10 +191,13 @@ class KamadaKawaiLayoutKWArgs(TypedDict, total=False):
     center: ArrayLike
     dim: int
 
+
 class BFSLayoutKWArgs(TypedDict, total=True):
     sources: Sequence[Port]
 
+
 # TODO: implement a circuit layout, using FinFunc data to layer circuits causally.
+
 
 class DrawDiagramOptions(TypedDict, total=False):
     """Style options for diagram drawing."""
@@ -349,8 +352,7 @@ class DiagramDrawer:
         # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
         # Include default options:
         _options: DrawDiagramOptions = dict_deep_update(
-            dict_deep_copy(self.__defaults),
-            options
+            dict_deep_copy(self.__defaults), options
         )
         # Create NetworkX graph for diagram + layout:
         graph = diagram_to_nx_graph(diagram, simplify_wires=_options["simplify_wires"])
@@ -359,8 +361,7 @@ class DiagramDrawer:
             case "kamada_kawai":
                 assert validate(layout_kwargs, KamadaKawaiLayoutKWArgs)
                 pos = nx.kamada_kawai_layout(
-                    graph,
-                    **cast(KamadaKawaiLayoutKWArgs, layout_kwargs)
+                    graph, **cast(KamadaKawaiLayoutKWArgs, layout_kwargs)
                 )
             case "bfs":
                 out_ports = diagram.ports
@@ -372,14 +373,14 @@ class DiagramDrawer:
                     )
                 elif not all(s in out_ports for s in sources):
                     raise ValueError("Sources must be valid ports for diagram.")
-                layers_list = list(nx.bfs_layers(graph, sources=[
-                    ("out_port", i, None) for i in sorted(sources)
-                ]))
+                layers_list = list(
+                    nx.bfs_layers(
+                        graph, sources=[("out_port", i, None) for i in sorted(sources)]
+                    )
+                )
                 layers = dict(enumerate(layers_list))
                 reachable_nodes = frozenset(
-                    node
-                    for layer_nodes in layers.values()
-                    for node in layer_nodes
+                    node for layer_nodes in layers.values() for node in layer_nodes
                 )
                 nodes_to_remove = [
                     node for node in graph.nodes if node not in reachable_nodes
@@ -389,6 +390,7 @@ class DiagramDrawer:
                 pos = nx.multipartite_layout(graph, subset_key=layers)
             case _:
                 raise ValueError(f"Invalid layout choice {layout!r}.")
+
         # Define utility function to apply option setter to node:
         def _apply[T](setter: NodeOptionSetters[T], node: DiagramGraphNode) -> T | None:
             res: Any
@@ -400,11 +402,11 @@ class DiagramDrawer:
                         res = apply_setter(setter["box"], box)
                     if res is None:
                         res = apply_setter(setter["box"], (box_idx, box))
-                    return cast(T|None, res)
+                    return cast(T | None, res)
                 case "open_slot":
                     _, slot_idx, _ = node
                     res = apply_setter(setter["open_slot"], slot_idx)
-                    return cast(T|None, res)
+                    return cast(T | None, res)
                 case "subdiagram":
                     _, slot_idx, subdiag = node
                     res = apply_setter(setter["subdiagram"], slot_idx)
@@ -415,7 +417,7 @@ class DiagramDrawer:
                     recipe = cast(Diagram, subdiag).recipe_used
                     if res is None and recipe is not None:
                         res = apply_setter(setter["subdiagram"], recipe)
-                    return cast(T|None, res)
+                    return cast(T | None, res)
                 case "out_port":
                     _, port_idx, _ = node
                     return apply_setter(setter["out_port"], port_idx)
@@ -453,7 +455,7 @@ class DiagramDrawer:
         draw_networkx_options["font_size"] = _options["font_size"]
         draw_networkx_options["font_color"] = _options["font_color"]
         # Draw diagram using Matplotlib and nx.draw_networkx:
-        edge_counts = {(u, v): i+1 for u, v, i in sorted(graph.edges)}
+        edge_counts = {(u, v): i + 1 for u, v, i in sorted(graph.edges)}
         if figsize is not None and ax is not None:
             raise ValueError("Options 'ax' and 'figsize' cannot both be set.")
         if ax is None:
@@ -463,16 +465,16 @@ class DiagramDrawer:
             draw_networkx_edge_options: dict[str, Any] = {}
             draw_networkx_edge_options["font_size"] = _options["edge_font_size"]
             draw_networkx_edge_options["font_color"] = _options["edge_font_color"]
-            nx.draw_networkx_edge_labels(graph, pos, {
-                edge: str(count)
-                for edge, count in edge_counts.items()
-                if count > 1
-            }, **draw_networkx_edge_options)
+            nx.draw_networkx_edge_labels(
+                graph,
+                pos,
+                {edge: str(count) for edge, count in edge_counts.items() if count > 1},
+                **draw_networkx_edge_options,
+            )
         if ax is None:
             plt.gca().invert_yaxis()
             plt.axis("off")
             plt.show()
-
 
     @overload
     def s(
@@ -509,8 +511,7 @@ class DiagramDrawer:
         # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
         # Include default options:
         _options: DrawDiagramOptions = dict_deep_update(
-            dict_deep_copy(self.__defaults),
-            options
+            dict_deep_copy(self.__defaults), options
         )
         if subplots is not None:
             nrows, ncols = subplots
@@ -518,18 +519,18 @@ class DiagramDrawer:
             nrows, ncols = 1, len(diagrams)
         plt.figure(figsize=figsize)
         for idx, diagram in enumerate(diagrams):
-            plt.subplot(nrows, ncols, idx+1)
+            plt.subplot(nrows, ncols, idx + 1)
             self(
                 diagram,
                 layout=layout,
                 layout_kwargs=layout_kwargs,
                 ax=plt.gca(),
-                **options
-            ) # type: ignore
+                **options,
+            )  # type: ignore
             plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.show()
 
+
 draw_diagram: Final[DiagramDrawer] = DiagramDrawer()
 """ Diagram-drawing function, based :func:`networkx.draw_networkx`."""
-
