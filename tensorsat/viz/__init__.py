@@ -14,3 +14,7 @@ Visualisation utilities for the TensorSAT library.
 
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+from .diagrams import draw_diagram
+
+__all__ = ("draw_diagram",)

@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
 from typing import (
+    Any,
     ClassVar,
     Generic,
     Self,
@@ -55,8 +56,6 @@ class Diagram(Shaped[TypeT_co]):
     A diagram, consisting of a :class:`Wiring` together with :obj:`Block`s associated
     to (a subset of) the wiring's slots.
     """
-
-    _store: ClassVar[InstanceStore] = InstanceStore()
 
     @staticmethod
     def from_recipe[
@@ -147,23 +146,27 @@ class Diagram(Shaped[TypeT_co]):
 
     @classmethod
     def _new(
-        cls, wiring: Wiring[TypeT_co], blocks: tuple[Block[TypeT_co] | None, ...]
+        cls,
+        wiring: Wiring[TypeT_co],
+        blocks: tuple[Block[TypeT_co] | None, ...]
     ) -> Self:
         """Protected constructor."""
-        with Diagram._store.instance(cls, (wiring, blocks)) as self:
-            if self is None:
-                self = super().__new__(cls)
-                self.__wiring = wiring
-                self.__blocks = blocks
-                self.__recipe_used = None
-                Diagram._store.register(self)
-            return self
+        self = super().__new__(cls)
+        self.__wiring = wiring
+        self.__blocks = blocks
+        self.__recipe_used = None
+        self.__input_ports = None
+        return self
 
     __wiring: Wiring[TypeT_co]
     __blocks: tuple[Box[TypeT_co] | Diagram[TypeT_co] | None, ...]
-    __recipe_used: tuple[DiagramRecipe[TypeT_co], tuple[TypeT_co, ...]] | None
+    __recipe_used: DiagramRecipe[TypeT_co] | None
+    __input_ports: tuple[Port, ...] | None
+    __hash_cache: int
 
-    __slots__ = ("__weakref__", "__wiring", "__blocks", "__recipe_used")
+    __slots__ = (
+        "__weakref__", "__wiring", "__blocks", "__recipe_used", "__input_ports", "__hash_cache"
+    )
 
     def __new__(
         cls, wiring: Wiring[TypeT_co], blocks: Mapping[Slot, Block[TypeT_co]]
@@ -240,9 +243,25 @@ class Diagram(Shaped[TypeT_co]):
         return 1 + max(diag.depth for diag in subdiagrams)
 
     @property
-    def recipe_used(self) -> tuple[DiagramRecipe[TypeT_co], tuple[TypeT_co, ...]] | None:
+    def recipe_used(self) -> DiagramRecipe[TypeT_co] | None:
         """The recipe used to create the diagram, if any."""
         return self.__recipe_used
+
+    @property
+    def input_ports(self) -> tuple[Port, ...] | None:
+        """Ports designated as inputs in this diagram, if any."""
+        return self.__input_ports
+
+    def with_input_ports(self, input_ports: Sequence[Port], /) -> Diagram[TypeT_co]:
+        """Returns a copy of this diagram, with the given ports selected as inputs."""
+        assert validate(input_ports, Sequence[Port])
+        ports = self.ports
+        if any(p not in ports for p in input_ports):
+            raise ValueError("Invalid ports selected.")
+        diagram = Diagram._new(self.__wiring, self.__blocks)
+        diagram.__recipe_used = self.__recipe_used
+        diagram.__input_ports = tuple(input_ports)
+        return diagram
 
     def compose(
         self, new_blocks: Mapping[Slot, Block[TypeT_co] | Wiring[TypeT_co]]
@@ -317,8 +336,8 @@ class Diagram(Shaped[TypeT_co]):
         num_open_slots = self.num_open_slots
         num_blocks = len(self.blocks)
         depth = self.depth
-        num_out_ports = len(self.wiring.out_wires)
-        recipe_used = self.recipe_used
+        num_ports = len(self.wiring.out_wires)
+        recipe = self.recipe_used
         if num_wires > 0:
             attrs.append(f"{num_wires} wires")
         if num_open_slots > 0:
@@ -327,13 +346,25 @@ class Diagram(Shaped[TypeT_co]):
             attrs.append(f"{num_blocks} blocks")
         if depth > 0:
             attrs.append(f"depth {depth}")
-        if num_out_ports > 0:
-            attrs.append(f"{num_out_ports} out ports")
-        if recipe_used:
-            recipe, _ = recipe_used
-            if recipe.name:
+        if num_ports > 0:
+            attrs.append(f"{num_ports} ports")
+        if recipe and recipe.name:
                 attrs.append(f"from recipe {recipe.name!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Diagram):
+            return NotImplemented
+        if self is other:
+            return True
+        return self.__wiring == other.__wiring and self.__blocks == other.__blocks
+
+    def __hash__(self) -> int:
+        try:
+            return self.__hash_cache
+        except AttributeError:
+            self.__hash_cache = h = hash((Diagram, self.__wiring, self.__blocks))
+            return h
 
 
 @final
@@ -342,14 +373,16 @@ class DiagramBuilder(Generic[TypeT_inv]):
 
     __wiring_builder: WiringBuilder[TypeT_inv]
     __blocks: dict[Slot, Block[TypeT_inv]]
+    __input_ports: list[Port]
 
-    __slots__ = ("__weakref__", "__wiring_builder", "__blocks")
+    __slots__ = ("__weakref__", "__wiring_builder", "__blocks", "__input_ports")
 
     def __new__(cls) -> Self:
         """Creates a blank diagram builder."""
         self = super().__new__(cls)
         self.__wiring_builder = WiringBuilder()
         self.__blocks = {}
+        self.__input_ports = []
         return self
 
     def copy(self) -> DiagramBuilder[TypeT_inv]:
@@ -357,6 +390,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         clone: DiagramBuilder[TypeT_inv] = DiagramBuilder.__new__(DiagramBuilder)
         clone.__wiring_builder = self.__wiring_builder.copy()
         clone.__blocks = self.__blocks.copy()
+        clone.__input_ports = self.__input_ports.copy()
         return clone
 
     @property
@@ -375,7 +409,9 @@ class DiagramBuilder(Generic[TypeT_inv]):
         wiring = self.__wiring_builder.wiring
         blocks = self.__blocks
         _blocks = tuple(blocks.get(slot) for slot in wiring.slots)
-        return Diagram._new(wiring, _blocks)
+        diagram = Diagram._new(wiring, _blocks)
+        diagram._Diagram__input_ports = tuple(self.__input_ports) # type: ignore[attr-defined]
+        return diagram
 
     def set_block(self, slot: Slot, block: Block[TypeT_inv]) -> None:
         """Sets a block for an existing open slot."""
@@ -455,7 +491,8 @@ class DiagramBuilder(Generic[TypeT_inv]):
     def _add_inputs(self, ts: Sequence[TypeT_inv]) -> tuple[Wire, ...]:
         wiring = self.wiring
         wires = wiring._add_wires(ts)
-        wiring._add_out_ports(wires)
+        input_ports = wiring._add_out_ports(wires)
+        self.__input_ports.extend(input_ports)
         return wires
 
     def add_outputs(self, wires: Sequence[Wire]) -> None:
@@ -653,7 +690,7 @@ class DiagramRecipe(Generic[TypeT_inv]):
         outputs = self.__recipe(builder, inputs)
         builder._add_outputs(outputs)
         diagram = builder.diagram
-        diagram._Diagram__recipe_used = (self, tuple(input_types)) # type: ignore[attr-defined]
+        diagram._Diagram__recipe_used = self # type: ignore[attr-defined]
         return diagram
 
     def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:

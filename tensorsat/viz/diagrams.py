@@ -23,7 +23,7 @@ Visualisation utilities for diagrams.
 from __future__ import annotations
 from collections.abc import Sequence
 from types import MappingProxyType
-from typing import Any, Final, Literal, Self, TypedDict, Unpack, overload
+from typing import Any, Final, Literal, Self, TypedDict, Unpack, cast, overload
 from numpy.typing import ArrayLike
 
 from ..diagrams import Slot, Box, Diagram, Wire, Port
@@ -178,7 +178,7 @@ class KamadaKawaiLayoutKWArgs(TypedDict, total=False):
     center: ArrayLike
     dim: int
 
-class BFSLayoutKWArgs(TypedDict, total=True):
+class LayeredLayoutKWArgs(TypedDict, total=False):
     sources: Sequence[Port]
 
 class DrawDiagramOptions(TypedDict, total=False):
@@ -298,8 +298,20 @@ class DiagramDrawer:
         *,
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
-        layout: Literal["bfs"],
-        layout_kwargs: BFSLayoutKWArgs,
+        layout: Literal["layered"],
+        layout_kwargs: LayeredLayoutKWArgs,
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None: ...
+
+    @overload
+    def __call__(
+        self,
+        diagram: Diagram,
+        *,
+        ax: Axes | None = None,
+        figsize: tuple[float, float] | None = None,
+        layout: None = None,
+        layout_kwargs: Any = MappingProxyType({}),
         **options: Unpack[DrawDiagramOptions],
     ) -> None: ...
 
@@ -307,7 +319,7 @@ class DiagramDrawer:
         self,
         diagram: Diagram,
         *,
-        layout: str,
+        layout: str | None = None,
         layout_kwargs: Any = MappingProxyType({}),
         ax: Axes | None = None,
         figsize: tuple[float, float] | None = None,
@@ -324,20 +336,34 @@ class DiagramDrawer:
         # Create NetworkX graph for diagram + layout:
         graph: nx.Graph
         pos: dict[DiagramGraphNode, tuple[float, float]]
+        if layout is None:
+            layout = "kamada_kawai" if diagram.input_ports is None else "layered"
         match layout:
             case "kamada_kawai":
                 assert validate(layout_kwargs, KamadaKawaiLayoutKWArgs)
                 # graph = diagram_to_nx_graph(diagram, simplify_wires=True)
                 graph = diagram_to_nx_graph(diagram)
-                pos = nx.kamada_kawai_layout(graph, **layout_kwargs)
-            case "bfs":
-                assert validate(layout_kwargs, BFSLayoutKWArgs)
-                sources = layout_kwargs["sources"]
-                if not sources:
-                    raise ValueError("At least one source must be selected for BFS layout.")
+                pos = nx.kamada_kawai_layout(
+                    graph,
+                    **cast(KamadaKawaiLayoutKWArgs, layout_kwargs)
+                )
+            case "layered":
                 out_ports = diagram.ports
-                if not all(s in out_ports for s in sources):
-                    raise ValueError("Sources must be valid output ports for diagram.")
+                assert validate(layout_kwargs, LayeredLayoutKWArgs)
+                sources = cast(LayeredLayoutKWArgs, layout_kwargs).get("sources")
+                if sources is None:
+                    if diagram.input_ports is None:
+                        raise ValueError(
+                            "Cannot automatically select source nodes for layered layout:"
+                            " diagram doesn't have input ports selected."
+                        )
+                    sources = diagram.input_ports
+                elif not sources:
+                    raise ValueError(
+                        "At least one source port must be selected for layered layout."
+                    )
+                elif not all(s in out_ports for s in sources):
+                    raise ValueError("Sources must be valid ports for diagram.")
                 graph = diagram_to_nx_graph(diagram)
                 layers_list = list(nx.bfs_layers(graph, sources=[
                     ("out_port", i, None) for i in sorted(sources)
