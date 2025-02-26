@@ -1,6 +1,4 @@
-"""
-Visualisation utilities for the TensorSAT library.
-"""
+"""Data structures for diagrammatic contraction."""
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -16,6 +14,11 @@ Visualisation utilities for the TensorSAT library.
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from .diagrams import draw_diagram
+from typing import final
 
-__all__ = ("draw_diagram",)
+
+@final
+class DiagramContraction:
+    """Diagram contraction data."""
+
+    # TODO: implement this, including utility constructor from einsum_path data

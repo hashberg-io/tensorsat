@@ -1,5 +1,6 @@
 """
-Top-level functions for the TensorSAT package, for use by the :mod:`autoray` package.
+Top-level functions for the TensorSAT package, for use by the
+`autoray <https://github.com/jcmgray/autoray>`_ package.
 """
 
 # This program is free software: you can redistribute it and/or modify

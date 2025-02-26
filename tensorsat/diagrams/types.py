@@ -36,11 +36,14 @@ if __debug__:
 
 if TYPE_CHECKING:
     from .boxes import Box
+else:
+    Box = Any
 
 # TODO: Create TypeMeta to track types.
 #       Automate registration of concrete Type subclasses into their language (module).
 #       Make it possible to subclass concrete Type classes, to allow overlapping langs.
 #       It makes sense to consider alternative parametrisations for types in diff langs.
+
 
 class Type(ABC):
     """
@@ -57,7 +60,11 @@ class Type(ABC):
     __slots__ = ("__weakref__",)
 
     def __new__(cls) -> Self:
-        """Constructs a new type."""
+        """
+        Constructs a new type.
+
+        :meta public:
+        """
         if not cls.__final__:
             raise TypeError("Only final subclasses of Type can be instantiated.")
         return super().__new__(cls)
@@ -81,15 +88,23 @@ class Type(ABC):
         """
 
     @final
-    def __mul__[T: Self, _T: Type](self: T, other: _T | Shape[_T]) -> Shape[T | _T]:
-        """Takes the product of this type with another type or shape."""
+    def __mul__[_S: Self, _T: Type](self: _S, other: _T | Shape[_T]) -> Shape[_S | _T]:
+        """
+        Takes the product of this type with another type or shape.
+
+        :meta public:
+        """
         if isinstance(other, Shape):
             return Shape([self, *other])
         return Shape([self, other])
 
     @final
-    def __pow__[T: Self](self: T, rhs: int, /) -> Shape[T]:
-        """Repeats a type a given number of times."""
+    def __pow__[_S: Self](self: _S, rhs: int, /) -> Shape[_S]:
+        """
+        Repeats a type a given number of times.
+
+        :meta public:
+        """
         assert validate(rhs, int)
         return Shape([self] * rhs)
 
@@ -136,29 +151,47 @@ class Shape(Sequence[TypeT_co]):
         Constructs a new shape with given component types.
         If iterables of types are passed, their types are extracted and inserted
         into the shape at the selected point.
+
+        :meta public:
         """
         components = tuple(components)
         assert validate(components, tuple[Type, ...])
         return cls._new(components)
 
-    def __mul__[T: Type](self, rhs: T | Shape[T], /) -> Shape[TypeT_co | T]:
-        """Takes the product of two shapes (i.e. concatenates their types)."""
+    def __mul__[_T: Type](self, rhs: _T | Shape[_T], /) -> Shape[TypeT_co | _T]:
+        """
+        Takes the product of two shapes (i.e. concatenates their types).
+
+        :meta public:
+        """
         if isinstance(rhs, Type):
-            return Shape([*self, cast(T, rhs)])
+            return Shape([*self, cast(_T, rhs)])
         assert validate(rhs, Shape)
         return Shape([*self, *rhs])
 
     def __pow__(self, rhs: int, /) -> Shape[TypeT_co]:
-        """Repeats a shape a given number of times."""
+        """
+        Repeats a shape a given number of times.
+
+        :meta public:
+        """
         assert validate(rhs, int)
         return Shape(tuple(self) * rhs)
 
     def __iter__(self) -> Iterator[TypeT_co]:
-        """Iterates over the components of the shape."""
+        """
+        Iterates over the components of the shape.
+
+        :meta public:
+        """
         return iter(self.__components)
 
     def __len__(self) -> int:
-        """Returns the number of components in the shape."""
+        """
+        Returns the number of components in the shape.
+
+        :meta public:
+        """
         return len(self.__components)
 
     @overload
@@ -170,7 +203,11 @@ class Shape(Sequence[TypeT_co]):
     def __getitem__(
         self, index: int | slice | Iterable[int], /
     ) -> TypeT_co | Shape[TypeT_co]:
-        """Returns the component(s) at the given index(es)."""
+        """
+        Returns the component(s) at the given index(es).
+
+        :meta public:
+        """
         if isinstance(index, slice):
             return Shape._new(self.__components[index])
         if isinstance(index, int):

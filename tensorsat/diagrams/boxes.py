@@ -18,26 +18,23 @@ Implementation of boxes and box recipes for the :mod:`tensorsat.diagrams` module
 
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Sequence
 from typing import (
-    TYPE_CHECKING,
     Any,
     ClassVar,
-    Generic,
     Self,
     TypeVar,
-    cast,
     final,
 )
 
 if __debug__:
     from typing_validation import validate
 
-from .types import Shape, TypeT_co, TypeT_inv
+from .types import TypeT_co
 from .wirings import Port, Shaped, Wire
 
-if TYPE_CHECKING:
-    from .diagrams import SelectedInputWires
+# if TYPE_CHECKING:
+#     from .diagrams import SelectedInputWires
 
 # TODO: Improve BoxMeta to track boxes.
 #       Automate registration of concrete Box subclasses into their language (module).
@@ -45,6 +42,7 @@ if TYPE_CHECKING:
 #       It makes sense to consider alternative parametrisations for boxes in diff langs.
 
 # TODO: consider introducing box labels, for builtin boxes
+
 
 class BoxMeta(ABCMeta):
     def __new__(
@@ -63,6 +61,7 @@ class BoxMeta(ABCMeta):
             except ModuleNotFoundError:
                 pass
         return cls
+
 
 class Box(Shaped[TypeT_co], metaclass=BoxMeta):
     """
@@ -130,30 +129,38 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
         - Every index in ``out_wires`` appears in ``lhs_wires`` or ``rhs_wires``
         """
 
-    @final
-    @staticmethod
-    def recipe(
-        recipe: Callable[[Shape[TypeT_inv]], BoxT_inv],
-    ) -> BoxRecipe[TypeT_inv, BoxT_inv]:
-        return BoxRecipe(recipe)
+    # @final
+    # @staticmethod
+    # def recipe(
+    #     recipe: Callable[[Shape[TypeT_inv]], BoxT_inv],
+    # ) -> BoxRecipe[TypeT_inv, BoxT_inv]:
+    #     """Wraps """
+    #     return BoxRecipe(recipe)
 
-    __recipe_used: BoxRecipe[TypeT_co, Self] | None
+    # __recipe_used: BoxRecipe[TypeT_co, Self] | None
 
-    __slots__ = ("__weakref__", "__recipe_used")
+    __slots__ = (
+        "__weakref__",
+        # "__recipe_used"
+    )
 
     def __new__(cls) -> Self:
-        """Constructs a new box."""
+        """
+        Constructs a new box.
+
+        :meta public:
+        """
         if not cls.__final__:
             raise TypeError("Only final subclasses of Box can be instantiated.")
         self = super().__new__(cls)
-        self.__recipe_used = None
+        # self.__recipe_used = None
         return self
 
-    @final
-    @property
-    def recipe_used(self) -> BoxRecipe[TypeT_co, Self] | None:
-        """The recipe used to create the box, if any."""
-        return self.__recipe_used
+    # @final
+    # @property
+    # def recipe_used(self) -> BoxRecipe[TypeT_co, Self] | None:
+    #     """The recipe used to create the box, if any."""
+    #     return self.__recipe_used
 
     @final
     def transpose(self, perm: Sequence[Port]) -> Self:
@@ -177,6 +184,8 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
         Takes the product of this relation with another relation of the same class.
         The resulting relation has as its ports the ports of this relation followed
         by the ports of the other relation, and is of the same class of both.
+
+        :meta public:
         """
         lhs, rhs = self, other
         lhs_len, rhs_len = len(lhs.shape), len(rhs.shape)
@@ -198,68 +207,76 @@ Invariant type variables for box classes.
 """
 
 
-@final
-class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
-    """
-    Utility class wrapping box building logic, which can be executed on
-    demand for given input types.
+# @final
+# class BoxRecipe(Generic[TypeT_inv, BoxT_inv]):
+#     """
+#     Utility class wrapping box building logic, which can be executed on
+#     demand for given input types.
 
-    Supports usage of the ``@`` operator with selected input wires on the rhs,
-    analogously to the special block addition syntax for diagram builders.
+#     Supports usage of the ``@`` operator with selected input wires on the rhs,
+#     analogously to the special block addition syntax for diagram builders.
 
-    See the :func:`Box.recipe` decorators for an example of how this works.
-    """
+#     See the :meth:`Box.recipe` decorators for an example of how this works.
+#     """
 
-    __recipe: Callable[[Shape[TypeT_inv]], BoxT_inv]
-    __name: str | None
+#     __recipe: Callable[[Shape[TypeT_inv]], BoxT_inv]
+#     __name: str | None
 
-    __slots__ = ("__weakref__", "__recipe", "__name")
+#     __slots__ = ("__weakref__", "__recipe", "__name")
 
-    def __new__(
-        cls,
-        recipe: Callable[[Shape[TypeT_inv]], BoxT_inv],
-    ) -> Self:
-        """Wraps the given box building logic."""
-        self = super().__new__(cls)
-        self.__recipe = recipe
-        self.__name = getattr(recipe, "__name__", None)
-        return self
+#     def __new__(
+#         cls,
+#         recipe: Callable[[Shape[TypeT_inv]], BoxT_inv],
+#     ) -> Self:
+#         """
+#         Wraps the given box building logic.
 
-    def __call__(self, shape: Iterable[TypeT_inv]) -> BoxT_inv:
-        """
-        Creates a box starting from a given shape, which we can think of as the
-        shape of its "input" ports.
-        The shape of the box returned is guaranteed to start with the given types,
-        but may contain further types, corresponding to the "output" ports of the box.
-        """
-        box = self.__recipe(Shape(shape))
-        if not hasattr(box, "_Box__recipe_used"):
-            box._Box__recipe_used = self  # type: ignore[attr-defined]
-        assert box._Box__recipe_used is self, (  # type: ignore[attr-defined]
-            "Box recipe set incorrectly."
-        )
-        return box
+#         :meta public:
+#         """
+#         self = super().__new__(cls)
+#         self.__recipe = recipe
+#         self.__name = getattr(recipe, "__name__", None)
+#         return self
 
-    def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
-        """
-        Executes the recipe for the input types specified by the selected input wires,
-        then adds the diagram resulting from the recipe as a block in the the broader
-        diagram being built, connected to the given input wires, and returns the
-        resulting output wires.
-        """
-        selected_wires = selected.wires
-        num_ports = len(selected_wires)
-        if set(selected_wires) != set(range(num_ports)):
-            raise ValueError("Selected ports must form a contiguous zero-based range.")
-        wire_types = selected.builder.wiring.wire_types
-        input_types = tuple(
-            wire_types[selected_wires[port]] for port in range(num_ports)
-        )
-        box = cast(Box[TypeT_inv], self(input_types))
-        return box @ selected
+#     def __call__(self, shape: Iterable[TypeT_inv]) -> BoxT_inv:
+#         """
+#         Creates a box starting from a given shape, which we can think of as the
+#         shape of its "input" ports.
+#         The shape of the box returned is guaranteed to start with the given types,
+#         but may contain further types, corresponding to the "output" ports of the box.
 
-    def __repr__(self) -> str:
-        name = self.__name
-        if name is None:
-            return f"<BoxRecipe {id(self):#x}>"
-        return f"<BoxRecipe {id(self):#x} {name!r}>"
+#         :meta public:
+#         """
+#         box = self.__recipe(Shape(shape))
+#         if not hasattr(box, "_Box__recipe_used"):
+#             box._Box__recipe_used = self  # type: ignore[attr-defined]
+#         assert box._Box__recipe_used is self, (  # type: ignore[attr-defined]
+#             "Box recipe set incorrectly."
+#         )
+#         return box
+
+#     def __matmul__(self, selected: SelectedInputWires[TypeT_inv]) -> tuple[Wire, ...]:
+#         """
+#         Executes the recipe for the input types specified by the selected input wires,
+#         then adds the diagram resulting from the recipe as a block in the the broader
+#         diagram being built, connected to the given input wires, and returns the
+#         resulting output wires.
+
+#         :meta public:
+#         """
+#         selected_wires = selected.wires
+#         num_ports = len(selected_wires)
+#         if set(selected_wires) != set(range(num_ports)):
+#             raise ValueError("Selected ports must form a contiguous zero-based range.")
+#         wire_types = selected.builder.wiring.wire_types
+#         input_types = tuple(
+#             wire_types[selected_wires[port]] for port in range(num_ports)
+#         )
+#         box = cast(Box[TypeT_inv], self(input_types))
+#         return box @ selected
+
+#     def __repr__(self) -> str:
+#         name = self.__name
+#         if name is None:
+#             return f"<BoxRecipe {id(self):#x}>"
+#         return f"<BoxRecipe {id(self):#x} {name!r}>"

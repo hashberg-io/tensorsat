@@ -70,10 +70,10 @@ class Shaped(Generic[TypeT_co], ABC):
     """Interface and mixin properties for objects with a shape."""
 
     @staticmethod
-    def wrap_shape[T: Type](shape: Shape[T]) -> Shaped[T]:
+    def wrap_shape[_T: Type](shape: Shape[_T]) -> Shaped[_T]:
         """Wraps a shape into an anonymous :class:`Shaped` instance."""
         assert validate(shape, Shape)
-        cls: SubclassOf[Shaped[T]] = final(
+        cls: SubclassOf[Shaped[_T]] = final(
             type.__new__(
                 type,
                 "<anon shaped class>",
@@ -110,10 +110,10 @@ class Slotted(Generic[TypeT_co], ABC):
     """Interface and mixin properties/methods for objects with shaped slots."""
 
     @staticmethod
-    def wrap_slot_shapes[T: Type](slot_shapes: tuple[Shape[T], ...]) -> Slotted[T]:
+    def wrap_slot_shapes[_T: Type](slot_shapes: tuple[Shape[_T], ...]) -> Slotted[_T]:
         """Wraps a tuple of shapes into an anonymous :class:`Slotted` instance."""
         assert validate(slot_shapes, tuple[Shape[Type], ...])
-        cls: SubclassOf[Slotted[T]] = final(
+        cls: SubclassOf[Slotted[_T]] = final(
             type.__new__(
                 type,
                 "<anon slotted class>",
@@ -290,7 +290,11 @@ class Wiring(WiringBase[TypeT_co]):
     )
 
     def __new__(cls, **data: Unpack[WiringData[TypeT_co]]) -> Self:
-        """Constructs a wiring from the given data."""
+        """
+        Constructs a wiring from the given data.
+
+        :meta public:
+        """
         assert validate(data, WiringData)
         # Destructure the data:
         wire_types = Shape(data["wire_types"])
@@ -440,18 +444,18 @@ class Wiring(WiringBase[TypeT_co]):
 
 
 @final
-class WiringBuilder[T: Type](WiringBase[T]):
+class WiringBuilder[_T: Type](WiringBase[_T]):
     """Utility class to build wirings."""
 
-    __slot_shapes: list[list[T]]
-    __shape: list[T]
-    __wire_types: list[T]
+    __slot_shapes: list[list[_T]]
+    __shape: list[_T]
+    __wire_types: list[_T]
     __slot_wires_list: list[list[Wire]]
     __out_wires: list[Wire]
 
-    __slot_shapes_cache: tuple[Shape[T], ...] | None
-    __shape_cache: Shape[T] | None
-    __wire_types_cache: Shape[T] | None
+    __slot_shapes_cache: tuple[Shape[_T], ...] | None
+    __shape_cache: Shape[_T] | None
+    __wire_types_cache: Shape[_T] | None
     __slot_wires_list_cache: tuple[tuple[Wire, ...], ...] | None
     __out_wires_cache: tuple[Wire, ...] | None
 
@@ -469,7 +473,11 @@ class WiringBuilder[T: Type](WiringBase[T]):
     )
 
     def __new__(cls) -> Self:
-        """Constructs a blank wiring builder."""
+        """
+        Constructs a blank wiring builder.
+
+        :meta public:
+        """
         self = super().__new__(cls)
         self.__slot_shapes = []
         self.__shape = []
@@ -479,7 +487,7 @@ class WiringBuilder[T: Type](WiringBase[T]):
         return self
 
     @property
-    def slot_shapes(self) -> tuple[Shape[T], ...]:
+    def slot_shapes(self) -> tuple[Shape[_T], ...]:
         slot_shapes = self.__slot_shapes_cache
         if slot_shapes is None:
             self.__slot_shapes_cache = slot_shapes = tuple(
@@ -488,14 +496,14 @@ class WiringBuilder[T: Type](WiringBase[T]):
         return slot_shapes
 
     @property
-    def shape(self) -> Shape[T]:
+    def shape(self) -> Shape[_T]:
         shape = self.__shape_cache
         if shape is None:
             self.__shape_cache = shape = Shape._new(tuple(self.__shape))
         return shape
 
     @property
-    def wire_types(self) -> Shape[T]:
+    def wire_types(self) -> Shape[_T]:
         wire_types = self.__wire_types_cache
         if wire_types is None:
             self.__wire_types_cache = wire_types = Shape._new(tuple(self.__wire_types))
@@ -518,7 +526,7 @@ class WiringBuilder[T: Type](WiringBase[T]):
         return out_wires
 
     @property
-    def wiring(self) -> Wiring[T]:
+    def wiring(self) -> Wiring[_T]:
         """The wiring built thus far."""
         return Wiring._new(
             self.slot_shapes,
@@ -536,9 +544,9 @@ class WiringBuilder[T: Type](WiringBase[T]):
             raise ValueError(f"Invalid slot {slot}.")
         return tuple(self.__slot_wires_list[slot])
 
-    def copy(self) -> WiringBuilder[T]:
+    def copy(self) -> WiringBuilder[_T]:
         """Returns a deep copy of this wiring builder."""
-        clone: WiringBuilder[T] = WiringBuilder.__new__(WiringBuilder)
+        clone: WiringBuilder[_T] = WiringBuilder.__new__(WiringBuilder)
         clone.__slot_shapes = [s.copy() for s in self.__slot_shapes]
         clone.__shape = self.__shape.copy()
         clone.__wire_types = self.__wire_types.copy()
@@ -551,17 +559,17 @@ class WiringBuilder[T: Type](WiringBase[T]):
         clone.__out_wires_cache = self.__out_wires_cache
         return clone
 
-    def add_wire(self, t: T) -> Wire:
+    def add_wire(self, t: _T) -> Wire:
         """Adds a new wire with the given type."""
         assert validate(t, Type)
         return self._add_wires([t])[0]
 
-    def add_wires(self, ts: Sequence[T]) -> tuple[Wire, ...]:
+    def add_wires(self, ts: Sequence[_T]) -> tuple[Wire, ...]:
         """Adds new wires with the given types."""
         assert validate(ts, Sequence[Type])
         return self._add_wires(ts)
 
-    def _add_wires(self, ts: Sequence[T]) -> tuple[Wire, ...]:
+    def _add_wires(self, ts: Sequence[_T]) -> tuple[Wire, ...]:
         self.__wire_types_cache = None
         wire_types = self.__wire_types
         len_before = len(wire_types)

@@ -21,7 +21,7 @@ wired together (cf. :class:`Wiring`) in such a way as to respect the types
 
 from __future__ import annotations
 from .types import Type, TypeT_co, TypeT_inv, Shape
-from .boxes import Box, BoxT_inv, BoxRecipe
+from .boxes import Box, BoxT_inv
 from .wirings import (
     Slot,
     Port,
@@ -41,7 +41,6 @@ __all__ = (
     "Shape",
     "Box",
     "BoxT_inv",
-    "BoxRecipe",
     "Slot",
     "Port",
     "Wire",

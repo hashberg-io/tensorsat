@@ -1,0 +1,4 @@
+tensorsat
+=========
+
+.. automodule:: tensorsat

@@ -23,12 +23,24 @@ Visualisation utilities for diagrams.
 from __future__ import annotations
 from collections.abc import Sequence
 from types import MappingProxyType
-from typing import Any, Final, Literal, Self, TypedDict, Unpack, cast, overload
+from typing import (
+    Any,
+    Final,
+    Generic,
+    Literal,
+    Self,
+    TypeAlias,
+    TypeVar,
+    TypedDict,
+    Unpack,
+    cast,
+    overload,
+)
 from numpy.typing import ArrayLike
 
 from ..diagrams import Slot, Box, Diagram, Wire, Port, DiagramRecipe
 from ..utils import (
-    ValueSetter as OptionSetter,
+    ValueSetter,
     apply_setter,
     dict_deep_copy,
     dict_deep_update,
@@ -44,6 +56,7 @@ except ModuleNotFoundError:
 
 try:
     import networkx as nx  # type: ignore
+    from networkx import MultiGraph
 except ModuleNotFoundError:
     raise ModuleNotFoundError(
         "For diagram visualisation, 'networkx' must be installed."
@@ -52,7 +65,9 @@ except ModuleNotFoundError:
 if __debug__:
     from typing_validation import validate
 
-DiagramGraphNodeKind = Literal["box", "open_slot", "subdiagram", "out_port", "wire"]
+DiagramGraphNodeKind: TypeAlias = Literal[
+    "box", "open_slot", "subdiagram", "out_port", "wire"
+]
 """Type alias for possible kinds of nodes in the NetworkX graph for a diagram."""
 
 DIAGRAM_GRAPH_NODE_KIND: Final[tuple[DiagramGraphNodeKind, ...]] = (
@@ -65,7 +80,7 @@ DIAGRAM_GRAPH_NODE_KIND: Final[tuple[DiagramGraphNodeKind, ...]] = (
 """Possible kinds of nodes in the NetworkX graph for a diagram."""
 
 
-DiagramGraphNode = (
+DiagramGraphNode: TypeAlias = (
     tuple[Literal["box"], int, Box]  # ("box", slot, box)
     | tuple[Literal["open_slot"], int, None]  # ("open_slot", slot, None)
     | tuple[Literal["subdiagram"], int, Diagram]  # ("subdiagram", slot, diagram)
@@ -80,7 +95,7 @@ labelled by the triple ``(kind, index, data)``.
 
 def diagram_to_nx_graph(
     diagram: Diagram, *, simplify_wires: bool = False
-) -> nx.MultiGraph:
+) -> MultiGraph:
     """Utility function converting a diagram to a NetworkX graph."""
     assert validate(diagram, Diagram)
     box_slots = set(diagram.box_slots)
@@ -126,7 +141,7 @@ def diagram_to_nx_graph(
         )
     else:
         simple_wires = set()
-    graph = nx.MultiGraph()
+    graph = MultiGraph()
     graph.add_nodes_from(
         [("wire", w, None) for w in wiring.wires if w not in simple_wires]
     )
@@ -163,21 +178,27 @@ def diagram_to_nx_graph(
     return graph
 
 
-class NodeOptionSetters[T](TypedDict, total=False):
+_T = TypeVar("_T")
+"""Invariant type variable"""
 
-    box: OptionSetter[Slot | Box | tuple[Slot, Box], T]
+
+class NodeOptionSetters(TypedDict, Generic[_T], total=False):
+
+    box: ValueSetter[Slot | Box | tuple[Slot, Box], _T]
     """Option value setter for nodes corresponding to boxes."""
 
-    open_slot: OptionSetter[Slot, T]
+    open_slot: ValueSetter[Slot, _T]
     """Option value setter for nodes corresponding to open slots."""
 
-    subdiagram: OptionSetter[Slot | Diagram | tuple[Slot, Diagram] | DiagramRecipe[Any, Any], T]
+    subdiagram: ValueSetter[
+        Slot | Diagram | tuple[Slot, Diagram] | DiagramRecipe[Any, Any], _T
+    ]
     """Option value setter for nodes corresponding to subdiagrams."""
 
-    out_port: OptionSetter[Port, T]
+    out_port: ValueSetter[Port, _T]
     """Option value setter for nodes corresponding to out ports."""
 
-    wire: OptionSetter[Wire, T]
+    wire: ValueSetter[Wire, _T]
     """Option value setter for nodes corresponding to wires."""
 
 
@@ -237,13 +258,17 @@ class DrawDiagramOptions(TypedDict, total=False):
 class DiagramDrawer:
     """
     A diagram-drawing function, with additional logic to handle default option values.
-    Based on :func:`networkx.draw_networkx`.
+    Based on :func:`~networkx.drawing.nx_pylab.draw_networkx`.
     """
 
     __defaults: DrawDiagramOptions
 
     def __new__(cls) -> Self:
-        """Instantiates a new diagram drawer, with default values for options."""
+        """
+        Instantiates a new diagram drawer, with default values for options.
+
+        :meta public:
+        """
         self = super().__new__(cls)
         self.__defaults = {
             "node_size": {
@@ -345,7 +370,11 @@ class DiagramDrawer:
         figsize: tuple[float, float] | None = None,
         **options: Unpack[DrawDiagramOptions],
     ) -> None:
-        """Draws the given diagram using NetworkX."""
+        """
+        Draws the given diagram using NetworkX.
+
+        :meta public:
+        """
         assert validate(diagram, Diagram)
         # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
         # Include default options:
@@ -413,7 +442,9 @@ class DiagramDrawer:
                     if res is None:
                         res = apply_setter(setter["subdiagram"], (slot_idx, subdiag))
                     if res is None and cast(Diagram, subdiag).recipe_used is not None:
-                        res = apply_setter(setter["subdiagram"], cast(Diagram, subdiag).recipe_used)
+                        res = apply_setter(
+                            setter["subdiagram"], cast(Diagram, subdiag).recipe_used
+                        )
                     return cast(T | None, res)
                 case "out_port":
                     _, port_idx, _ = node
@@ -530,4 +561,4 @@ class DiagramDrawer:
 
 
 draw_diagram: Final[DiagramDrawer] = DiagramDrawer()
-""" Diagram-drawing function, based :func:`networkx.draw_networkx`."""
+""" Diagram-drawing function, based :func:`~networkx.drawing.nx_pylab.draw_networkx`."""

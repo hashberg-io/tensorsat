@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-
 from __future__ import annotations
 from collections.abc import Sequence
 from math import comb
@@ -35,6 +34,7 @@ with the integer sign determining whether the literal is positive or negative.
 
 CNFDiagramMode: TypeAlias = Literal["bintree"]
 """Type alias for available diagram creation modes in :class:`CNFInstance`."""
+
 
 class CNFInstance:
     """A SAT instance in CNF form."""
@@ -110,7 +110,11 @@ class CNFInstance:
     __clauses: tuple[Clause, ...]
 
     def __new__(cls, num_vars: int, clauses: Sequence[Sequence[int]]) -> Self:
-        """Create a SAT instance from a number of vars and a sequence of clauses."""
+        """
+        Create a SAT instance from a number of vars and a sequence of clauses.
+
+        :meta public:
+        """
         assert validate(num_vars, int)
         assert validate(clauses, Sequence[Sequence[int]])
         if num_vars < max(abs(lit) for clause in clauses for lit in clause):

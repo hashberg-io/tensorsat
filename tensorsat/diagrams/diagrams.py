@@ -53,6 +53,7 @@ Type alias for a block in a diagram, which can be either:
 RecipeParams = ParamSpec("RecipeParams")
 """Parameter specification variable for the parameters of a recipe."""
 
+
 class DiagramRecipe(Generic[RecipeParams, TypeT_inv]):
     """A Recipe to produce diagrams from given perameters."""
 
@@ -63,7 +64,7 @@ class DiagramRecipe(Generic[RecipeParams, TypeT_inv]):
 
     def __new__(
         cls,
-        recipe: Callable[Concatenate[DiagramBuilder[TypeT_inv], RecipeParams], None]
+        recipe: Callable[Concatenate[DiagramBuilder[TypeT_inv], RecipeParams], None],
     ) -> Self:
         self = super().__new__(cls)
         self.__recipe = recipe
@@ -76,9 +77,7 @@ class DiagramRecipe(Generic[RecipeParams, TypeT_inv]):
         return self.__recipe.__name__
 
     def __call__(
-        self,
-        *args: RecipeParams.args,
-        **kwargs: RecipeParams.kwargs
+        self, *args: RecipeParams.args, **kwargs: RecipeParams.kwargs
     ) -> Diagram[TypeT_inv]:
         """
         Returns the diagram constructed by the recipe on given arguments.
@@ -91,7 +90,7 @@ class DiagramRecipe(Generic[RecipeParams, TypeT_inv]):
         builder: DiagramBuilder[TypeT_inv] = DiagramBuilder()
         self.__recipe(builder, *args, **kwargs)
         diagram = builder.diagram
-        diagram._Diagram__recipe_used = self # type: ignore[attr-defined]
+        diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
         self.__diagrams[key] = diagram
         return diagram
 
@@ -103,11 +102,10 @@ class DiagramRecipe(Generic[RecipeParams, TypeT_inv]):
         return f"Diagram.recipe({mod}.{name})"
 
 
-
 @final
 class Diagram(Shaped[TypeT_co]):
     """
-    A diagram, consisting of a :class:`Wiring` together with :obj:`Block`s associated
+    A diagram, consisting of a :class:`Wiring` together with :obj:`Block` associated
     to (a subset of) the wiring's slots.
     """
 
@@ -197,7 +195,11 @@ class Diagram(Shaped[TypeT_co]):
     def __new__(
         cls, wiring: Wiring[TypeT_co], blocks: Mapping[Slot, Block[TypeT_co]]
     ) -> Self:
-        """Constructs a new diagram from a wiring and blocks for (some of) its slots."""
+        """
+        Constructs a new diagram from a wiring and blocks for (some of) its slots.
+
+        :meta public:
+        """
         assert validate(wiring, Wiring)
         wiring.validate_slot_data(blocks)
         _blocks = tuple(map(blocks.get, wiring.slots))
@@ -240,7 +242,7 @@ class Diagram(Shaped[TypeT_co]):
 
     @property
     def subdiagrams(self) -> tuple[Diagram[TypeT_co], ...]:
-        """Diagrams associated to the slots in :prop:`subdiagram_slots`."""
+        """Diagrams associated to the slots in :attr:`subdiagram_slots`."""
         return tuple(block for block in self.blocks if isinstance(block, Diagram))
 
     @property
@@ -252,7 +254,7 @@ class Diagram(Shaped[TypeT_co]):
 
     @property
     def boxes(self) -> tuple[Box[TypeT_co], ...]:
-        """Boxes associated to the slots in :prop:`box_slots`."""
+        """Boxes associated to the slots in :attr:`box_slots`."""
         return tuple(block for block in self.blocks if isinstance(block, Box))
 
     @property
@@ -270,7 +272,7 @@ class Diagram(Shaped[TypeT_co]):
 
     @property
     def recipe_used(self) -> DiagramRecipe[Any, TypeT_co] | None:
-        """The recipe used to construct this diagram, if any. """
+        """The recipe used to construct this diagram, if any."""
         return self.__recipe_used
 
     def compose(
@@ -392,7 +394,11 @@ class DiagramBuilder(Generic[TypeT_inv]):
     __slots__ = ("__weakref__", "__wiring_builder", "__blocks")
 
     def __new__(cls) -> Self:
-        """Creates a blank diagram builder."""
+        """
+        Creates a blank diagram builder.
+
+        :meta public:
+        """
         self = super().__new__(cls)
         self.__wiring_builder = WiringBuilder()
         self.__blocks = {}
@@ -411,7 +417,7 @@ class DiagramBuilder(Generic[TypeT_inv]):
         return self.__wiring_builder
 
     @property
-    def blocks(self) -> MappingProxyType[Slot, Block[TypeT_inv]]:
+    def blocks(self) -> Mapping[Slot, Block[TypeT_inv]]:
         """Blocks in the diagram."""
         return MappingProxyType(self.__blocks)
 
@@ -453,7 +459,8 @@ class DiagramBuilder(Generic[TypeT_inv]):
            ``inputs`` are connected to the specified wire, while the others are connected
            to the newly created wires.
         4. Sets the block for the slot.
-        4. Returns the newly created wires (in port order).
+        5. Returns the newly created wires (in port order).
+
         """
         wire_types = self.__wiring_builder.wire_types
         assert validate(block, Box | Diagram)
@@ -526,9 +533,9 @@ class DiagramBuilder(Generic[TypeT_inv]):
         Enables special syntax for addition of blocks to the diagram:
 
         .. code-block:: python
+
             from tensorsat.lang.rel import bit
             from tensorsat.lib.bincirc import and_, or_, xor_
-
             circ = DiagramBuilder()
             a, b, c_in = circ.add_inputs(bit*3)
             x1, = xor_ @ circ[a, b]
@@ -541,6 +548,8 @@ class DiagramBuilder(Generic[TypeT_inv]):
         This is achieved by this method returning an object which encodes the
         association of ports to wires, and supports the application of the ``@``
         operator with a block as the lhs and the object as the rhs.
+
+        :meta public:
         """
         return SelectedInputWires(self, wires)
 
@@ -616,7 +625,7 @@ class SelectedInputWires(Generic[TypeT_inv]):
         return self.__builder
 
     @property
-    def wires(self) -> MappingProxyType[Port, Wire] | tuple[Wire, ...]:
+    def wires(self) -> Mapping[Port, Wire] | tuple[Wire, ...]:
         """
         The selected input wires, as either:
 
@@ -627,7 +636,11 @@ class SelectedInputWires(Generic[TypeT_inv]):
         return self.__wires
 
     def __rmatmul__(self, block: Block[TypeT_inv]) -> tuple[Wire, ...]:
-        """Adds the given block to the diagram, applied to the selected input wires."""
+        """
+        Adds the given block to the diagram, applied to the selected input wires.
+
+        :meta public:
+        """
         if not isinstance(block, (Box, Diagram)):
             return NotImplemented
         if isinstance(self.__wires, MappingProxyType):

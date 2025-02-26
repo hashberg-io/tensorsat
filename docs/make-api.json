@@ -1,0 +1,19 @@
+{
+    "pkg_name": "tensorsat",
+    "pkg_path": "..",
+    "apidocs_folder": "api",
+    "toc_filename": "api-toc.rst",
+    "type_alias_dict_filename": "autodoc-type-aliases.json",
+    "include_members": {},
+    "type_aliases": {
+        "tensorsat.diagrams.wirings": ["Slot", "Port", "Wire"],
+        "tensorsat.lang.fin_rel": ["Size", "El", "Point", "NumpyUInt8Array"],
+        "tensorsat.lib.sat": ["Clause", "CNFDiagramMode"],
+        "tensorsat.viz.diagrams": ["DiagramGraphNodeKind", "DiagramGraphNode"]
+    },
+    "exclude_members": {},
+    "include_modules": [],
+    "exclude_modules": [],
+    "member_fullnames": {},
+    "special_class_members": {}
+}

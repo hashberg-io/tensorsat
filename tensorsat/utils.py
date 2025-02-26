@@ -1,7 +1,8 @@
 """Assorted utility functions, classes and types for TensorSAT."""
 
+from __future__ import annotations
 from collections.abc import Callable
-from typing import Any, Mapping, ParamSpec, Type as SubclassOf, TypeVar
+from typing import Any, Mapping, ParamSpec, Type, TypeVar
 
 
 type ValueSetter[K, V] = V | Callable[[K], V] | Mapping[K, V]
@@ -17,13 +18,18 @@ produced on some given key.
 """
 
 P = ParamSpec("P")
+"""Param specification variable."""
+
 R = TypeVar("R")
+"""Invariant type variable."""
+
 S = TypeVar("S")
+"""Invariant type variable."""
 
 
 def default_on_error(
     fun: Callable[P, R],
-    default: dict[SubclassOf[Exception], S],
+    default: dict[Type[Exception], S],
     *args: P.args,
     **kwargs: P.kwargs,
 ) -> R | S:
@@ -34,7 +40,7 @@ def default_on_error(
         return default[type(e)]
 
 
-def apply_setter[K, V](setter: ValueSetter[K, V], k: K) -> V | None:
+def apply_setter[_K, _V](setter: ValueSetter[_K, _V], k: _K) -> _V | None:
     """
     Applies a setter to the given key.
     Returns :obj:`None` if the setter could not produce a value on the given key.
@@ -46,7 +52,7 @@ def apply_setter[K, V](setter: ValueSetter[K, V], k: K) -> V | None:
     return setter
 
 
-def dict_deep_copy[T](val: T) -> T:
+def dict_deep_copy[_T](val: _T) -> _T:
     """Utility function for deep copy of nested dictionaries."""
     if type(val) != dict:  # noqa: E721
         # T != dict[K, V] => return == T

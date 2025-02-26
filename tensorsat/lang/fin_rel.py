@@ -32,13 +32,13 @@ if __debug__:
     from typing_validation import validate
 
 Size: TypeAlias = int
-"""Type alias for integers used as sizes of :class:`FinSet`s."""
+"""Type alias for integers used as sizes of :class:`FinSet`."""
 
 El: TypeAlias = int
-"""Type alias for integers used as elements of :class:`FinSet`s."""
+"""Type alias for integers used as elements of :class:`FinSet`."""
 
 Point: TypeAlias = tuple[El, ...]
-"""Type alias for tuples of integers, used as points of :class:`FinRel`s."""
+"""Type alias for tuples of integers, used as points of :class:`FinRel`."""
 
 
 def _wrap_el(el_or_point: El | Point, /) -> Point:
@@ -91,7 +91,11 @@ class FinSet(Type):
     __slots__ = ("__size",)
 
     def __new__(cls, size: int) -> Self:
-        """Public constructor."""
+        """
+        Public constructor.
+
+        :meta public:
+        """
         validate(size, int)
         if size <= 0:
             raise ValueError("Finite set size must be strictly positive.")
@@ -281,7 +285,11 @@ class FinRel(Box[FinSet]):
     __slots__ = ("__tensor", "__shape", "__hash_cache", "__is_function_graph_cache")
 
     def __new__(cls, tensor: NumpyUInt8Array) -> Self:
-        """Constructs a relation from a Boolean tensor."""
+        """
+        Constructs a relation from a Boolean tensor.
+
+        :meta public:
+        """
         assert validate(tensor, NumpyUInt8Array)
         if not np.all(tensor <= 1):
             raise ValueError("Values in a Boolean tensor must be 0 or 1.")
@@ -303,7 +311,7 @@ class FinRel(Box[FinSet]):
     def to_set(self) -> Iterator[Point]:
         """
         Iterates over the subset of points in the relation.
-        An inverse to the constructor :meth:`FinRel.from_subset`.
+        An inverse to the constructor :meth:`FinRel.from_set`.
         """
         tensor = self.tensor
         for idxs in np.ndindex(tensor.shape):

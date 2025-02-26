@@ -85,6 +85,7 @@ def full_adder(diag: DiagramBuilder[FinSet]) -> None:
     (c_out,) = or_ @ diag[x2, x3]
     diag.add_outputs([s, c_out])
 
+
 @Diagram.recipe
 def rc_adder(diag: DiagramBuilder[FinSet], num_bits: int) -> None:
     """
@@ -95,7 +96,7 @@ def rc_adder(diag: DiagramBuilder[FinSet], num_bits: int) -> None:
     assert validate(num_bits, int)
     if num_bits <= 0:
         raise ValueError("Number of bits must be positive.")
-    inputs = diag.add_inputs(bit**(2*num_bits+1))
+    inputs = diag.add_inputs(bit ** (2 * num_bits + 1))
     outputs: list[Wire] = []
     c = inputs[0]
     for i in range(num_bits):

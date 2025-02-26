@@ -1,0 +1,8 @@
+sphinx_rtd_theme
+sphinx_autodoc_typehints
+
+typing_extensions
+numpy
+hashcons
+typing_validation
+xxhash
