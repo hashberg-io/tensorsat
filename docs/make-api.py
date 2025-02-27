@@ -179,9 +179,14 @@ Set "toc_filename" to null to avoid generating a table of contents file.
                 member_kind = "module"
             if not imported_member:
                 member_lines: List[str] = []
+                member_name_ = (
+                    member_name[:-1]+"\\_"
+                    if member_name.endswith("_")
+                    else member_name
+                )
                 member_lines = [
-                    member_name,
-                    "-"*len(member_name),
+                    member_name_,
+                    "-"*len(member_name_),
                     "",
                     f".. auto{member_kind}:: {member_fullname}",
                 ]

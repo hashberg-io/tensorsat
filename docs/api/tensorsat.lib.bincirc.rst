@@ -3,8 +3,8 @@ tensorsat.lib.bincirc
 
 .. automodule:: tensorsat.lib.bincirc
 
-and_
-----
+and\_
+-----
 
 .. autodata:: tensorsat.lib.bincirc.and_
 
@@ -38,13 +38,13 @@ half_adder
 
 .. autodata:: tensorsat.lib.bincirc.half_adder
 
-not_
-----
+not\_
+-----
 
 .. autodata:: tensorsat.lib.bincirc.not_
 
-or_
----
+or\_
+----
 
 .. autodata:: tensorsat.lib.bincirc.or_
 
@@ -58,7 +58,7 @@ wallace_multiplier
 
 .. autodata:: tensorsat.lib.bincirc.wallace_multiplier
 
-xor_
-----
+xor\_
+-----
 
 .. autodata:: tensorsat.lib.bincirc.xor_
