@@ -1,4 +1,5 @@
 {
+    "Block": "tensorsat.diagrams.Block",
     "Box": "tensorsat.diagrams.Box",
     "Slot": "tensorsat.diagrams.Slot",
     "Port": "tensorsat.diagrams.Port",

@@ -53,6 +53,7 @@ def make_apidocs() -> None:
     "exclude_modules": List[str],
     "member_fullnames": Dict[str, Dict[str, str]],
     "special_class_members": Dict[str, List[str]],
+    "manual_doc": Dict[str, List[str]]
 }
 
 Set "toc_filename" to null to avoid generating a table of contents file.
@@ -85,6 +86,8 @@ Set "toc_filename" to null to avoid generating a table of contents file.
             validate(member_fullnames, Dict[str, Dict[str, str]])
             special_class_members = config.get("special_class_members", {})
             validate(special_class_members, Dict[str, List[str]])
+            manual_doc = config.get("manual_doc", {})
+            validate(manual_doc, Dict[str, List[str]])
     except FileNotFoundError:
         print(err_msg)
         sys.exit(1)
@@ -184,12 +187,21 @@ Set "toc_filename" to null to avoid generating a table of contents file.
                     if member_name.endswith("_")
                     else member_name
                 )
-                member_lines = [
-                    member_name_,
-                    "-"*len(member_name_),
-                    "",
-                    f".. auto{member_kind}:: {member_fullname}",
-                ]
+                if member_fullname in manual_doc:
+                    member_lines = [
+                        member_name_,
+                        "-"*len(member_name_),
+                        "",
+                        *manual_doc[member_fullname],
+                        f".. auto{member_kind}:: {member_fullname}",
+                    ]
+                else:
+                    member_lines = [
+                        member_name_,
+                        "-"*len(member_name_),
+                        "",
+                        f".. auto{member_kind}:: {member_fullname}",
+                    ]
                 if member_kind == "class":
                     member_lines.append("    :show-inheritance:")
                     member_lines.append("    :members:")

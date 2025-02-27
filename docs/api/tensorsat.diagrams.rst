@@ -6,6 +6,11 @@ tensorsat.diagrams
 Block
 -----
 
+Type alias for a block in a diagram, which can be either:
+
+- a box, as an instance of a subclass of :class:`Box`;
+- a sub-diagram, as an instance of :class:`Diagram`.
+
 .. autodata:: tensorsat.diagrams.Block
 
 Box

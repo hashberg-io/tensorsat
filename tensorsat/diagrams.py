@@ -1017,6 +1017,7 @@ class Box(Shaped[TypeT_co], metaclass=BoxMeta):
 BoxT_inv = TypeVar("BoxT_inv", bound=Box, default=Box)
 """Invariant type variable for boxes."""
 
+
 type Block[T: Type] = Box[T] | Diagram[T]
 """
 Type alias for a block in a diagram, which can be either:
