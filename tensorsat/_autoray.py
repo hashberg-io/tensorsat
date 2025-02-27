@@ -49,5 +49,4 @@ def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
 def transpose(box: BoxT_inv, perm: Sequence[int], /) -> BoxT_inv:
     """Rearranges the ports of a box."""
     assert validate(box, Box)
-    assert validate(perm, Sequence[int])
     return box.transpose(perm)

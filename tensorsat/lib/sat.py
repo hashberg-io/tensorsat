@@ -21,7 +21,7 @@ from typing import Literal, Self, TypeAlias
 import numpy as np
 from ..diagrams import Diagram, DiagramBuilder
 from ..lang.fin_rel import FinSet
-from .bincirc import not_, or_, bit
+from .bincirc import bits, not_, or_, bit
 
 if __debug__:
     from typing_validation import validate
@@ -144,16 +144,16 @@ class CNFInstance:
         self,
         *,
         mode: CNFDiagramMode = "bintree",
-    ) -> Diagram[FinSet]:
+    ) -> Diagram:
         match mode:
             case "bintree":
                 return self._diagram_bintree()
         raise NotImplementedError(f"Unknown diagram mode for CNFInstance: {mode!r}")
 
-    def _diagram_bintree(self) -> Diagram[FinSet]:
+    def _diagram_bintree(self) -> Diagram:
         num_vars, clauses = self.__num_vars, self.__clauses
-        circ: DiagramBuilder[FinSet] = DiagramBuilder()
-        circ.add_inputs(bit**num_vars)
+        circ = DiagramBuilder()
+        circ.add_inputs(bits(num_vars))
         for clause in clauses:
             layer = [x - 1 if x > 0 else (not_ @ circ[-x - 1])[0] for x in clause]
             while (n := len(layer)) > 1:

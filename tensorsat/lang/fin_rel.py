@@ -31,6 +31,7 @@ from ..diagrams import Port, Shape, Type, Box, Wire
 if __debug__:
     from typing_validation import validate
 
+
 Size: TypeAlias = int
 """Type alias for integers used as sizes of :class:`FinSet`."""
 
@@ -117,12 +118,15 @@ class FinSet(Type):
         return f"FinSet({self.__size})"
 
 
+FinSetShape: TypeAlias = tuple[FinSet, ...]
+"""Type alias for a shape consisting of finite set types."""
+
 NumpyUInt8Array: TypeAlias = np.ndarray[tuple[Size, ...], np.dtype[np.uint8]]
 """Type alias for Numpy's UInt8 arrays."""
 
 
 @final
-class FinRel(Box[FinSet]):
+class FinRel(Box):
     """
     Type class for finite, densely represented relations between finite, explicitly
     enumerated sets.
@@ -275,11 +279,11 @@ class FinRel(Box[FinSet]):
             tensor = tensor.view()
         self = super().__new__(cls)
         self.__tensor = tensor
-        self.__shape = Shape(map(FinSet._new, tensor.shape))
+        self.__shape = tuple(map(FinSet._new, tensor.shape))
         return self
 
     __tensor: NumpyUInt8Array
-    __shape: Shape[FinSet]
+    __shape: FinSetShape
     __hash_cache: int
 
     __slots__ = ("__tensor", "__shape", "__hash_cache", "__is_function_graph_cache")
@@ -301,12 +305,12 @@ class FinRel(Box[FinSet]):
         return self.__tensor
 
     @property
-    def shape(self) -> Shape[FinSet]:
+    def shape(self) -> FinSetShape:
         """The shape of the relation."""
         return self.__shape
 
-    def _transpose(self, perm: Sequence[Port]) -> Self:
-        return FinRel._new(np.transpose(self.__tensor, perm))
+    def _transpose(self, out_ports: Sequence[Port], /) -> Self:
+        return FinRel._new(np.transpose(self.__tensor, out_ports))
 
     def to_set(self) -> Iterator[Point]:
         """
@@ -327,8 +331,9 @@ class FinRel(Box[FinSet]):
         if len(input_ports) != len(set(input_ports)):
             raise ValueError("Input ports cannot be repeated.")
         output_ports = tuple(p for p in ports if p not in input_ports)
-        input_sizes = tuple(s.size for s in self.shape[input_ports])
-        output_sizes = tuple(s.size for s in self.shape[output_ports])
+        shape = self.shape
+        input_sizes = tuple(shape[i].size for i in input_ports)
+        output_sizes = tuple(shape[o].size for o in output_ports)
         transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
         return (
             output_ports,
@@ -360,8 +365,9 @@ class FinRel(Box[FinSet]):
             raise ValueError(
                 "Relation is not a function graph with the given input ports."
             )
-        input_sizes = tuple(s.size for s in self.shape[input_ports])
-        output_sizes = tuple(s.size for s in self.shape[output_ports])
+        shape = self.shape
+        input_sizes = tuple(shape[i].size for i in input_ports)
+        output_sizes = tuple(shape[o].size for o in output_ports)
         out_points = list(np.ndindex(output_sizes))
         return {
             in_point: out_points[np.argmax(col)]
