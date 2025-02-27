@@ -4,10 +4,24 @@
     "apidocs_folder": "api",
     "toc_filename": "api-toc.rst",
     "type_alias_dict_filename": "autodoc-type-aliases.json",
-    "include_members": {},
+    "include_members": {
+        "tensorsat.lib.bincirc": [
+            "bit",
+            "not_",
+            "and_",
+            "or_",
+            "xor_",
+            "bit_0",
+            "bit_1",
+            "binop_labels",
+            "half_adder",
+            "full_adder",
+            "rc_adder",
+            "wallace_multiplier"
+        ]
+    },
     "type_aliases": {
-        "tensorsat.diagrams.boxes": ["Box"],
-        "tensorsat.diagrams.wirings": ["Slot", "Port", "Wire"],
+        "tensorsat.diagrams": ["Box", "Slot", "Port", "Wire"],
         "tensorsat.lang.fin_rel": ["Size", "El", "Point", "NumpyUInt8Array"],
         "tensorsat.lib.sat": ["Clause", "CNFDiagramMode"],
         "tensorsat.viz.diagrams": ["DiagramGraphNodeKind", "DiagramGraphNode"],

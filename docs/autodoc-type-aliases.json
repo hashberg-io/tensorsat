@@ -1,8 +1,8 @@
 {
-    "Box": "tensorsat.diagrams.boxes.Box",
-    "Slot": "tensorsat.diagrams.wirings.Slot",
-    "Port": "tensorsat.diagrams.wirings.Port",
-    "Wire": "tensorsat.diagrams.wirings.Wire",
+    "Box": "tensorsat.diagrams.Box",
+    "Slot": "tensorsat.diagrams.Slot",
+    "Port": "tensorsat.diagrams.Port",
+    "Wire": "tensorsat.diagrams.Wire",
     "Size": "tensorsat.lang.fin_rel.Size",
     "El": "tensorsat.lang.fin_rel.El",
     "Point": "tensorsat.lang.fin_rel.Point",

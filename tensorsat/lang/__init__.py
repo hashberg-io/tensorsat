@@ -3,9 +3,9 @@ Diagrammatic languages for the compact-closed category of sets and relations.
 Every language corresponds to a choice of parametrisation for a class of relations:
 specified by defining types and/or boxes:
 
-- Every (concrete) subclass of :class:`~tensorsat.diagrams.types.Type` parametrises a
+- Every (concrete) subclass of :class:`~tensorsat.diagrams.Type` parametrises a
   class of sets (via its constructor arguments).
-- Every (concrete) subclass of :class:`~tensorsat.diagrams.boxes.Box` parametrises a
+- Every (concrete) subclass of :class:`~tensorsat.diagrams.Box` parametrises a
   class of relations (via its constructor arguments).
 
 The following languages are currently implemented:

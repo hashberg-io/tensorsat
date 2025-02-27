@@ -9,10 +9,6 @@
     api/tensorsat.contraction.cotengra
     api/tensorsat.contraction.simple
     api/tensorsat.diagrams
-    api/tensorsat.diagrams.boxes
-    api/tensorsat.diagrams.diagrams
-    api/tensorsat.diagrams.types
-    api/tensorsat.diagrams.wirings
     api/tensorsat.lang
     api/tensorsat.lang.fin_rel
     api/tensorsat.lib
