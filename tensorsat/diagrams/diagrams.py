@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import (
+    TYPE_CHECKING,
     Any,
     Concatenate,
     Generic,
@@ -37,6 +38,12 @@ if __debug__:
 from .types import Type, Shape, TypeT_co, TypeT_inv
 from .wirings import Port, Shaped, Slot, Wire, Wiring, WiringBuilder
 from .boxes import Box
+
+if TYPE_CHECKING:
+    from ..contraction import Contraction
+else:
+    Contraction = Any
+
 
 type Block[T: Type] = Box[T] | Diagram[T]
 """
@@ -274,6 +281,12 @@ class Diagram(Shaped[TypeT_co]):
     def recipe_used(self) -> DiagramRecipe[Any, TypeT_co] | None:
         """The recipe used to construct this diagram, if any."""
         return self.__recipe_used
+
+    def contract(self, contraction: Contraction) -> Box[TypeT_co]:
+        """Contracts the diagram using the given contraction."""
+        return contraction.contract(self)
+
+    # TODO: implement partial contraction, with wiring update logic.
 
     def compose(
         self, new_blocks: Mapping[Slot, Block[TypeT_co] | Wiring[TypeT_co]]
