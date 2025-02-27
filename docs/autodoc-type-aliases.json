@@ -1,4 +1,5 @@
 {
+    "Box": "tensorsat.diagrams.boxes.Box",
     "Slot": "tensorsat.diagrams.wirings.Slot",
     "Port": "tensorsat.diagrams.wirings.Port",
     "Wire": "tensorsat.diagrams.wirings.Wire",
@@ -9,5 +10,6 @@
     "Clause": "tensorsat.lib.sat.Clause",
     "CNFDiagramMode": "tensorsat.lib.sat.CNFDiagramMode",
     "DiagramGraphNodeKind": "tensorsat.viz.diagrams.DiagramGraphNodeKind",
-    "DiagramGraphNode": "tensorsat.viz.diagrams.DiagramGraphNode"
+    "DiagramGraphNode": "tensorsat.viz.diagrams.DiagramGraphNode",
+    "Contraction": "tensorsat.contraction.Contraction"
 }

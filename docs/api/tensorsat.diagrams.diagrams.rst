@@ -44,3 +44,8 @@ SelectedInputWires
     :show-inheritance:
     :members:
     :special-members: __rmatmul__
+
+TYPE_CHECKING
+-------------
+
+.. autodata:: tensorsat.diagrams.diagrams.TYPE_CHECKING

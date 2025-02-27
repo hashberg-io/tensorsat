@@ -4,9 +4,12 @@
 
     api/tensorsat
     api/tensorsat._autoray
+    api/tensorsat.contraction
+    api/tensorsat.contraction.abc
+    api/tensorsat.contraction.cotengra
+    api/tensorsat.contraction.simple
     api/tensorsat.diagrams
     api/tensorsat.diagrams.boxes
-    api/tensorsat.diagrams.contractions
     api/tensorsat.diagrams.diagrams
     api/tensorsat.diagrams.types
     api/tensorsat.diagrams.wirings

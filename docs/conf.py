@@ -72,6 +72,8 @@ intersphinx_mapping = {
     'networkx': ('https://networkx.org/documentation/stable/', "./intersphinx/networkx-objects.inv"),
     'matplotlib': ('https://matplotlib.org/stable/', "./intersphinx/matplotlib-objects.inv"),
     'sympy': ('https://docs.sympy.org/latest/', "./intersphinx/sympy-objects.inv"),
+    'opt-einsum': ('https://optimized-einsum.readthedocs.io/en/latest/', "./intersphinx/opt-einsum-objects.inv"),
+    'cotengra': ('https://cotengra.readthedocs.io/en/latest/', "./intersphinx/cotengra-objects.inv"),
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -116,7 +118,6 @@ skip_missing_references: set[str] = {
     "tensorsat.viz.diagrams._T",
     "numpy.uint8",
     "np.random.Generator",
-    "Box",
 }
 
 def on_missing_reference(app: Sphinx, env: BuildEnvironment, node: pending_xref, contnode: Any) -> Any:

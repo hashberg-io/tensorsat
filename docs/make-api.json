@@ -6,10 +6,12 @@
     "type_alias_dict_filename": "autodoc-type-aliases.json",
     "include_members": {},
     "type_aliases": {
+        "tensorsat.diagrams.boxes": ["Box"],
         "tensorsat.diagrams.wirings": ["Slot", "Port", "Wire"],
         "tensorsat.lang.fin_rel": ["Size", "El", "Point", "NumpyUInt8Array"],
         "tensorsat.lib.sat": ["Clause", "CNFDiagramMode"],
-        "tensorsat.viz.diagrams": ["DiagramGraphNodeKind", "DiagramGraphNode"]
+        "tensorsat.viz.diagrams": ["DiagramGraphNodeKind", "DiagramGraphNode"],
+        "tensorsat.contraction": ["Contraction"]
     },
     "exclude_members": {},
     "include_modules": [],
