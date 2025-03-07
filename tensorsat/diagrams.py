@@ -51,13 +51,6 @@ else:
 if __debug__:
     from typing_validation import validate
 
-
-# TODO: Create TypeMeta to track types.
-#       Automate registration of concrete Type subclasses into their language (module).
-#       Make it possible to subclass concrete Type classes, to allow overlapping langs.
-#       It makes sense to consider alternative parametrisations for types in diff langs.
-
-
 class Type(metaclass=ABCMeta):
     """
     Abstract base class for types in diagrams.
@@ -82,24 +75,20 @@ class Type(metaclass=ABCMeta):
             raise TypeError("Only final subclasses of Type can be instantiated.")
         return super().__new__(cls)
 
-    @final
-    def spider(self, num_ports: int) -> Box:
-        """
-        The box corresponding to a single wire connected to the given number of ports,
-        all ports being of this type.
-        """
-        validate(num_ports, int)
-        if num_ports <= 0:
-            raise ValueError("Number of ports must be strictly positive.")
-        return self._spider(num_ports)
+class TensorLikeType(Type):
+    """
+    Abstract base class for tensor-like types, endowed with a dimension which can be
+    used to estimate contraction cost and memory requirements for boxes.
+    See :class:`TensorLikeBox`.
+    """
 
+    @property
     @abstractmethod
-    def _spider(self, num_ports: int) -> Box:
-        """
-        Protected version of :meth:`Type.spider`, to be implemented by subclasses.
-        It is guaranteed that ``num_ports`` is strictly positive.
-        """
+    def tensor_dim(self) -> int:
+        """The tensor-like dimension for this object."""
 
+TypeClass: TypeAlias = SubclassOf[Type]
+"""A type class, i.e. a subclass of :class:`Type`."""
 
 Shape: TypeAlias = tuple[Type, ...]
 """A shape, as a tuple of types."""
@@ -115,7 +104,6 @@ Wire: TypeAlias = int
 Type alias for (the index of) a wire in a diagram.
 Each port is connected to exactly one wire, but a wire can connect any number of ports.
 """
-
 
 class WiringData(TypedDict, total=True):
     """Data for a wiring."""
@@ -284,7 +272,12 @@ class WiringBase(Shaped, Slotted, ABC):
     @property
     def discarded_wires(self) -> frozenset[Wire]:
         """The set of "discarded" wires, wires not connected to any out ports."""
-        return frozenset(self.wires) - frozenset(self.out_wires)
+        return frozenset(self.wires) - set(self.out_wires)
+
+    @property
+    def scalar_wires(self) -> frozenset[Wire]:
+        """The set of "scalar" wires, wires not connected to any ports."""
+        return frozenset(self.wires) - set(self.out_wires) - set(self.dangling_wires)
 
     @final
     @property
@@ -307,7 +300,7 @@ class WiringBase(Shaped, Slotted, ABC):
     @property
     def wired_slots(self) -> Mapping[Wire, tuple[Slot, ...]]:
         """
-        Computes and returns a mapping of wires to the collection of slot pairs
+        Computes and returns a mapping of wires to the collection of slots
         connected by that wire.
         Wires not appearing as keys in the mapping are "dangling", i.e. they don't
         connect to any slots.
@@ -319,6 +312,44 @@ class WiringBase(Shaped, Slotted, ABC):
         return MappingProxyType(
             {w: tuple(w_slots) for w, w_slots in wired_slots.items()}
         )
+
+
+    @final
+    @property
+    def wired_out_ports(self) -> Mapping[Wire, tuple[Port, ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of out ports
+        connected by that wire.
+        Wires not appearing as keys in the mapping are "discarded", i.e. they don't
+        connect to any out ports.
+        """
+        wired_out_ports: dict[Wire, list[Port]] = {}
+        for port, wire in enumerate(self.out_wires):
+            wired_out_ports.setdefault(wire, []).append(port)
+        return MappingProxyType(
+            {w: tuple(w_out_ports) for w, w_out_ports in wired_out_ports.items()}
+        )
+
+
+    @final
+    @property
+    def wired_ports(self) -> Mapping[Wire, tuple[Port|tuple[Slot, Port], ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of ports connected by
+        that wire: ``(slot, port)`` pairs for slot ports and individual out ports.
+        Wires not appearing as keys in the mapping are "scalar", i.e. they don't
+        connect to any ports.
+        """
+        wired_ports: dict[Wire, list[Port|tuple[Slot, Port]]] = {}
+        for slot, wires in enumerate(self.slot_wires_list):
+            for port, wire in enumerate(wires):
+                wired_ports.setdefault(wire, []).append((slot, port))
+        for port, wire in enumerate(self.out_wires):
+            wired_ports.setdefault(wire, []).append(port)
+        return MappingProxyType(
+            {w: tuple(w_out_ports) for w, w_out_ports in wired_ports.items()}
+        )
+
 
 
 @final
@@ -381,7 +412,7 @@ class Wiring(WiringBase):
         """
         assert validate(data, WiringData)
         # Destructure the data:
-        wire_types = Shape(data["wire_types"])
+        wire_types = tuple(data["wire_types"])
         slot_wires_list = tuple(map(tuple, data["slot_wires_list"]))
         out_wires = tuple(data["out_wires"])
         # Validate the data:
@@ -397,9 +428,9 @@ class Wiring(WiringBase):
             if wire not in range(num_wires):
                 raise ValueError(f"Invalid wire index {wire} in outer mapping.")
         slot_shapes = tuple(
-            Shape(wire_types[i] for i in slot_wires) for slot_wires in slot_wires_list
+            tuple(wire_types[i] for i in slot_wires) for slot_wires in slot_wires_list
         )
-        shape = Shape(wire_types[o] for o in out_wires)
+        shape = tuple(wire_types[o] for o in out_wires)
         return cls._new(slot_shapes, shape, wire_types, slot_wires_list, out_wires)
 
     @property
@@ -748,15 +779,6 @@ class WiringBuilder(WiringBase):
             attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
         return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
 
-
-# TODO: Improve BoxMeta to track boxes.
-#       Automate registration of concrete Box subclasses into their language (module).
-#       Make it possible to subclass concrete Box classes, to allow overlapping langs.
-#       It makes sense to consider alternative parametrisations for boxes in diff langs.
-
-# TODO: consider introducing box labels, for builtin boxes
-
-
 class BoxMeta(ABCMeta):
     def __new__(
         mcs,
@@ -769,12 +791,10 @@ class BoxMeta(ABCMeta):
         if not cls.__abstractmethods__:
             try:
                 import autoray  # type: ignore
-
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
         return cls
-
 
 class Box(Shaped, metaclass=BoxMeta):
     """
@@ -782,6 +802,114 @@ class Box(Shaped, metaclass=BoxMeta):
     """
 
     __final__: ClassVar[bool] = False
+
+    @final
+    @staticmethod
+    def box_class_join(box_classes: Iterable[BoxClass]) -> BoxClass:
+        """The most specific superclass (join) of the given box classes."""
+        raise NotImplementedError()
+
+    @classmethod
+    def can_be_contracted(cls) -> bool:
+        """
+        Whether this box class can be contracted,
+        i.e. whether it provides implementations for the (protected versions of)
+        :meth:`Box.contract2`, :meth:`Box.rewire` and :meth:`Box.spider`.
+        """
+        abstract_methods = cls.__abstractmethods__
+        return (
+            "_contract2" not in abstract_methods
+            and "_rewire" not in abstract_methods
+            and "_spider" not in abstract_methods
+        )
+
+
+    @final
+    @classmethod
+    def prod(cls, boxes: Iterable[Self]) -> Self:
+        """
+        Takes the product of two or more boxes of this class.
+        The resulting relation has as its ports the ports of the boxes given,
+        in the order they were given.
+        """
+        boxes = tuple(boxes)
+        if __debug__:
+            for box in boxes:
+                if not isinstance(box, cls):
+                    raise TypeError(
+                        f"Boxes must be instances of box class {cls},"
+                        f" found instance of box class {type(box)} instead."
+                    )
+        if not boxes:
+            raise ValueError("Products must involve at least one box.")
+        if len(boxes) == 1:
+            return boxes[0]
+        res = boxes[0]
+        for box in boxes[1:]:
+            lhs, rhs = res, box
+            lhs_len, rhs_len = len(lhs.shape), len(rhs.shape)
+            lhs_wires, rhs_wires = range(lhs_len), range(lhs_len, lhs_len + rhs_len)
+            out_wires = range(lhs_len + rhs_len)
+            res = cls._contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
+        return res
+
+    @final
+    @classmethod
+    def from_wiring(cls, wiring: Wiring) -> Self:
+        """
+        Creates a box of this class for the given wiring.
+        The ports of the box are the slot ports for the wiring, in slot order,
+        followed by the out ports for the wiring.
+        """
+        wires = wiring.wires
+        wire_types = wiring.wire_types
+        wired_ports = wiring.wired_ports
+        wires_by_spider_args: dict[tuple[Type, int], list[Wire]] = {}
+        for w, w_ports in wired_ports.items():
+            w_spider_args = (wire_types[w], len(w_ports))
+            wires_by_spider_args.setdefault(w_spider_args, []).append(w)
+        spiders = {
+            (t, n): cls.spider(t, n)
+            for t, n in wires_by_spider_args
+        }
+        wire_spiders = {
+            w: spiders[spider_args]
+            for spider_args, ws in wires_by_spider_args.items()
+            for w in ws
+        }
+        res = cls.prod(wire_spiders[w] for w in wires)
+        res_port_labels = [
+            port
+            for w in wires
+            for port in wired_ports[w]
+        ]
+        out_port_labels = [
+            (slot, port)
+            for slot in wiring.slots
+            for port in wiring.slot_ports(slot)
+        ] + list(wiring.ports)
+        out_ports = [res_port_labels.index(p) for p in out_port_labels]
+        return res._rewire(out_ports)
+
+    @final
+    @classmethod
+    def spider(cls, t: Type, num_ports: int) -> Self:
+        """
+        The box corresponding to a single wire connected to the given number of ports,
+        all ports being of this type.
+        """
+        validate(num_ports, int)
+        if num_ports <= 0:
+            raise ValueError("Number of ports must be strictly positive.")
+        return cls._spider(t, num_ports)
+
+    @abstractmethod
+    @classmethod
+    def _spider(cls, t: Type, num_ports: int) -> Self:
+        """
+        Protected version of :meth:`Box.spider`, to be implemented by subclasses.
+        It is guaranteed that ``num_ports`` is strictly positive.
+        """
 
     @final
     @classmethod
@@ -812,11 +940,6 @@ class Box(Shaped, metaclass=BoxMeta):
             out_wires = sorted(set(lhs_wires).symmetric_difference(rhs_wires))
         else:
             out_wires_set = set(out_wires)
-            if len(out_wires) != len(out_wires_set):
-                raise NotImplementedError("Output wires cannot be repeated.")
-                # TODO: This is not ordinarily handled by einsum,
-                #       but it is pretty natural in the context of the wirings we use,
-                #       so we might wish to add support for it in the future.
             out_wires_set.difference_update(lhs_wires)
             out_wires_set.difference_update(rhs_wires)
             if out_wires_set:
@@ -836,17 +959,15 @@ class Box(Shaped, metaclass=BoxMeta):
         """
         Protected version of :meth:`Box.contract2`, to be implemented by subclasses.
         It is guaranteed that:
+
         - The length of ``lhs_wires`` matches the length of ``lhs.shape``
         - The length of ``rhs_wires`` matches the length of ``rhs.shape``
-        - Indices in ``out_wires`` are not repeated
         - Every index in ``out_wires`` appears in ``lhs_wires`` or ``rhs_wires``
+
+        It is possible for wires from ``lhs_wires`` or ``rhs_wires`` to appear multiple
+        times in ``out_wires``, or not at all.
         """
 
-    # TODO: allow index repetition in out_wires
-    # TODO: allow index introduction in out_wires
-    # TODO: can implement contraction via tensordot if index copy is supported:
-    #       X|Y, Y|Z -> X|Y'|Z implemented as X X|Y @ Y|Y'|Z,
-    #       using duplication + transposition to turn Y|Z into Y|Y'|Z.
 
     __slots__ = ("__weakref__",)
 
@@ -859,43 +980,69 @@ class Box(Shaped, metaclass=BoxMeta):
         if not cls.__final__:
             raise TypeError("Only final subclasses of Box can be instantiated.")
         self = super().__new__(cls)
-        # self.__recipe_used = None
         return self
 
     @final
-    def transpose(self, out_ports: Sequence[Port]) -> Self:
-        """Permutes output ports."""
+    def rewire(self, out_ports: Sequence[Port]) -> Self:
+        """Permutes, duplicates and/or drops output ports from this box."""
         assert validate(out_ports, Sequence[Port])
-        if sorted(out_ports) != list(self.ports):
-            raise ValueError("Argument to transpose must be permutation of ports.")
-        return self._transpose(out_ports)
+        ports = self.ports
+        if not all(port in ports for port in out_ports):
+            raise ValueError("Output ports must be valid for this box.")
+        return self._rewire(out_ports)
 
     @abstractmethod
-    def _transpose(self, out_ports: Sequence[Port], /) -> Self:
-        """Protected version of :meth:`Box.rewire`, to be implemented by subclasses."""
-
-    def __mul__(self, other: Self) -> Self:
+    def _rewire(self, out_ports: Sequence[Port]) -> Self:
         """
-        Takes the product of this relation with another relation of the same class.
-        The resulting relation has as its ports the ports of this relation followed
-        by the ports of the other relation, and is of the same class of both.
-
-        :meta public:
+        Protected version of :meth:`Box.rewire`, to be implemented by subclasses.
+        It is guaranteed that the output ports are valid for this box.
+        It is possible for ports to appear multiple times in ``out_ports``,
+        or not at all.
         """
-        lhs, rhs = self, other
-        lhs_len, rhs_len = len(lhs.shape), len(rhs.shape)
-        lhs_wires, rhs_wires = range(lhs_len), range(lhs_len, lhs_len + rhs_len)
-        out_wires = range(lhs_len + rhs_len)
-        return type(self)._contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
 
     def __repr__(self) -> str:
         cls_name = type(self).__name__
         num_ports = len(self.shape)
         return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
 
+BoxClass: TypeAlias = SubclassOf[Box]
+"""A box class, i.e. a subclass of :class:`Box`."""
+
+class TensorLikeBox(Box):
+    """
+    Abstract base classes for tensor-like boxes, where an integral shape can be
+    used to estimate contraction costs and memory requirements.
+    """
+
+    __tensor_shape_cache: tuple[int, ...]
+
+    __slots__ = ("__tensor_shape_cache",)
+
+    @property
+    @abstractmethod
+    def shape(self) -> tuple[TensorLikeType, ...]:
+        ...
+
+    @property
+    def tensor_shape(self) -> tuple[int, ...]:
+        """
+        The tensor-like shape for this box.
+        Guaranteed to have the
+        """
+        try:
+            return self.__tensor_shape_cache
+        except AttributeError:
+            shape = self.shape
+            assert all(isinstance(t, TensorLikeType) for t in shape)
+            self.__tensor_shape_cache = t_shape = tuple(t.tensor_dim for t in shape)
+            return t_shape
+
 
 BoxT_inv = TypeVar("BoxT_inv", bound=Box, default=Box)
 """Invariant type variable for boxes."""
+
+TensorLikeBoxT_inv = TypeVar("TensorLikeBoxT_inv", bound=TensorLikeBox, default=TensorLikeBox)
+"""Invariant type variable for tensor-like boxes."""
 
 
 Block: TypeAlias = "Box | Diagram"
@@ -995,7 +1142,6 @@ class Diagram(Shaped):
         builder: DiagramBuilder = DiagramBuilder()
         recipe(builder)
         diagram = builder.diagram
-        # TODO: store recipe name, if available
         return diagram
 
     @staticmethod
@@ -1037,15 +1183,23 @@ class Diagram(Shaped):
         self = super().__new__(cls)
         self.__wiring = wiring
         self.__blocks = blocks
-        # self.__recipe_used = None
+        self.__recipe_used = None
         return self
 
     __wiring: Wiring
     __blocks: tuple[Box | Diagram | None, ...]
     __recipe_used: DiagramRecipe[Any, Type] | None
     __hash_cache: int
+    __box_class_cache: BoxClass
 
-    __slots__ = ("__weakref__", "__wiring", "__blocks", "__recipe_used", "__hash_cache")
+    __slots__ = (
+        "__weakref__",
+        "__wiring",
+        "__blocks",
+        "__recipe_used",
+        "__hash_cache",
+        "__box_class_cache"
+    )
 
     def __new__(cls, wiring: Wiring, blocks: Mapping[Slot, Block]) -> Self:
         """
@@ -1128,11 +1282,23 @@ class Diagram(Shaped):
         """The recipe used to construct this diagram, if any."""
         return self.__recipe_used
 
-    def contract(self, contraction: Contraction) -> Box:
-        """Contracts the diagram using the given contraction."""
-        return contraction.contract(self)
-
-    # TODO: implement partial contraction, with wiring update logic.
+    @property
+    def box_class(self) -> BoxClass:
+        """
+        The most specific common box class for the boxes in this diagram and its
+        subdiagrams. See :meth:`Box.box_class_join`.
+        """
+        try:
+            return self.__box_class_cache
+        except AttributeError:
+            box_classes = [
+                type(box) for box in self.boxes
+            ] + [
+                subdiagram.box_class for subdiagram in self.subdiagrams
+            ]
+            box_class = Box.box_class_join(cast(list[BoxClass], box_classes))
+            self.__box_class_cache = box_class
+            return box_class
 
     def compose(self, new_blocks: Mapping[Slot, Block | Wiring]) -> Diagram:
         """
@@ -1196,11 +1362,6 @@ class Diagram(Shaped):
         if cache is not None:
             cache[self] = flat_diagram
         return flat_diagram
-
-    # TODO: implement diagrammatic contraction
-    # ContractionPath = Any # dummy
-    # def contract(self, path: ContractionPath | None = None) -> Diagram:
-    #     raise NotImplementedError()
 
     def __repr__(self) -> str:
         attrs: list[str] = []

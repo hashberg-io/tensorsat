@@ -18,6 +18,7 @@ Top-level functions for the TensorSAT package, for use by the
 
 from __future__ import annotations
 from collections.abc import Sequence
+from typing import cast
 from .diagrams import Box, BoxT_inv
 
 if __debug__:
@@ -29,11 +30,7 @@ def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
     assert validate(contraction, str)
     assert validate(lhs, Box)
     assert validate(rhs, Box)
-    cls = type(lhs)
-    if not isinstance(rhs, cls):
-        raise NotImplementedError(
-            "Contraction between boxes of different box classes is not yet implemented."
-        )
+    box_class = Box.box_class_join([type(lhs), type(rhs)])
     _input_wires, _out_wires = contraction.split("->")
     _lhs_wires, _rhs_wires = _input_wires.split(",")
     char_idxs = {
@@ -43,10 +40,11 @@ def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
     lhs_wires = [char_idxs[c] for c in _lhs_wires]
     rhs_wires = [char_idxs[c] for c in _rhs_wires]
     out_wires = [char_idxs[c] for c in _out_wires]
-    return cls.contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
+    res = box_class.contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
+    return cast(BoxT_inv, res) # Think about whether this cast can be avoided.
 
 
 def transpose(box: BoxT_inv, perm: Sequence[int], /) -> BoxT_inv:
     """Rearranges the ports of a box."""
     assert validate(box, Box)
-    return box.transpose(perm)
+    return box.rewire(perm)

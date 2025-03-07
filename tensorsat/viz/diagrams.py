@@ -215,9 +215,6 @@ class BFSLayoutKWArgs(TypedDict, total=True):
     sources: Sequence[Port]
 
 
-# TODO: implement a circuit layout, using FinFunc data to layer circuits causally.
-
-
 class DrawDiagramOptions(TypedDict, total=False):
     """Style options for diagram drawing."""
 
@@ -452,7 +449,8 @@ class DiagramDrawer:
                 case "wire":
                     _, wire_idx, _ = node
                     return apply_setter(setter["wire"], wire_idx)
-            raise NotImplementedError()
+                case unknown_kind:
+                    assert False, f"Unknown node kind {unknown_kind}"
 
         # Set options for nx.draw_networkx:
         draw_networkx_options: dict[str, Any] = {}

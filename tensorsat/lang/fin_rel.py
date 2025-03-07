@@ -18,15 +18,15 @@ and relations between them, represented as Boolean tensors (cf. :class:`FinRel`)
 
 from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from itertools import product
 from math import prod
-from typing import Any, ClassVar, Self, TypeAlias, final
+from typing import Any, ClassVar, Self, TypeAlias, Unpack, final, overload
 
 import numpy as np
 from hashcons import InstanceStore
 import xxhash
 
-from ..diagrams import Port, Shape, Type, Box, Wire
+from ..diagrams import Port, TensorLikeBox, TensorLikeType, Type, Wire
+from ..utils import rewire_array
 
 if __debug__:
     from typing_validation import validate
@@ -62,14 +62,14 @@ def _extract_sizes(
     if isinstance(sizes_or_finsets, int):
         return (sizes_or_finsets,)
     if isinstance(sizes_or_finsets, FinSet):
-        return (sizes_or_finsets.size,)
+        return (sizes_or_finsets.tensor_dim,)
     return tuple(
-        size if isinstance(size, int) else size.size for size in sizes_or_finsets
+        size if isinstance(size, int) else size.tensor_dim for size in sizes_or_finsets
     )
 
 
 @final
-class FinSet(Type):
+class FinSet(TensorLikeType):
     """
     Type class for finite, explicitly enumerated sets.
     Parametrises sets in the form ``{0, ..., size-1}`` by their ``size >= 1``.
@@ -107,12 +107,10 @@ class FinSet(Type):
         """Size of the finite set."""
         return self.__size
 
-    def _spider(self, num_ports: int) -> FinRel:
-        size = self.__size
-        tensor = np.zeros(shape=(size,) * num_ports, dtype=np.uint8)
-        for i in range(size):
-            tensor[(i,) * num_ports] = 1
-        return FinRel._new(tensor)
+    @property
+    def tensor_dim(self) -> Size:
+        """Tensor dimension of a finite set coincides with its size."""
+        return self.__size
 
     def __repr__(self) -> str:
         return f"FinSet({self.__size})"
@@ -124,9 +122,40 @@ FinSetShape: TypeAlias = tuple[FinSet, ...]
 NumpyUInt8Array: TypeAlias = np.ndarray[tuple[Size, ...], np.dtype[np.uint8]]
 """Type alias for Numpy's UInt8 arrays."""
 
+_NumpyUIntArray: TypeAlias = np.ndarray[tuple[Size, ...], np.dtype[np.unsignedinteger[Any]]]
+"""Type alias for Numpy's unsigned integer arrays."""
+
+@overload
+def _to_safe_contraction_dtype(
+    contraction_size: int,
+    *tensors: Unpack[tuple[NumpyUInt8Array]]
+) -> tuple[_NumpyUIntArray]: ...
+
+@overload
+def _to_safe_contraction_dtype(
+    contraction_size: int,
+    *tensors: Unpack[tuple[NumpyUInt8Array, NumpyUInt8Array]]
+) -> tuple[_NumpyUIntArray, _NumpyUIntArray]: ...
+
+def _to_safe_contraction_dtype(
+    contraction_size: int,
+    *tensors: NumpyUInt8Array
+) -> tuple[_NumpyUIntArray, ...]:
+    assert contraction_size >= 0
+    dt: np.dtype[Any]
+    if contraction_size < 256:
+        return tensors
+    if contraction_size < 65536:
+        dt = np.dtype("uint16")
+    elif contraction_size < 2**32:
+        dt = np.dtype("uint32")
+    else:
+        dt = np.dtype("uint64")
+    return tuple(t.astype(dt) for t in tensors)
+
 
 @final
-class FinRel(Box):
+class FinRel(TensorLikeBox):
     """
     Type class for finite, densely represented relations between finite, explicitly
     enumerated sets.
@@ -209,36 +238,6 @@ class FinRel(Box):
         mapping = {idx: func(*idx) for idx in np.ndindex(input_shape)}
         return cls.from_mapping(input_shape, output_shape, mapping)
 
-    @classmethod
-    def from_wiring(
-        cls,
-        out_mapping: Sequence[Wire],
-        wire_types: Mapping[Port, Size | FinSet],
-    ) -> Self:
-        """Creates the spider relation for the given wiring."""
-        # 1. Extract and validate wires and their sizes:
-        assert validate(out_mapping, Sequence[Wire])
-        assert validate(wire_types, Mapping[Port, Size | FinSet])
-        wire_sizes = dict(zip(wire_types.keys(), _extract_sizes(wire_types.values())))
-        wires = sorted(set(out_mapping))
-        for wire in wires:
-            if wire not in wire_sizes:
-                raise ValueError(f"Size missing for wire {wire}.")
-        if any(dim <= 0 for dim in wire_sizes.values()):
-            raise ValueError("Wire sizes must be strictly positive.")
-        # 2. Re-index the wires:
-        _wire_idx = {wire: i for i, wire in enumerate(wires)}
-        out_mapping = [_wire_idx[node] for node in out_mapping]
-        wire_sizes = {_wire_idx[node]: wire_sizes[node] for node in wires}
-        # 3. Construct and return the relation:
-        ports = range(len(out_mapping))
-        shape = tuple(wire_sizes[out_mapping[port]] for port in ports)
-        subset = frozenset(
-            tuple(values[out_mapping[port]] for port in ports)
-            for values in product(*(range(wire_sizes[node]) for node in wires))
-        )
-        return cls.from_set(shape, subset)
-
     @staticmethod
     def _contract2(
         lhs: FinRel,
@@ -249,23 +248,36 @@ class FinRel(Box):
     ) -> FinRel:
         lhs_tensor = lhs.__tensor
         rhs_tensor = rhs.__tensor
-        contracted_size = prod(
+        contraction_size = prod(
             dim
             for dim, w in zip(lhs_tensor.shape, lhs_wires)
             if w in (set(lhs_wires) & set(rhs_wires)) - set(out_wires)
         )
-        if contracted_size >= 256:
-            dt: np.dtype[Any]
-            if contracted_size < 2**16:
-                dt = np.dtype("uint16")
-            elif contracted_size < 2**32:
-                dt = np.dtype("uint32")
-            else:
-                dt = np.dtype("uint64")
-            lhs_tensor, rhs_tensor = lhs_tensor.astype(dt), rhs_tensor.astype(dt)
-        res_tensor = np.einsum(lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, out_wires)
+        lhs_tensor, rhs_tensor = _to_safe_contraction_dtype(
+            contraction_size,
+            lhs_tensor,
+            rhs_tensor
+        )
+        out_wireset = set(out_wires)
+        if len(out_wireset) == len(out_wires):
+            res_tensor = np.einsum(lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, out_wires)
+            res_tensor = np.sign(res_tensor, dtype=np.uint8)
+            return FinRel._new(res_tensor)
+        einsum_out_wires = sorted(out_wireset)
+        rewire_out_ports = [einsum_out_wires.index(w) for w in out_wires]
+        res_tensor = np.einsum(lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, einsum_out_wires)
+        res_tensor = rewire_array(res_tensor, rewire_out_ports)
         res_tensor = np.sign(res_tensor, dtype=np.uint8)
         return FinRel._new(res_tensor)
+
+    @classmethod
+    def _spider(cls, t: Type, num_ports: int) -> Self:
+        assert isinstance(t, FinSet)
+        size = t.tensor_dim
+        tensor = np.zeros(shape=(size,) * num_ports, dtype=np.uint8)
+        for i in range(size):
+            tensor[(i,) * num_ports] = 1
+        return FinRel._new(tensor)
 
     @classmethod
     def _new(cls, tensor: NumpyUInt8Array) -> Self:
@@ -309,8 +321,23 @@ class FinRel(Box):
         """The shape of the relation."""
         return self.__shape
 
-    def _transpose(self, out_ports: Sequence[Port], /) -> Self:
-        return FinRel._new(np.transpose(self.__tensor, out_ports))
+    def _rewire(self, out_ports: Sequence[Port]) -> Self:
+        out_portset = frozenset(out_ports)
+        if len(out_portset) == len(out_ports):
+            return FinRel._new(np.transpose(self.__tensor, out_ports))
+        tensor = self.__tensor
+        tensor_shape = tensor.shape
+        discarded_ports = frozenset(self.ports)-out_portset
+        if discarded_ports:
+            contraction_size = prod(
+                dim
+                for port, dim in enumerate(tensor_shape)
+                if port in discarded_ports
+            )
+            tensor, = _to_safe_contraction_dtype(contraction_size, tensor)
+        res_tensor = rewire_array(tensor, out_ports)
+        res_tensor = np.sign(res_tensor, dtype=np.uint8)
+        return FinRel._new(tensor)
 
     def to_set(self) -> Iterator[Point]:
         """
@@ -332,8 +359,8 @@ class FinRel(Box):
             raise ValueError("Input ports cannot be repeated.")
         output_ports = tuple(p for p in ports if p not in input_ports)
         shape = self.shape
-        input_sizes = tuple(shape[i].size for i in input_ports)
-        output_sizes = tuple(shape[o].size for o in output_ports)
+        input_sizes = tuple(shape[i].tensor_dim for i in input_ports)
+        output_sizes = tuple(shape[o].tensor_dim for o in output_ports)
         transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
         return (
             output_ports,
@@ -366,8 +393,8 @@ class FinRel(Box):
                 "Relation is not a function graph with the given input ports."
             )
         shape = self.shape
-        input_sizes = tuple(shape[i].size for i in input_ports)
-        output_sizes = tuple(shape[o].size for o in output_ports)
+        input_sizes = tuple(shape[i].tensor_dim for i in input_ports)
+        output_sizes = tuple(shape[o].tensor_dim for o in output_ports)
         out_points = list(np.ndindex(output_sizes))
         return {
             in_point: out_points[np.argmax(col)]
