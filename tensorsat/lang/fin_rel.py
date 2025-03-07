@@ -26,7 +26,7 @@ from hashcons import InstanceStore
 import xxhash
 
 from ..diagrams import Port, TensorLikeBox, TensorLikeType, Type, Wire
-from ..utils import rewire_array
+from .._utils.misc import rewire_array
 
 if __debug__:
     from typing_validation import validate

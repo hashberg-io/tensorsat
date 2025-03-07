@@ -39,7 +39,7 @@ from typing import (
 from numpy.typing import ArrayLike
 
 from ..diagrams import Slot, Box, Diagram, Wire, Port, DiagramRecipe
-from ..utils import (
+from .._utils.misc import (
     ValueSetter,
     apply_setter,
     dict_deep_copy,
