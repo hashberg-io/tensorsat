@@ -41,7 +41,7 @@ from typing import (
 )
 from weakref import WeakValueDictionary
 from hashcons import InstanceStore
-from ._utils.meta import TensorSatMeta
+from ._utils.meta import TensorSatMeta, InheritanceForestMeta
 
 if TYPE_CHECKING:
     from .contractions import Contraction
@@ -752,7 +752,17 @@ class WiringBuilder(WiringBase):
             attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
         return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
 
-class Box(Shaped, metaclass=TensorSatMeta):
+
+class BoxMeta(InheritanceForestMeta, TensorSatMeta):
+    """
+    Metaclass for box classes, forcing box classes to form an inheritance tree
+    with :class:`Box` as the root.
+    This guarantees that the class join of box classes, returned by the static method
+    :meth:`Box.class_join`, is always well-defined.
+    """
+
+
+class Box(Shaped, metaclass=BoxMeta):
     """
     Abstract base class for boxes in diagrams.
     """
@@ -763,16 +773,18 @@ class Box(Shaped, metaclass=TensorSatMeta):
         cls.__final__ = False
         if not cls.__abstractmethods__:
             try:
-                import autoray # type: ignore[import-untyped]
+                import autoray  # type: ignore[import-untyped]
+
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
 
-    @final
     @staticmethod
-    def box_class_join(box_classes: Iterable[BoxClass]) -> BoxClass:
-        """The most specific superclass (join) of the given box classes."""
-        raise NotImplementedError()
+    def class_join(bases: Iterable[BoxClass]) -> BoxClass:
+        """Returns the join of the given box classes."""
+        join = Box._subclass_join(bases)
+        assert join is not None
+        return join
 
     @classmethod
     def can_be_contracted(cls) -> bool:
@@ -1235,7 +1247,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
             box_classes = [type(box) for box in self.boxes] + [
                 subdiagram.box_class for subdiagram in self.subdiagrams
             ]
-            box_class = Box.box_class_join(cast(list[BoxClass], box_classes))
+            box_class = Box.class_join(cast(list[BoxClass], box_classes))
             self.__box_class_cache = box_class
             return box_class
 

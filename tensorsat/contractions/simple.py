@@ -78,7 +78,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     """A simple contraction based on an explicit contraction path."""
 
     @classmethod
-    def using_opt_einsum(
+    def from_opt_einsum(
         cls,
         box_class: SubclassOf[TensorLikeBoxT_inv],
         wiring: Wiring,
@@ -103,7 +103,9 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         assert validate(wiring, Wiring)
         if wiring.num_wires == 0:
             raise ValueError("Cannot define contraction for empty wiring.")
-        # TODO: check that the wiring types are compatible with box class
+        for t in wiring.wire_types:
+            if not isinstance(t, TensorLikeType):
+                raise ValueError("Wiring must have tensor-like wire types.")
         contract_path_operands: list[Any] = []
         wire_dims = [cast(TensorLikeType, t).tensor_dim for t in wiring.wire_types]
         for slot_wires in wiring.slot_wires_list:
@@ -206,6 +208,9 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         assert validate(box_class, SubclassOf[TensorLikeBox])
         assert validate(wiring, Wiring)
         assert validate(path, ContractionPath)
+        for t in wiring.wire_types:
+            if not isinstance(t, TensorLikeType):
+                raise ValueError("Wiring must have tensor-like wire types.")
         if wiring.num_wires == 0:
             raise ValueError("Cannot define contraction for empty wiring.")
         n = wiring.num_slots

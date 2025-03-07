@@ -30,7 +30,7 @@ def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
     assert validate(contraction, str)
     assert validate(lhs, Box)
     assert validate(rhs, Box)
-    box_class = Box.box_class_join([type(lhs), type(rhs)])
+    box_class = Box.class_join([type(lhs), type(rhs)])
     _input_wires, _out_wires = contraction.split("->")
     _lhs_wires, _rhs_wires = _input_wires.split(",")
     char_idxs = {

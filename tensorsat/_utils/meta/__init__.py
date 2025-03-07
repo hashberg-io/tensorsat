@@ -17,6 +17,14 @@ Metaclasses for the TensorSat library.
 
 from __future__ import annotations
 
+from .autoslotted import AutoSlottedMeta
+from .autoreadonly import AutoReadonlyMeta
+from .inheritance_forest import InheritanceForestMeta
 from .tensorsat import TensorSatMeta
 
-__all__ = ("TensorSatMeta",)
+__all__ = (
+    "AutoSlottedMeta",
+    "AutoReadonlyMeta",
+    "InheritanceForestMeta",
+    "TensorSatMeta",
+)
