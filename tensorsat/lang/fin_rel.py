@@ -89,8 +89,6 @@ class FinSet(TensorLikeType):
 
     __size: Size
 
-    __slots__ = ("__size",)
-
     def __new__(cls, size: int) -> Self:
         """
         Public constructor.
@@ -122,24 +120,26 @@ FinSetShape: TypeAlias = tuple[FinSet, ...]
 NumpyUInt8Array: TypeAlias = np.ndarray[tuple[Size, ...], np.dtype[np.uint8]]
 """Type alias for Numpy's UInt8 arrays."""
 
-_NumpyUIntArray: TypeAlias = np.ndarray[tuple[Size, ...], np.dtype[np.unsignedinteger[Any]]]
+_NumpyUIntArray: TypeAlias = np.ndarray[
+    tuple[Size, ...], np.dtype[np.unsignedinteger[Any]]
+]
 """Type alias for Numpy's unsigned integer arrays."""
 
+
 @overload
 def _to_safe_contraction_dtype(
-    contraction_size: int,
-    *tensors: Unpack[tuple[NumpyUInt8Array]]
+    contraction_size: int, *tensors: Unpack[tuple[NumpyUInt8Array]]
 ) -> tuple[_NumpyUIntArray]: ...
 
+
 @overload
 def _to_safe_contraction_dtype(
-    contraction_size: int,
-    *tensors: Unpack[tuple[NumpyUInt8Array, NumpyUInt8Array]]
+    contraction_size: int, *tensors: Unpack[tuple[NumpyUInt8Array, NumpyUInt8Array]]
 ) -> tuple[_NumpyUIntArray, _NumpyUIntArray]: ...
 
+
 def _to_safe_contraction_dtype(
-    contraction_size: int,
-    *tensors: NumpyUInt8Array
+    contraction_size: int, *tensors: NumpyUInt8Array
 ) -> tuple[_NumpyUIntArray, ...]:
     assert contraction_size >= 0
     dt: np.dtype[Any]
@@ -254,18 +254,20 @@ class FinRel(TensorLikeBox):
             if w in (set(lhs_wires) & set(rhs_wires)) - set(out_wires)
         )
         lhs_tensor, rhs_tensor = _to_safe_contraction_dtype(
-            contraction_size,
-            lhs_tensor,
-            rhs_tensor
+            contraction_size, lhs_tensor, rhs_tensor
         )
         out_wireset = set(out_wires)
         if len(out_wireset) == len(out_wires):
-            res_tensor = np.einsum(lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, out_wires)
+            res_tensor = np.einsum(
+                lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, out_wires
+            )
             res_tensor = np.sign(res_tensor, dtype=np.uint8)
             return FinRel._new(res_tensor)
         einsum_out_wires = sorted(out_wireset)
         rewire_out_ports = [einsum_out_wires.index(w) for w in out_wires]
-        res_tensor = np.einsum(lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, einsum_out_wires)
+        res_tensor = np.einsum(
+            lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, einsum_out_wires
+        )
         res_tensor = rewire_array(res_tensor, rewire_out_ports)
         res_tensor = np.sign(res_tensor, dtype=np.uint8)
         return FinRel._new(res_tensor)
@@ -298,8 +300,6 @@ class FinRel(TensorLikeBox):
     __shape: FinSetShape
     __hash_cache: int
 
-    __slots__ = ("__tensor", "__shape", "__hash_cache", "__is_function_graph_cache")
-
     def __new__(cls, tensor: NumpyUInt8Array) -> Self:
         """
         Constructs a relation from a Boolean tensor.
@@ -327,14 +327,12 @@ class FinRel(TensorLikeBox):
             return FinRel._new(np.transpose(self.__tensor, out_ports))
         tensor = self.__tensor
         tensor_shape = tensor.shape
-        discarded_ports = frozenset(self.ports)-out_portset
+        discarded_ports = frozenset(self.ports) - out_portset
         if discarded_ports:
             contraction_size = prod(
-                dim
-                for port, dim in enumerate(tensor_shape)
-                if port in discarded_ports
+                dim for port, dim in enumerate(tensor_shape) if port in discarded_ports
             )
-            tensor, = _to_safe_contraction_dtype(contraction_size, tensor)
+            (tensor,) = _to_safe_contraction_dtype(contraction_size, tensor)
         res_tensor = rewire_array(tensor, out_ports)
         res_tensor = np.sign(res_tensor, dtype=np.uint8)
         return FinRel._new(tensor)

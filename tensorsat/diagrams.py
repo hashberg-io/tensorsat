@@ -17,7 +17,7 @@ Implementation of core diagrammatic data structures.
 
 
 from __future__ import annotations
-from abc import ABC, ABCMeta, abstractmethod
+from abc import abstractmethod
 from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
@@ -40,18 +40,23 @@ from typing import (
     override,
 )
 from weakref import WeakValueDictionary
-
 from hashcons import InstanceStore
+from ._utils.meta import TensorSatMeta
 
 if TYPE_CHECKING:
-    from .contraction import Contraction
+    from .contractions import Contraction
 else:
     Contraction = Any
 
 if __debug__:
     from typing_validation import validate
 
-class Type(metaclass=ABCMeta):
+
+class TypeMeta(TensorSatMeta):
+    """Metaclass for type classes."""
+
+
+class Type(metaclass=TypeMeta):
     """
     Abstract base class for types in diagrams.
 
@@ -63,8 +68,6 @@ class Type(metaclass=ABCMeta):
 
     __final__: ClassVar[bool] = False
 
-    __slots__ = ("__weakref__",)
-
     def __new__(cls) -> Self:
         """
         Constructs a new type.
@@ -74,6 +77,7 @@ class Type(metaclass=ABCMeta):
         if not cls.__final__:
             raise TypeError("Only final subclasses of Type can be instantiated.")
         return super().__new__(cls)
+
 
 class TensorLikeType(Type):
     """
@@ -86,6 +90,7 @@ class TensorLikeType(Type):
     @abstractmethod
     def tensor_dim(self) -> int:
         """The tensor-like dimension for this object."""
+
 
 TypeClass: TypeAlias = SubclassOf[Type]
 """A type class, i.e. a subclass of :class:`Type`."""
@@ -105,6 +110,7 @@ Type alias for (the index of) a wire in a diagram.
 Each port is connected to exactly one wire, but a wire can connect any number of ports.
 """
 
+
 class WiringData(TypedDict, total=True):
     """Data for a wiring."""
 
@@ -118,7 +124,7 @@ class WiringData(TypedDict, total=True):
     """Assignment of a wire to each outer port."""
 
 
-class Shaped(metaclass=ABCMeta):
+class Shaped(metaclass=TensorSatMeta):
     """Interface and mixin properties for objects with a shape."""
 
     @staticmethod
@@ -138,8 +144,6 @@ class Shaped(metaclass=ABCMeta):
         )
         return cls()
 
-    __slots__ = ()
-
     @property
     @abstractmethod
     def shape(self) -> Shape:
@@ -158,7 +162,7 @@ class Shaped(metaclass=ABCMeta):
         return range(self.num_ports)
 
 
-class Slotted(metaclass=ABCMeta):
+class Slotted(metaclass=TensorSatMeta):
     """Interface and mixin properties/methods for objects with shaped slots."""
 
     @staticmethod
@@ -177,8 +181,6 @@ class Slotted(metaclass=ABCMeta):
             )
         )
         return cls()
-
-    __slots__ = ()
 
     @property
     @abstractmethod
@@ -223,10 +225,8 @@ class Slotted(metaclass=ABCMeta):
                 )
 
 
-class WiringBase(Shaped, Slotted, ABC):
+class WiringBase(Shaped, Slotted, metaclass=TensorSatMeta):
     """Abstract base class for wiring and wiring builder."""
-
-    __slots__ = ("__weakref__",)
 
     @property
     @abstractmethod
@@ -313,7 +313,6 @@ class WiringBase(Shaped, Slotted, ABC):
             {w: tuple(w_slots) for w, w_slots in wired_slots.items()}
         )
 
-
     @final
     @property
     def wired_out_ports(self) -> Mapping[Wire, tuple[Port, ...]]:
@@ -330,17 +329,16 @@ class WiringBase(Shaped, Slotted, ABC):
             {w: tuple(w_out_ports) for w, w_out_ports in wired_out_ports.items()}
         )
 
-
     @final
     @property
-    def wired_ports(self) -> Mapping[Wire, tuple[Port|tuple[Slot, Port], ...]]:
+    def wired_ports(self) -> Mapping[Wire, tuple[Port | tuple[Slot, Port], ...]]:
         """
         Computes and returns a mapping of wires to the collection of ports connected by
         that wire: ``(slot, port)`` pairs for slot ports and individual out ports.
         Wires not appearing as keys in the mapping are "scalar", i.e. they don't
         connect to any ports.
         """
-        wired_ports: dict[Wire, list[Port|tuple[Slot, Port]]] = {}
+        wired_ports: dict[Wire, list[Port | tuple[Slot, Port]]] = {}
         for slot, wires in enumerate(self.slot_wires_list):
             for port, wire in enumerate(wires):
                 wired_ports.setdefault(wire, []).append((slot, port))
@@ -349,7 +347,6 @@ class WiringBase(Shaped, Slotted, ABC):
         return MappingProxyType(
             {w: tuple(w_out_ports) for w, w_out_ports in wired_ports.items()}
         )
-
 
 
 @final
@@ -393,16 +390,6 @@ class Wiring(WiringBase):
     __out_wires: tuple[Wire, ...]
     __dangling_wires: frozenset[Wire]
     __discarded_wires: frozenset[Wire]
-
-    __slots__ = (
-        "__slot_shapes",
-        "__shape",
-        "__wire_types",
-        "__slot_wires_list",
-        "__out_wires",
-        "__dangling_wires",
-        "__discarded_wires",
-    )
 
     def __new__(cls, **data: Unpack[WiringData]) -> Self:
         """
@@ -590,19 +577,6 @@ class WiringBuilder(WiringBase):
     __slot_wires_list_cache: tuple[tuple[Wire, ...], ...] | None
     __out_wires_cache: tuple[Wire, ...] | None
 
-    __slots__ = (
-        "__slot_shapes",
-        "__shape",
-        "__wire_types",
-        "__slot_wires_list",
-        "__out_wires",
-        "__slot_shapes_cache",
-        "__shape_cache",
-        "__wire_types_cache",
-        "__slot_wires_list_cache",
-        "__out_wires_cache",
-    )
-
     def __new__(cls) -> Self:
         """
         Constructs a blank wiring builder.
@@ -779,22 +753,26 @@ class WiringBuilder(WiringBase):
             attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
         return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
 
-class BoxMeta(ABCMeta):
+
+class BoxMeta(TensorSatMeta):
+    """Metaclass for box classes."""
+
     def __new__(
         mcs,
         name: str,
         bases: tuple[type, ...],
         namespace: dict[str, Any],
-        **kwargs: Any,
-    ) -> BoxMeta:
+    ) -> Any:
         cls = super().__new__(mcs, name, bases, namespace)
         if not cls.__abstractmethods__:
             try:
                 import autoray  # type: ignore
+
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
         return cls
+
 
 class Box(Shaped, metaclass=BoxMeta):
     """
@@ -822,7 +800,6 @@ class Box(Shaped, metaclass=BoxMeta):
             and "_rewire" not in abstract_methods
             and "_spider" not in abstract_methods
         )
-
 
     @final
     @classmethod
@@ -868,25 +845,16 @@ class Box(Shaped, metaclass=BoxMeta):
         for w, w_ports in wired_ports.items():
             w_spider_args = (wire_types[w], len(w_ports))
             wires_by_spider_args.setdefault(w_spider_args, []).append(w)
-        spiders = {
-            (t, n): cls.spider(t, n)
-            for t, n in wires_by_spider_args
-        }
+        spiders = {(t, n): cls.spider(t, n) for t, n in wires_by_spider_args}
         wire_spiders = {
             w: spiders[spider_args]
             for spider_args, ws in wires_by_spider_args.items()
             for w in ws
         }
         res = cls.prod(wire_spiders[w] for w in wires)
-        res_port_labels = [
-            port
-            for w in wires
-            for port in wired_ports[w]
-        ]
+        res_port_labels = [port for w in wires for port in wired_ports[w]]
         out_port_labels = [
-            (slot, port)
-            for slot in wiring.slots
-            for port in wiring.slot_ports(slot)
+            (slot, port) for slot in wiring.slots for port in wiring.slot_ports(slot)
         ] + list(wiring.ports)
         out_ports = [res_port_labels.index(p) for p in out_port_labels]
         return res._rewire(out_ports)
@@ -968,9 +936,6 @@ class Box(Shaped, metaclass=BoxMeta):
         times in ``out_wires``, or not at all.
         """
 
-
-    __slots__ = ("__weakref__",)
-
     def __new__(cls) -> Self:
         """
         Constructs a new box.
@@ -1005,8 +970,10 @@ class Box(Shaped, metaclass=BoxMeta):
         num_ports = len(self.shape)
         return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
 
+
 BoxClass: TypeAlias = SubclassOf[Box]
 """A box class, i.e. a subclass of :class:`Box`."""
+
 
 class TensorLikeBox(Box):
     """
@@ -1016,12 +983,9 @@ class TensorLikeBox(Box):
 
     __tensor_shape_cache: tuple[int, ...]
 
-    __slots__ = ("__tensor_shape_cache",)
-
     @property
     @abstractmethod
-    def shape(self) -> tuple[TensorLikeType, ...]:
-        ...
+    def shape(self) -> tuple[TensorLikeType, ...]: ...
 
     @property
     def tensor_shape(self) -> tuple[int, ...]:
@@ -1041,7 +1005,9 @@ class TensorLikeBox(Box):
 BoxT_inv = TypeVar("BoxT_inv", bound=Box, default=Box)
 """Invariant type variable for boxes."""
 
-TensorLikeBoxT_inv = TypeVar("TensorLikeBoxT_inv", bound=TensorLikeBox, default=TensorLikeBox)
+TensorLikeBoxT_inv = TypeVar(
+    "TensorLikeBoxT_inv", bound=TensorLikeBox, default=TensorLikeBox
+)
 """Invariant type variable for tensor-like boxes."""
 
 
@@ -1058,13 +1024,11 @@ RecipeParams = ParamSpec("RecipeParams")
 """Parameter specification variable for the parameters of a recipe."""
 
 
-class DiagramRecipe(Generic[RecipeParams]):
+class DiagramRecipe(Generic[RecipeParams], metaclass=TensorSatMeta):
     """A Recipe to produce diagrams from given perameters."""
 
     __diagrams: WeakValueDictionary[Any, Diagram]
     __recipe: Callable[Concatenate[DiagramBuilder, RecipeParams], None]
-
-    __slots__ = ("__weakref__", "__diagrams", "__recipe")
 
     def __new__(
         cls,
@@ -1107,7 +1071,7 @@ class DiagramRecipe(Generic[RecipeParams]):
 
 
 @final
-class Diagram(Shaped):
+class Diagram(Shaped, metaclass=TensorSatMeta):
     """
     A diagram, consisting of a :class:`Wiring` together with :obj:`Block` associated
     to (a subset of) the wiring's slots.
@@ -1191,15 +1155,6 @@ class Diagram(Shaped):
     __recipe_used: DiagramRecipe[Any, Type] | None
     __hash_cache: int
     __box_class_cache: BoxClass
-
-    __slots__ = (
-        "__weakref__",
-        "__wiring",
-        "__blocks",
-        "__recipe_used",
-        "__hash_cache",
-        "__box_class_cache"
-    )
 
     def __new__(cls, wiring: Wiring, blocks: Mapping[Slot, Block]) -> Self:
         """
@@ -1291,9 +1246,7 @@ class Diagram(Shaped):
         try:
             return self.__box_class_cache
         except AttributeError:
-            box_classes = [
-                type(box) for box in self.boxes
-            ] + [
+            box_classes = [type(box) for box in self.boxes] + [
                 subdiagram.box_class for subdiagram in self.subdiagrams
             ]
             box_class = Box.box_class_join(cast(list[BoxClass], box_classes))
@@ -1401,13 +1354,11 @@ class Diagram(Shaped):
 
 
 @final
-class DiagramBuilder:
+class DiagramBuilder(metaclass=TensorSatMeta):
     """Utility class to build diagrams."""
 
     __wiring_builder: WiringBuilder
     __blocks: dict[Slot, Block]
-
-    __slots__ = ("__weakref__", "__wiring_builder", "__blocks")
 
     def __new__(cls) -> Self:
         """
@@ -1583,7 +1534,7 @@ class DiagramBuilder:
 
 
 @final
-class SelectedInputWires:
+class SelectedInputWires(metaclass=TensorSatMeta):
     """
     Utility class wrapping a selection of input wires in a given diagram builder,
     to be used for the purposes of adding blocks to the builder.
@@ -1607,8 +1558,6 @@ class SelectedInputWires:
 
     __builder: DiagramBuilder
     __wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
-
-    __slots__ = ("__weakref__", "__builder", "__wires")
 
     def __new__(
         cls,

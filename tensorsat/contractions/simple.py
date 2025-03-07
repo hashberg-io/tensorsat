@@ -20,7 +20,15 @@ from collections.abc import Sequence
 from typing import Any, Literal, Self, Type as SubclassOf, TypeAlias, cast, final
 
 from .abc import Contraction
-from ..diagrams import Box, Diagram, TensorLikeBox, TensorLikeBoxT_inv, TensorLikeType, Wire, Wiring
+from ..diagrams import (
+    Box,
+    Diagram,
+    TensorLikeBox,
+    TensorLikeBoxT_inv,
+    TensorLikeType,
+    Wire,
+    Wiring,
+)
 
 if __debug__:
     from typing_validation import validate
@@ -64,6 +72,7 @@ Possible values that can be passed to the ``optimize`` argument
 of :meth:`opt_einsum.contract_path`
 """
 
+
 @final
 class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     """A simple contraction based on an explicit contraction path."""
@@ -73,8 +82,8 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         cls,
         box_class: SubclassOf[TensorLikeBoxT_inv],
         wiring: Wiring,
-        optimize: OptEinsumOptimize = "auto"
-        ) -> Self:
+        optimize: OptEinsumOptimize = "auto",
+    ) -> Self:
         """
         Creates a simple contraction using :func:`opt_einsum.contract_path`.
 
@@ -85,7 +94,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             https://github.com/dgasmith/opt_einsum/pull/247
         """
         try:
-            import opt_einsum # type: ignore[import-untyped]
+            import opt_einsum  # type: ignore[import-untyped]
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
                 "SimpleContraction.using_opt_einsum requires the opt_einsum library"
@@ -94,20 +103,14 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         assert validate(wiring, Wiring)
         if wiring.num_wires == 0:
             raise ValueError("Cannot define contraction for empty wiring.")
-        #TODO: check that the wiring types are compatible with box class
+        # TODO: check that the wiring types are compatible with box class
         contract_path_operands: list[Any] = []
-        wire_dims = [
-            cast(TensorLikeType, t).tensor_dim
-            for t in wiring.wire_types
-        ]
+        wire_dims = [cast(TensorLikeType, t).tensor_dim for t in wiring.wire_types]
         for slot_wires in wiring.slot_wires_list:
             contract_path_operands.append(tuple(wire_dims[w] for w in slot_wires))
             contract_path_operands.append(slot_wires)
         contract_path_operands.append(wiring.out_wires)
-        path, _ = opt_einsum.contract_path(
-            *contract_path_operands,
-            optimize=optimize
-        )
+        path, _ = opt_einsum.contract_path(*contract_path_operands, optimize=optimize)
         return cls._new(box_class, wiring, path)
 
     @classmethod
@@ -115,7 +118,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         cls,
         box_class: SubclassOf[TensorLikeBoxT_inv],
         wiring: Wiring,
-        path: ContractionPath
+        path: ContractionPath,
     ) -> Self:
         self = super().__new__(cls, box_class)
         self.__wiring = wiring
@@ -179,18 +182,11 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     __box_out_wires: tuple[Wire, ...]
     __dangling_wires: tuple[Wire, ...]
 
-    __slots__ = (
-        "__wiring",
-        "__contract2_args",
-        "__box_out_wires",
-        "__dangling_wires",
-    )
-
     def __new__(
         cls,
         box_class: SubclassOf[TensorLikeBoxT_inv],
         wiring: Wiring,
-        path: Sequence[tuple[int, int]]
+        path: Sequence[tuple[int, int]],
     ) -> Self:
         """
         Constructs a simple contraction for a given wiring, from a contraction path.
@@ -236,7 +232,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
                 raise ValueError(
                     f"Invalid rhs for contraction {(lhs, rhs) = } at {idx = }."
                 )
-        #TODO: check that the wiring types are compatible with box class
+        # TODO: check that the wiring types are compatible with box class
         # Construct and return contraction:
         return cls._new(box_class, wiring, path)
 

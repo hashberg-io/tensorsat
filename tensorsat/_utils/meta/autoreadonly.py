@@ -17,6 +17,7 @@ from __future__ import annotations
 from abc import ABCMeta
 from typing import Any, Self, Type, TypeAlias, final, overload
 
+
 def name_mangle(owner: type, attr_name: str) -> str:
     """
     If the given attribute name is private and not dunder,
@@ -28,6 +29,7 @@ def name_mangle(owner: type, attr_name: str) -> str:
         return attr_name
     return f"_{owner.__name__}{attr_name}"
 
+
 def name_unmangle(owner: type, attr_name: str) -> str:
     """
     If the given attribute name is name-mangled for the given owner class,
@@ -37,6 +39,7 @@ def name_unmangle(owner: type, attr_name: str) -> str:
     if attr_name.startswith(name_mangling_prefix + "__"):
         return attr_name[len(name_mangling_prefix) :]
     return attr_name
+
 
 def class_slots(cls: type) -> tuple[str, ...] | None:
     """
@@ -54,6 +57,7 @@ def class_slots(cls: type) -> tuple[str, ...] | None:
                 continue
             slots.append(slot)
     return tuple(slots)
+
 
 def class_slotset(*classes: type) -> frozenset[str]:
     """
@@ -73,13 +77,14 @@ def class_slotset(*classes: type) -> frozenset[str]:
 AttributeValue: TypeAlias = Any
 """Type alias for attribute values."""
 
+
 @final
 class ReadonlyAttribute:
     """Descriptor for readonly attributes of slotted classes."""
 
     @staticmethod
     def __validate(owner: Type[Any], name: str) -> None:
-        attrname = "__"+name
+        attrname = "__" + name
         slots = class_slots(owner)
         if slots is not None and attrname not in slots:
             raise TypeError(
@@ -114,7 +119,7 @@ class ReadonlyAttribute:
         ReadonlyAttribute.__validate(owner, name)
         self.__owner = owner
         self.__name = name
-        self.__mangled_attrname = name_mangle(owner, "__"+name)
+        self.__mangled_attrname = name_mangle(owner, "__" + name)
 
     @overload
     def __get__(self, instance: None, _: Type[Any]) -> Self: ...
@@ -161,6 +166,7 @@ class ReadonlyAttribute:
         except AttributeError:
             return super().__repr__()
 
+
 class AutoReadonlyMeta(ABCMeta):
     """
     Metaclass to automatically set define readonly descriptors for public attributes.
@@ -181,7 +187,7 @@ class AutoReadonlyMeta(ABCMeta):
             and not attr_name.startswith("_")
         }
         for attr_name, annotation in public_instance_attrs.items():
-            __attr_name = "__"+attr_name
+            __attr_name = "__" + attr_name
             if __attr_name in annotations:
                 raise TypeError(
                     f"Cannot define public instance attribute {name}.{attr_name} when"

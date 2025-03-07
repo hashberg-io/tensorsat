@@ -18,6 +18,7 @@ from abc import ABCMeta
 from collections import deque
 from typing import Any
 
+
 def __all_ancestors(classes: tuple[type, ...]) -> set[type]:
     """The set of all ancestors of the given sequence of classes (incl. themselves)."""
     ancestors = set(classes)
@@ -29,12 +30,13 @@ def __all_ancestors(classes: tuple[type, ...]) -> set[type]:
         q.extend(new_bases)
     return ancestors
 
+
 def _weakref_slot_present(bases: tuple[type, ...]) -> bool:
     """Whether a class with given bases has ``__weakref__`` in its slots."""
     return any(
-        "__weakref__" in getattr(cls, "__slots__", {})
-        for cls in __all_ancestors(bases)
+        "__weakref__" in getattr(cls, "__slots__", {}) for cls in __all_ancestors(bases)
     )
+
 
 def _dict_slot_present(bases: tuple[type, ...]) -> bool:
     """Whether a class with given bases has ``__dict__`` in its slots."""
@@ -42,6 +44,7 @@ def _dict_slot_present(bases: tuple[type, ...]) -> bool:
         not hasattr(cls, "__slots__") or "__dict__" in cls.__slots__
         for cls in __all_ancestors(bases)
     )
+
 
 class AutoSlottedMeta(ABCMeta):
     """Metaclass to automatically declare slots for annotated instance attributes."""
@@ -53,7 +56,7 @@ class AutoSlottedMeta(ABCMeta):
         namespace: dict[str, Any],
         *,
         use_weakref: bool = True,
-        use_dict: bool = False
+        use_dict: bool = False,
     ) -> Any:
         if "__slots__" not in namespace:
             slots: list[str] = []
@@ -63,7 +66,8 @@ class AutoSlottedMeta(ABCMeta):
                 slots.append("__dict__")
             annotations: dict[str, Any] = namespace.get("__annotations__", {})
             slots.extend(
-                attr_name for attr_name in annotations
+                attr_name
+                for attr_name in annotations
                 if attr_name not in namespace
                 and all(attr_name not in base.__dict__ for base in bases)
             )

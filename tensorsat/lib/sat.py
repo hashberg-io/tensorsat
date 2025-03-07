@@ -19,9 +19,10 @@ from math import comb
 import re
 from typing import Literal, Self, TypeAlias
 import numpy as np
+
+from .._utils.meta.tensorsat import TensorSatMeta
 from ..diagrams import Diagram, DiagramBuilder
-from ..lang.fin_rel import FinSet
-from .bincirc import bits, not_, or_, bit
+from .bincirc import bits, not_, or_
 
 if __debug__:
     from typing_validation import validate
@@ -36,7 +37,7 @@ CNFDiagramMode: TypeAlias = Literal["bintree"]
 """Type alias for available diagram creation modes in :class:`CNFInstance`."""
 
 
-class CNFInstance:
+class CNFInstance(metaclass=TensorSatMeta):
     """A SAT instance in CNF form."""
 
     @classmethod

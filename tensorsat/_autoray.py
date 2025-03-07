@@ -41,7 +41,7 @@ def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
     rhs_wires = [char_idxs[c] for c in _rhs_wires]
     out_wires = [char_idxs[c] for c in _out_wires]
     res = box_class.contract2(lhs, lhs_wires, rhs, rhs_wires, out_wires)
-    return cast(BoxT_inv, res) # Think about whether this cast can be avoided.
+    return cast(BoxT_inv, res)  # Think about whether this cast can be avoided.
 
 
 def transpose(box: BoxT_inv, perm: Sequence[int], /) -> BoxT_inv:

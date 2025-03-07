@@ -14,19 +14,20 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from typing import Generic, Self, Type as SubclassOf, final
+
+from .._utils.meta.tensorsat import TensorSatMeta
 from ..diagrams import Box, BoxT_inv, Diagram
 
 if __debug__:
     from typing_validation import validate
 
-class Contraction(Generic[BoxT_inv], metaclass=ABCMeta):
+
+class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
     """Abstract base class for contractions."""
 
     __box_class: SubclassOf[BoxT_inv]
-
-    __slots__ = ("__weakref__", "__box_class")
 
     def __new__(cls, box_class: SubclassOf[BoxT_inv]) -> Self:
         assert validate(box_class, SubclassOf[Box])

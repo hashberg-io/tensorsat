@@ -19,6 +19,4 @@ from __future__ import annotations
 
 from .tensorsat import TensorSatMeta
 
-__all__ = (
-    "TensorSatMeta",
-)
+__all__ = ("TensorSatMeta",)

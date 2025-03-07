@@ -21,6 +21,7 @@ from .autoreadonly import AutoReadonlyMeta
 
 _ClsT = TypeVar("_ClsT", bound=type)
 
+
 class TensorSatMeta(AutoReadonlyMeta, AutoSlottedMeta):
     """
     Common metaclass for TensorSat classes, enforcing the following behaviour:
