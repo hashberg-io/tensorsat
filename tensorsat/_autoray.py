@@ -1,5 +1,5 @@
 """
-Top-level functions for the TensorSAT package, for use by the
+Top-level functions for the TensorSat package, for use by the
 `autoray <https://github.com/jcmgray/autoray>`_ package.
 """
 

@@ -1,5 +1,5 @@
 """
-TensorSAT is a suite of SAT/SMT solvers based on hyper-optimised contraction of diagrams
+TensorSat is a suite of SAT/SMT solvers based on hyper-optimised contraction of diagrams
 for the compact-closed category of finite sets and relations.
 
 Boxes from multiple languages (cf. :mod:`tensorsat.lang`) are allowed to coexist within

@@ -1,4 +1,4 @@
-# TensorSAT
+# TensorSat
 
 [![Generic badge](https://img.shields.io/badge/python-3.13+-green.svg)](https://docs.python.org/3.13/)
 [![Checked with Mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](https://github.com/python/mypy)

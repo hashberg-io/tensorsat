@@ -1,5 +1,5 @@
 """
-Visualisation utilities for the TensorSAT library.
+Visualisation utilities for the TensorSat library.
 """
 
 # This program is free software: you can redistribute it and/or modify
