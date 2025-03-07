@@ -52,11 +52,7 @@ if __debug__:
     from typing_validation import validate
 
 
-class TypeMeta(TensorSatMeta):
-    """Metaclass for type classes."""
-
-
-class Type(metaclass=TypeMeta):
+class Type(metaclass=TensorSatMeta):
     """
     Abstract base class for types in diagrams.
 
@@ -66,7 +62,10 @@ class Type(metaclass=TypeMeta):
     same diagram.
     """
 
-    __final__: ClassVar[bool] = False
+    __final__: ClassVar[bool]
+
+    def __init_subclass__(cls) -> None:
+        cls.__final__ = False
 
     def __new__(cls) -> Self:
         """
@@ -753,33 +752,21 @@ class WiringBuilder(WiringBase):
             attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
         return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
 
-
-class BoxMeta(TensorSatMeta):
-    """Metaclass for box classes."""
-
-    def __new__(
-        mcs,
-        name: str,
-        bases: tuple[type, ...],
-        namespace: dict[str, Any],
-    ) -> Any:
-        cls = super().__new__(mcs, name, bases, namespace)
-        if not cls.__abstractmethods__:
-            try:
-                import autoray  # type: ignore
-
-                autoray.register_backend(cls, "tensorsat._autoray")
-            except ModuleNotFoundError:
-                pass
-        return cls
-
-
-class Box(Shaped, metaclass=BoxMeta):
+class Box(Shaped, metaclass=TensorSatMeta):
     """
     Abstract base class for boxes in diagrams.
     """
 
-    __final__: ClassVar[bool] = False
+    __final__: ClassVar[bool]
+
+    def __init_subclass__(cls) -> None:
+        cls.__final__ = False
+        if not cls.__abstractmethods__:
+            try:
+                import autoray # type: ignore[import-untyped]
+                autoray.register_backend(cls, "tensorsat._autoray")
+            except ModuleNotFoundError:
+                pass
 
     @final
     @staticmethod
@@ -944,8 +931,7 @@ class Box(Shaped, metaclass=BoxMeta):
         """
         if not cls.__final__:
             raise TypeError("Only final subclasses of Box can be instantiated.")
-        self = super().__new__(cls)
-        return self
+        return super().__new__(cls)
 
     @final
     def rewire(self, out_ports: Sequence[Port]) -> Self:
