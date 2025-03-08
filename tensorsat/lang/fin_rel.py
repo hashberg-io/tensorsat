@@ -83,11 +83,12 @@ class FinSet(TensorLikeType):
         with FinSet._store.instance(cls, size) as self:
             if self is None:
                 self = super().__new__(cls)
-                self.__size = size
+                self.size = size
                 FinSet._store.register(self)
             return self
 
-    __size: Size
+    size: Size
+    """Size of the finite set."""
 
     def __new__(cls, size: int) -> Self:
         """
@@ -101,17 +102,12 @@ class FinSet(TensorLikeType):
         return cls._new(size)
 
     @property
-    def size(self) -> Size:
-        """Size of the finite set."""
-        return self.__size
-
-    @property
     def tensor_dim(self) -> Size:
         """Tensor dimension of a finite set coincides with its size."""
-        return self.__size
+        return self.size
 
     def __repr__(self) -> str:
-        return f"FinSet({self.__size})"
+        return f"FinSet({self.size})"
 
 
 FinSetShape: TypeAlias = tuple[FinSet, ...]
@@ -246,8 +242,8 @@ class FinRel(TensorLikeBox):
         rhs_wires: Sequence[Wire],
         out_wires: Sequence[Wire],
     ) -> FinRel:
-        lhs_tensor = lhs.__tensor
-        rhs_tensor = rhs.__tensor
+        lhs_tensor = lhs.tensor
+        rhs_tensor = rhs.tensor
         contraction_size = prod(
             dim
             for dim, w in zip(lhs_tensor.shape, lhs_wires)
@@ -292,12 +288,16 @@ class FinRel(TensorLikeBox):
             tensor.setflags(write=False)
             tensor = tensor.view()
         self = super().__new__(cls)
-        self.__tensor = tensor
-        self.__shape = tuple(map(FinSet._new, tensor.shape))
+        self.tensor = tensor
+        self.shape = tuple(map(FinSet._new, tensor.shape))
         return self
 
-    __tensor: NumpyUInt8Array
-    __shape: FinSetShape
+    tensor: NumpyUInt8Array
+    """The Boolean tensor defining the relation."""
+
+    shape: FinSetShape
+    """The shape of the relation."""
+
     __hash_cache: int
 
     def __new__(cls, tensor: NumpyUInt8Array) -> Self:
@@ -311,21 +311,11 @@ class FinRel(TensorLikeBox):
             raise ValueError("Values in a Boolean tensor must be 0 or 1.")
         return cls._new(tensor)
 
-    @property
-    def tensor(self) -> NumpyUInt8Array:
-        """The Boolean tensor defining the relation."""
-        return self.__tensor
-
-    @property
-    def shape(self) -> FinSetShape:
-        """The shape of the relation."""
-        return self.__shape
-
     def _rewire(self, out_ports: Sequence[Port]) -> Self:
         out_portset = frozenset(out_ports)
         if len(out_portset) == len(out_ports):
-            return FinRel._new(np.transpose(self.__tensor, out_ports))
-        tensor = self.__tensor
+            return FinRel._new(np.transpose(self.tensor, out_ports))
+        tensor = self.tensor
         tensor_shape = tensor.shape
         discarded_ports = frozenset(self.ports) - out_portset
         if discarded_ports:
@@ -359,7 +349,7 @@ class FinRel(TensorLikeBox):
         shape = self.shape
         input_sizes = tuple(shape[i].tensor_dim for i in input_ports)
         output_sizes = tuple(shape[o].tensor_dim for o in output_ports)
-        transposed_tensor = np.transpose(self.__tensor, input_ports + output_ports)
+        transposed_tensor = np.transpose(self.tensor, input_ports + output_ports)
         return (
             output_ports,
             transposed_tensor.reshape(prod(input_sizes), prod(output_sizes)),
@@ -425,12 +415,12 @@ class FinRel(TensorLikeBox):
                 return False
         except AttributeError:
             pass
-        return np.array_equal(self.__tensor, other.__tensor)
+        return np.array_equal(self.tensor, other.tensor)
 
     def __hash__(self) -> int:
         """Computes the hash of the finite relation, based on the bytes in the tensor."""
         try:
             return self.__hash_cache
         except AttributeError:
-            self.__hash_cache = h = xxhash.xxh64(self.__tensor.data).intdigest()
+            self.__hash_cache = h = xxhash.xxh64(self.tensor.data).intdigest()
             return h

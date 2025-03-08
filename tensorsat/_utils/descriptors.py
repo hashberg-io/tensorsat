@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 from collections.abc import Callable
-from typing import Any, Generic, Never, NoReturn, Self, Type, TypeVar, cast, overload
-
-InstanceT = TypeVar("InstanceT")
-"""Type variable for instances for the owner class of a :class:`cached_property`."""
-
-ValueT = TypeVar("ValueT")
-"""Type variable for instances for return value of a :class:`cached_property`."""
+from typing import (
+    Any,
+    Generic,
+    Never,
+    NoReturn,
+    Self,
+    Type,
+    TypeAlias,
+    TypeVar,
+    cast,
+    final,
+    overload,
+)
 
 
 def name_mangle(owner: type, attr_name: str) -> str:
@@ -67,6 +73,14 @@ def class_slotset(*classes: type) -> frozenset[str]:
     return frozenset(slotset)
 
 
+InstanceT = TypeVar("InstanceT", default=Any)
+"""Type variable for instances for the owner class of a :class:`cached_property`."""
+
+ValueT = TypeVar("ValueT", default=Any)
+"""Type variable for instances for return value of a :class:`cached_property`."""
+
+
+@final
 class cached_property(Generic[InstanceT, ValueT]):
     """
     A cached property descriptor for slotted classes.
@@ -122,6 +136,11 @@ class cached_property(Generic[InstanceT, ValueT]):
         """The class that owns the cached property."""
         return self.__owner
 
+    @property
+    def func(self) -> Callable[[InstanceT], ValueT]:
+        """The function implementing this cached property."""
+        return self.__func
+
     def __set_name__(self, owner: Type[Any], name: str) -> None:
         """
         Sets the owner and name for the cached property.
@@ -142,7 +161,7 @@ class cached_property(Generic[InstanceT, ValueT]):
     @overload
     def __get__(self, instance: InstanceT, _: Type[Any]) -> ValueT: ...
 
-    def __get__(self, instance: InstanceT | None, _: Type[Any]) -> Self | ValueT:
+    def __get__(self, instance: InstanceT | None, _: Type[Any]) -> ValueT | Self:
         """
         Gets the value of the cached_property on the given instance.
         If no instance is passed, returns the descriptor itsef.
@@ -180,6 +199,99 @@ class cached_property(Generic[InstanceT, ValueT]):
         :meta public:
         """
         delattr(instance, self.__mangled_attrname)
+
+    def __str__(self) -> str:
+        try:
+            return f"{self.__owner.__qualname__}.{self.__name}"
+        except AttributeError:
+            return super().__repr__()
+
+
+AttributeValue: TypeAlias = Any
+"""Type alias for attribute values."""
+
+
+@final
+class ReadonlyAttribute:
+    """Descriptor for readonly attributes of slotted classes."""
+
+    @staticmethod
+    def __validate(owner: Type[Any], name: str) -> None:
+        attrname = "__" + name
+        slots = class_slots(owner)
+        if slots is not None and attrname not in slots:
+            raise TypeError(
+                f"Backing attribute name {attrname!r} must appear in class slots."
+            )
+
+    __name: str
+    __owner: Type[Any]
+    __mangled_attrname: str
+
+    __slots__ = ("__name", "__owner", "__mangled_attrname")
+
+    @property
+    def name(self) -> str:
+        """The name of the attribute."""
+        return self.__name
+
+    @property
+    def owner(self) -> Type[Any]:
+        """The class that owns the attribute."""
+        return self.__owner
+
+    def __set_name__(self, owner: Type[Any], name: str) -> None:
+        """
+        Sets the owner and backing attribute name for the descriptor.
+
+        :meta public:
+        """
+        if hasattr(self, "_ReadonlyAttribute__owner"):
+            raise TypeError("Cannot set owner/name for the same descriptor twice.")
+        name = name_unmangle(owner, name)
+        ReadonlyAttribute.__validate(owner, name)
+        self.__owner = owner
+        self.__name = name
+        self.__mangled_attrname = name_mangle(owner, "__" + name)
+
+    @overload
+    def __get__(self, instance: None, _: Type[Any]) -> Self: ...
+
+    @overload
+    def __get__(self, instance: Any, _: Type[Any]) -> AttributeValue: ...
+
+    def __get__(self, instance: Any, _: Type[Any]) -> Self | AttributeValue:
+        """
+        Gets the value of the attribute on the given instance.
+        If no instance is passed, returns the attribute descriptor itsef.
+
+        :meta public:
+        """
+        if instance is None:
+            return self
+        try:
+            return getattr(instance, self.__mangled_attrname)
+        except AttributeError:
+            raise AttributeError(f"Readonly attribute {self} is not set.") from None
+
+    def __set__(self, instance: Any, value: AttributeValue) -> None:
+        """
+        Sets the value of the attribute on the given instance.
+        Can only be called once, after which it raises :class:`AttributeError`.
+
+        :meta public:
+        """
+        if hasattr(instance, self.__mangled_attrname):
+            raise AttributeError(f"Readonly attribute {self} can only be set once.")
+        setattr(instance, self.__mangled_attrname, value)
+
+    def __delete__(self, instance: Any) -> None:
+        """
+        Raises :class:`AttributeError`, because readonly attributes cannot be deleted.
+
+        :meta public:
+        """
+        raise AttributeError(f"Readonly attribute {self} cannot be deleted.")
 
     def __str__(self) -> str:
         try:

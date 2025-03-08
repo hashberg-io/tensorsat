@@ -103,12 +103,15 @@ class CNFInstance(metaclass=TensorSatMeta):
     def _new(cls, num_vars: int, clauses: tuple[Clause, ...]) -> Self:
         """Protected constructor for SAT instances."""
         self = super().__new__(cls)
-        self.__num_vars = num_vars
-        self.__clauses = clauses
+        self.num_vars = num_vars
+        self.clauses = clauses
         return self
 
-    __num_vars: int
-    __clauses: tuple[Clause, ...]
+    num_vars: int
+    """Number of variables in the SAT instance."""
+
+    clauses: tuple[Clause, ...]
+    """Clauses in the SAT instance."""
 
     def __new__(cls, num_vars: int, clauses: Sequence[Sequence[int]]) -> Self:
         """
@@ -122,22 +125,12 @@ class CNFInstance(metaclass=TensorSatMeta):
             raise ValueError("Clauses contain invalid variables.")
         return cls._new(num_vars, tuple(tuple(clause) for clause in clauses))
 
-    @property
-    def num_vars(self) -> int:
-        """Number of variables in the SAT instance."""
-        return self.__num_vars
-
-    @property
-    def clauses(self) -> tuple[Clause, ...]:
-        """Clauses in the SAT instance."""
-        return self.__clauses
-
     def to_dimacs(self) -> str:
         """Convert the SAT instance to the DIMACS format."""
-        num_clauses = len(self.__clauses)
+        num_clauses = len(self.clauses)
         lines = [
             f"p cnf {self.num_vars} {num_clauses}",
-            *(f"{' '.join(map(str, clause))} 0" for clause in self.__clauses),
+            *(f"{' '.join(map(str, clause))} 0" for clause in self.clauses),
         ]
         return "\n".join(lines)
 
@@ -152,7 +145,7 @@ class CNFInstance(metaclass=TensorSatMeta):
         raise NotImplementedError(f"Unknown diagram mode for CNFInstance: {mode!r}")
 
     def _diagram_bintree(self) -> Diagram:
-        num_vars, clauses = self.__num_vars, self.__clauses
+        num_vars, clauses = self.num_vars, self.clauses
         circ = DiagramBuilder()
         circ.add_inputs(bits(num_vars))
         for clause in clauses:

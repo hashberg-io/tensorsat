@@ -27,20 +27,16 @@ if __debug__:
 class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
     """Abstract base class for contractions."""
 
-    __box_class: SubclassOf[BoxT_inv]
+    box_class: SubclassOf[BoxT_inv]
+    """Box class associated with this contraction."""
 
     def __new__(cls, box_class: SubclassOf[BoxT_inv]) -> Self:
         assert validate(box_class, SubclassOf[Box])
         if not box_class.can_be_contracted():
             raise ValueError("Given box class cannot be contracted.")
         self = super().__new__(cls)
-        self.__box_class = box_class
+        self.box_class = box_class
         return self
-
-    @property
-    def box_class(self) -> SubclassOf[BoxT_inv]:
-        """Box class associated with this contraction."""
-        return self.__box_class
 
     @final
     def can_contract(self, diagram: Diagram) -> bool:

@@ -37,7 +37,6 @@ from typing import (
     Unpack,
     cast,
     final,
-    override,
 )
 from weakref import WeakValueDictionary
 from hashcons import InstanceStore
@@ -128,106 +127,24 @@ class WiringData(TypedDict, total=True):
 class Shaped(metaclass=TensorSatMeta):
     """Interface and mixin properties for objects with a shape."""
 
-    @staticmethod
-    def wrap_shape(shape: Shape) -> Shaped:
-        """Wraps a shape into an anonymous :class:`Shaped` instance."""
-        assert validate(shape, Shape)
-        cls: SubclassOf[Shaped] = final(
-            type.__new__(
-                type,
-                "<anon shaped class>",
-                (Shaped,),
-                {
-                    "shape": property(lambda self: shape),
-                    "__repr__": lambda self: "<anon shaped>",
-                },
-            )
-        )
-        return cls()
-
     @property
     @abstractmethod
     def shape(self) -> Shape:
         """Shape of the object."""
 
-    @final
     @property
     def num_ports(self) -> int:
         """Number of ports in the object, aka the length of its shape."""
         return len(self.shape)
 
-    @final
     @property
     def ports(self) -> Sequence[Port]:
         """Sequence of (the indices of) ports in the object."""
         return range(self.num_ports)
 
 
-class Slotted(metaclass=TensorSatMeta):
-    """Interface and mixin properties/methods for objects with shaped slots."""
-
-    @staticmethod
-    def wrap_slot_shapes(slot_shapes: tuple[Shape, ...]) -> Slotted:
-        """Wraps a tuple of shapes into an anonymous :class:`Slotted` instance."""
-        assert validate(slot_shapes, tuple[Shape, ...])
-        cls: SubclassOf[Slotted] = final(
-            type.__new__(
-                type,
-                "<anon slotted class>",
-                (Slotted,),
-                {
-                    "shape": property(lambda self: slot_shapes),
-                    "__repr__": lambda self: "<anon slotted>",
-                },
-            )
-        )
-        return cls()
-
-    @property
-    @abstractmethod
-    def slot_shapes(self) -> tuple[Shape, ...]:
-        """Shapes for the slots."""
-
-    @final
-    @property
-    def num_slots(self) -> int:
-        """Number of slots."""
-        return len(self.slot_shapes)
-
-    @final
-    @property
-    def slots(self) -> Sequence[Slot]:
-        """Sequence of (the indices of) slots."""
-        return range(self.num_slots)
-
-    @final
-    def num_slot_ports(self, slot: Slot) -> int:
-        """Number of ports for the given slot."""
-        return len(self.slot_shapes[slot])
-
-    @final
-    def slot_ports(self, slot: Slot) -> Sequence[Port]:
-        """Sequence of (the indices of) ports for the given slot."""
-        return range(self.num_slot_ports(slot))
-
-    @final
-    def validate_slot_data(self, data: Mapping[Slot, Shaped], /) -> None:
-        """Validates the shapes for given slot data."""
-        assert validate(data, Mapping[Slot, Shaped])
-        slots, slot_shapes = self.slots, self.slot_shapes
-        for slot, shaped in data.items():
-            if slot not in slots:
-                raise ValueError(f"Invalid slot {slot}.")
-            if shaped.shape != slot_shapes[slot]:
-                raise ValueError(
-                    f"Incompatible shape for data at slot {slot}:"
-                    f" expected slot shape {slot_shapes[slot]}, "
-                    f" got data with shape {shaped.shape}."
-                )
-
-
 @final
-class Wiring(Shaped, Slotted, metaclass=TensorSatMeta):
+class Wiring(Shaped, metaclass=TensorSatMeta):
     """An immutable wiring."""
 
     __store: ClassVar[InstanceStore] = InstanceStore()
@@ -252,19 +169,28 @@ class Wiring(Shaped, Slotted, metaclass=TensorSatMeta):
         with Wiring.__store.instance(cls, instance_key) as self:
             if self is None:
                 self = super().__new__(cls)
-                self.__slot_shapes = slot_shapes
-                self.__shape = shape
-                self.__wire_types = wire_types
-                self.__slot_wires_list = slot_wires_list
-                self.__out_wires = out_wires
+                self.slot_shapes = slot_shapes
+                self.shape = shape
+                self.wire_types = wire_types
+                self.slot_wires_list = slot_wires_list
+                self.out_wires = out_wires
                 Wiring.__store.register(self)
             return self
 
-    __slot_shapes: tuple[Shape, ...]
-    __shape: Shape
-    __wire_types: Shape
-    __slot_wires_list: tuple[tuple[Wire, ...], ...]
-    __out_wires: tuple[Wire, ...]
+    slot_shapes: tuple[Shape, ...]
+    """Shapes for the slots of the wiring."""
+
+    shape: Shape
+    """Shape of the wiring, i.e. types of its outer ports."""
+
+    wire_types: Shape
+    """Wire types."""
+
+    slot_wires_list: tuple[tuple[Wire, ...], ...]
+    """Assignment of (the index of) a wire to each port of each slot."""
+
+    out_wires: tuple[Wire, ...]
+    """Assignment of (the index of) a wire to each outer port."""
 
     def __new__(cls, **data: Unpack[WiringData]) -> Self:
         """
@@ -296,37 +222,46 @@ class Wiring(Shaped, Slotted, metaclass=TensorSatMeta):
         return cls._new(slot_shapes, shape, wire_types, slot_wires_list, out_wires)
 
     @property
-    def slot_shapes(self) -> tuple[Shape, ...]:
-        return self.__slot_shapes
+    def num_slots(self) -> int:
+        """Number of slots."""
+        return len(self.slot_shapes)
 
     @property
-    def shape(self) -> Shape:
-        return self.__shape
+    def slots(self) -> Sequence[Slot]:
+        """Sequence of (the indices of) slots."""
+        return range(self.num_slots)
 
-    @property
-    def wire_types(self) -> Shape:
-        """Wire types."""
-        return self.__wire_types
+    def num_slot_ports(self, slot: Slot) -> int:
+        """Number of ports for the given slot."""
+        return len(self.slot_shapes[slot])
+
+    def slot_ports(self, slot: Slot) -> Sequence[Port]:
+        """Sequence of (the indices of) ports for the given slot."""
+        return range(self.num_slot_ports(slot))
+
+    def validate_slot_data(self, data: Mapping[Slot, Shaped], /) -> None:
+        """Validates the shapes for given slot data."""
+        assert validate(data, Mapping[Slot, Shaped])
+        slots, slot_shapes = self.slots, self.slot_shapes
+        for slot, shaped in data.items():
+            if slot not in slots:
+                raise ValueError(f"Invalid slot {slot}.")
+            if shaped.shape != slot_shapes[slot]:
+                raise ValueError(
+                    f"Incompatible shape for data at slot {slot}:"
+                    f" expected slot shape {slot_shapes[slot]}, "
+                    f" got data with shape {shaped.shape}."
+                )
 
     @property
     def num_wires(self) -> int:
         """Number of wires."""
-        return len(self.__wire_types)
+        return len(self.wire_types)
 
     @property
     def wires(self) -> Sequence[Wire]:
         """Sequence of (the indices of) wires."""
         return range(self.num_wires)
-
-    @property
-    def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
-        """Assignment of (the index of) a wire to each port of each slot."""
-        return self.__slot_wires_list
-
-    @property
-    def out_wires(self) -> tuple[Wire, ...]:
-        """Assignment of (the index of) a wire to each outer port."""
-        return self.__out_wires
 
     def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
         """Sequence of (the indices of) wires for the given slot."""
@@ -416,7 +351,6 @@ class Wiring(Shaped, Slotted, metaclass=TensorSatMeta):
         return MappingProxyType(
             {w: tuple(w_out_ports) for w, w_out_ports in wired_ports.items()}
         )
-
 
     def compose(self, wirings: Mapping[Slot, Wiring]) -> Wiring:
         """Composes this wiring with the given wirings for (some of) its slots."""
@@ -524,7 +458,7 @@ class Wiring(Shaped, Slotted, metaclass=TensorSatMeta):
 
 
 @final
-class WiringBuilder(Shaped, Slotted):
+class WiringBuilder(Shaped):
     """Utility class to build wirings."""
 
     __slot_shapes: list[list[Type]]
@@ -532,12 +466,6 @@ class WiringBuilder(Shaped, Slotted):
     __wire_types: list[Type]
     __slot_wires_list: list[list[Wire]]
     __out_wires: list[Wire]
-
-    __slot_shapes_cache: tuple[Shape, ...] | None
-    __shape_cache: Shape | None
-    __wire_types_cache: Shape | None
-    __slot_wires_list_cache: tuple[tuple[Wire, ...], ...] | None
-    __out_wires_cache: tuple[Wire, ...] | None
 
     def __new__(cls) -> Self:
         """
@@ -554,6 +482,16 @@ class WiringBuilder(Shaped, Slotted):
         return self
 
     @property
+    def num_slots(self) -> int:
+        """Number of slots."""
+        return len(self.slot_shapes)
+
+    @property
+    def slots(self) -> Sequence[Slot]:
+        """Sequence of (the indices of) slots."""
+        return range(self.num_slots)
+
+    @property
     def num_wires(self) -> int:
         """Number of wires."""
         return len(self.wire_types)
@@ -563,47 +501,28 @@ class WiringBuilder(Shaped, Slotted):
         """Sequence of (the indices of) wires."""
         return range(self.num_wires)
 
-    @property
+    @cached_property
     def slot_shapes(self) -> tuple[Shape, ...]:
-        slot_shapes = self.__slot_shapes_cache
-        if slot_shapes is None:
-            self.__slot_shapes_cache = slot_shapes = tuple(
-                tuple(s) for s in self.__slot_shapes
-            )
-        return slot_shapes
+        return tuple(tuple(s) for s in self.__slot_shapes)
 
-    @property
-    def shape(self) -> Shape:
-        shape = self.__shape_cache
-        if shape is None:
-            self.__shape_cache = shape = tuple(self.__shape)
-        return shape
+    @cached_property
+    def shape(self) -> Shape:  # type: ignore[override]
+        return tuple(self.__shape)
 
-    @property
+    @cached_property
     def wire_types(self) -> Shape:
         """Wire types."""
-        wire_types = self.__wire_types_cache
-        if wire_types is None:
-            self.__wire_types_cache = wire_types = tuple(self.__wire_types)
-        return wire_types
+        return tuple(self.__wire_types)
 
-    @property
+    @cached_property
     def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
         """Assignment of (the index of) a wire to each port of each slot."""
-        slot_wires_list = self.__slot_wires_list_cache
-        if slot_wires_list is None:
-            self.__slot_wires_list_cache = slot_wires_list = tuple(
-                map(tuple, self.__slot_wires_list)
-            )
-        return slot_wires_list
+        return tuple(map(tuple, self.__slot_wires_list))
 
-    @property
+    @cached_property
     def out_wires(self) -> tuple[Wire, ...]:
         """Assignment of (the index of) a wire to each outer port."""
-        out_wires = self.__out_wires_cache
-        if out_wires is None:
-            self.__out_wires_cache = out_wires = tuple(self.__out_wires)
-        return out_wires
+        return tuple(self.__out_wires)
 
     @property
     def wiring(self) -> Wiring:
@@ -616,9 +535,8 @@ class WiringBuilder(Shaped, Slotted):
             self.out_wires,
         )
 
-    # @override
     def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
-        # Overridden for more efficient implementation.
+        """Sequence of (the indices of) wires for the given slot."""
         assert validate(slot, Slot)
         if slot not in range(self.num_slots):
             raise ValueError(f"Invalid slot {slot}.")
@@ -632,11 +550,6 @@ class WiringBuilder(Shaped, Slotted):
         clone.__wire_types = self.__wire_types.copy()
         clone.__slot_wires_list = [m.copy() for m in self.__slot_wires_list]
         clone.__out_wires = self.__out_wires.copy()
-        clone.__slot_shapes_cache = self.__slot_shapes_cache
-        clone.__shape_cache = self.__shape_cache
-        clone.__wire_types_cache = self.__wire_types_cache
-        clone.__slot_wires_list_cache = self.__slot_wires_list_cache
-        clone.__out_wires_cache = self.__out_wires_cache
         return clone
 
     def add_wire(self, t: Type) -> Wire:
@@ -650,7 +563,7 @@ class WiringBuilder(Shaped, Slotted):
         return self._add_wires(ts)
 
     def _add_wires(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
-        self.__wire_types_cache = None
+        del self.wire_types
         wire_types = self.__wire_types
         len_before = len(wire_types)
         wire_types.extend(ts)
@@ -675,8 +588,8 @@ class WiringBuilder(Shaped, Slotted):
         return self._add_out_ports(wires)
 
     def _add_out_ports(self, wires: Sequence[Wire]) -> tuple[Port, ...]:
-        self.__shape_cache = None
-        self.__out_wires_cache = None
+        del self.shape
+        del self.out_wires
         shape, wire_types = self.__shape, self.__wire_types
         len_before = len(shape)
         shape.extend(wire_types[wire] for wire in wires)
@@ -685,7 +598,7 @@ class WiringBuilder(Shaped, Slotted):
 
     def add_slot(self) -> Slot:
         """Adds a new slot."""
-        self.__slot_shapes_cache = None
+        del self.slot_shapes
         slot_shapes = self.__slot_shapes
         k = len(slot_shapes)
         slot_shapes.append([])
@@ -707,8 +620,8 @@ class WiringBuilder(Shaped, Slotted):
         return self._add_slot_ports(slot, wires)
 
     def _add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[Port, ...]:
-        self.__slot_shapes_cache = None
-        self.__slot_wires_list_cache = None
+        del self.__slot_shapes
+        del self.__slot_wires_list
         slot_shape, wire_types = self.__slot_shapes[slot], self.__wire_types
         len_before = len(slot_shape)
         slot_shape.extend(wire_types[w] for w in wires)
@@ -955,25 +868,19 @@ class TensorLikeBox(Box):
     used to estimate contraction costs and memory requirements.
     """
 
-    __tensor_shape_cache: tuple[int, ...]
-
     @property
     @abstractmethod
     def shape(self) -> tuple[TensorLikeType, ...]: ...
 
-    @property
+    @cached_property
     def tensor_shape(self) -> tuple[int, ...]:
         """
         The tensor-like shape for this box.
         Guaranteed to have the
         """
-        try:
-            return self.__tensor_shape_cache
-        except AttributeError:
-            shape = self.shape
-            assert all(isinstance(t, TensorLikeType) for t in shape)
-            self.__tensor_shape_cache = t_shape = tuple(t.tensor_dim for t in shape)
-            return t_shape
+        shape = self.shape
+        assert all(isinstance(t, TensorLikeType) for t in shape)
+        return tuple(t.tensor_dim for t in shape)
 
 
 BoxT_inv = TypeVar("BoxT_inv", bound=Box, default=Box)
@@ -1119,16 +1026,22 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
     def _new(cls, wiring: Wiring, blocks: tuple[Block | None, ...]) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
-        self.__wiring = wiring
-        self.__blocks = blocks
+        self.wiring = wiring
+        self.blocks = blocks
         self.__recipe_used = None
         return self
 
-    __wiring: Wiring
-    __blocks: tuple[Box | Diagram | None, ...]
+    wiring: Wiring
+    """Wiring for the diagram."""
+
+    blocks: tuple[Box | Diagram | None, ...]
+    """
+    Sequence of blocks associated to the slots in the diagram's wiring,
+    or :obj:`None` to indicate that a slot is open.
+    """
+
     __recipe_used: DiagramRecipe[Any, Type] | None
     __hash_cache: int
-    __box_class_cache: BoxClass
 
     def __new__(cls, wiring: Wiring, blocks: Mapping[Slot, Block]) -> Self:
         """
@@ -1140,19 +1053,6 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         wiring.validate_slot_data(blocks)
         _blocks = tuple(map(blocks.get, wiring.slots))
         return cls._new(wiring, _blocks)
-
-    @property
-    def wiring(self) -> Wiring:
-        """Wiring for the diagram."""
-        return self.__wiring
-
-    @property
-    def blocks(self) -> tuple[Block | None, ...]:
-        """
-        Sequence of blocks associated to the slots in the diagram's wiring,
-        or :obj:`None` to indicate that a slot is open.
-        """
-        return self.__blocks
 
     @property
     def shape(self) -> Shape:
@@ -1211,21 +1111,16 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         """The recipe used to construct this diagram, if any."""
         return self.__recipe_used
 
-    @property
+    @cached_property
     def box_class(self) -> BoxClass:
         """
         The most specific common box class for the boxes in this diagram and its
         subdiagrams. See :meth:`Box.box_class_join`.
         """
-        try:
-            return self.__box_class_cache
-        except AttributeError:
-            box_classes = [type(box) for box in self.boxes] + [
-                subdiagram.box_class for subdiagram in self.subdiagrams
-            ]
-            box_class = Box.class_join(cast(list[BoxClass], box_classes))
-            self.__box_class_cache = box_class
-            return box_class
+        box_classes = [type(box) for box in self.boxes] + [
+            subdiagram.box_class for subdiagram in self.subdiagrams
+        ]
+        return Box.class_join(cast(list[BoxClass], box_classes))
 
     def compose(self, new_blocks: Mapping[Slot, Block | Wiring]) -> Diagram:
         """
@@ -1317,13 +1212,13 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
             return NotImplemented
         if self is other:
             return True
-        return self.__wiring == other.__wiring and self.__blocks == other.__blocks
+        return self.wiring == other.wiring and self.blocks == other.blocks
 
     def __hash__(self) -> int:
         try:
             return self.__hash_cache
         except AttributeError:
-            self.__hash_cache = h = hash((Diagram, self.__wiring, self.__blocks))
+            self.__hash_cache = h = hash((Diagram, self.wiring, self.blocks))
             return h
 
 
@@ -1526,12 +1421,21 @@ class SelectedInputWires(metaclass=TensorSatMeta):
     ) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
-        self.__builder = builder
-        self.__wires = wires
+        self.builder = builder
+        self.wires = wires
         return self
 
-    __builder: DiagramBuilder
-    __wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
+    builder: DiagramBuilder
+    """The builder to which the selected input wires belong."""
+
+    wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
+    """
+    The selected input wires, as either:
+
+    - a tuple of wires, implying contiguous port selection starting at index 0
+    - a mapping of ports to wires
+
+    """
 
     def __new__(
         cls,
@@ -1554,22 +1458,6 @@ class SelectedInputWires(metaclass=TensorSatMeta):
                 raise ValueError(f"Invalid wire index {wire}.")
         return cls._new(builder, _wires)
 
-    @property
-    def builder(self) -> DiagramBuilder:
-        """The builder to which the selected input wires belong."""
-        return self.__builder
-
-    @property
-    def wires(self) -> Mapping[Port, Wire] | tuple[Wire, ...]:
-        """
-        The selected input wires, as either:
-
-        - a tuple of wires, implying contiguous port selection starting at index 0
-        - a mapping of ports to wires
-
-        """
-        return self.__wires
-
     def __rmatmul__(self, block: Block) -> tuple[Wire, ...]:
         """
         Adds the given block to the diagram, applied to the selected input wires.
@@ -1578,11 +1466,11 @@ class SelectedInputWires(metaclass=TensorSatMeta):
         """
         if not isinstance(block, (Box, Diagram)):
             return NotImplemented
-        if isinstance(self.__wires, MappingProxyType):
-            wires = self.__wires
+        if isinstance(self.wires, MappingProxyType):
+            wires = self.wires
         else:
-            wires = MappingProxyType(dict(enumerate(self.__wires)))
-        return self.__builder.add_block(block, wires)
+            wires = MappingProxyType(dict(enumerate(self.wires)))
+        return self.builder.add_block(block, wires)
 
     def __repr__(self) -> str:
-        return f"<DiagramBuilder {id(self.__builder):#x}>[{self.__wires}]"
+        return f"<DiagramBuilder {id(self.builder):#x}>[{self.wires}]"

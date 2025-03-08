@@ -123,7 +123,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         path: ContractionPath,
     ) -> Self:
         self = super().__new__(cls, box_class)
-        self.__wiring = wiring
+        self.wiring = wiring
         if path:
             # == non-trivial contraction case ==
             # Compute arguments to contract2 calls:
@@ -160,7 +160,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
                         _res_wires.pop(w)
                         break
             # Store contract2 calls and wires of last contraction result:
-            self.__contract2_args = tuple(
+            self.contract2_args = tuple(
                 (lhs, lhs_wires, rhs, rhs_wires, tuple(_res_wires))
                 for lhs, lhs_wires, rhs, rhs_wires, _res_wires in contract2_args
             )
@@ -168,7 +168,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         else:
             # == trivial contraction cases ==
             # No contract2 calls necessary:
-            self.__contract2_args = ()
+            self.contract2_args = ()
             # There may be a single box, or none:
             if wiring.num_slots == 0:
                 self.__box_out_wires = ()
@@ -179,8 +179,12 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         self.__dangling_wires = tuple(sorted(wiring.dangling_wires))
         return self
 
-    __wiring: Wiring
-    __contract2_args: tuple[Contract2Args, ...]
+    wiring: Wiring
+    """The wiring upon which the contraction is defined."""
+
+    contract2_args: tuple[Contract2Args, ...]
+    """The arguments to contract2 calls in the contraction."""
+
     __box_out_wires: tuple[Wire, ...]
     __dangling_wires: tuple[Wire, ...]
 
@@ -241,23 +245,13 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         # Construct and return contraction:
         return cls._new(box_class, wiring, path)
 
-    @property
-    def wiring(self) -> Wiring:
-        """The wiring upon which the contraction is defined."""
-        return self.__wiring
-
-    @property
-    def contract2_args(self) -> tuple[Contract2Args, ...]:
-        """The arguments to contract2 calls in the contraction."""
-        return self.__contract2_args
-
     def _contract(self, diagram: Diagram) -> Box:
-        box_class, wiring = self.box_class, self.__wiring
+        box_class, wiring = self.box_class, self.wiring
         contract2 = box_class.contract2
         rewire = box_class.rewire
         spider = box_class.spider
         wire_types, out_wires = wiring.wire_types, wiring.out_wires
-        contract2_args = self.__contract2_args
+        contract2_args = self.contract2_args
         box_out_wires, dangling_wires = self.__box_out_wires, self.__dangling_wires
         # 1. Contract all boxes using contract2:
         boxes = cast(list[TensorLikeBoxT_inv], list(diagram.boxes))
@@ -288,7 +282,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         return box
 
     def _validate(self, diagram: Diagram) -> None:
-        if diagram.wiring != self.__wiring:
+        if diagram.wiring != self.wiring:
             raise ValueError("Diagram's wiring must match contraction wiring.")
         if not diagram.is_flat:
             raise ValueError("Diagram must be flat.")
