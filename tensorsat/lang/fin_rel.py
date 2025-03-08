@@ -25,8 +25,10 @@ import numpy as np
 from hashcons import InstanceStore
 import xxhash
 
+
 from ..diagrams import Port, TensorLikeBox, TensorLikeType, Type, Wire
 from .._utils.misc import rewire_array
+from .._utils.descriptors import cached_property
 
 if __debug__:
     from typing_validation import validate
@@ -289,14 +291,15 @@ class FinRel(TensorLikeBox):
             tensor = tensor.view()
         self = super().__new__(cls)
         self.tensor = tensor
-        self.shape = tuple(map(FinSet._new, tensor.shape))
         return self
 
     tensor: NumpyUInt8Array
     """The Boolean tensor defining the relation."""
 
-    shape: FinSetShape
-    """The shape of the relation."""
+    @cached_property
+    def shape(self) -> FinSetShape: # type: ignore[override]
+        """The shape of the relation."""
+        return tuple(map(FinSet._new, self.tensor.shape))
 
     __hash_cache: int
 

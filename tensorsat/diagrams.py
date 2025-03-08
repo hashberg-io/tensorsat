@@ -153,7 +153,6 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
     def _new(
         cls,
         slot_shapes: tuple[Shape, ...],
-        shape: Shape,
         wire_types: Shape,
         slot_wires_list: tuple[tuple[Wire, ...], ...],
         out_wires: tuple[Wire, ...],
@@ -161,7 +160,6 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         """Protected constructor."""
         instance_key = (
             slot_shapes,
-            shape,
             wire_types,
             slot_wires_list,
             out_wires,
@@ -170,7 +168,6 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
             if self is None:
                 self = super().__new__(cls)
                 self.slot_shapes = slot_shapes
-                self.shape = shape
                 self.wire_types = wire_types
                 self.slot_wires_list = slot_wires_list
                 self.out_wires = out_wires
@@ -179,9 +176,6 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
 
     slot_shapes: tuple[Shape, ...]
     """Shapes for the slots of the wiring."""
-
-    shape: Shape
-    """Shape of the wiring, i.e. types of its outer ports."""
 
     wire_types: Shape
     """Wire types."""
@@ -218,8 +212,12 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         slot_shapes = tuple(
             tuple(wire_types[i] for i in slot_wires) for slot_wires in slot_wires_list
         )
-        shape = tuple(wire_types[o] for o in out_wires)
-        return cls._new(slot_shapes, shape, wire_types, slot_wires_list, out_wires)
+        return cls._new(slot_shapes, wire_types, slot_wires_list, out_wires)
+
+    @cached_property
+    def shape(self) -> Shape: # type: ignore[override]
+        """Shape of the wiring, i.e. types of its outer ports."""
+        return tuple(self.wire_types[o] for o in self.out_wires)
 
     @property
     def num_slots(self) -> int:
@@ -529,7 +527,6 @@ class WiringBuilder(Shaped):
         """The wiring built thus far."""
         return Wiring._new(
             self.slot_shapes,
-            self.shape,
             self.wire_types,
             self.slot_wires_list,
             self.out_wires,
@@ -620,8 +617,8 @@ class WiringBuilder(Shaped):
         return self._add_slot_ports(slot, wires)
 
     def _add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[Port, ...]:
-        del self.__slot_shapes
-        del self.__slot_wires_list
+        del self.slot_shapes
+        del self.slot_wires_list
         slot_shape, wire_types = self.__slot_shapes[slot], self.__wire_types
         len_before = len(slot_shape)
         slot_shape.extend(wire_types[w] for w in wires)
@@ -660,7 +657,7 @@ class Box(Shaped, metaclass=BoxMeta):
 
     def __init_subclass__(cls) -> None:
         cls.__final__ = False
-        if not cls.__abstractmethods__:
+        if not getattr(cls, "__abstractmethods__", None):
             try:
                 import autoray  # type: ignore[import-untyped]
 
@@ -759,8 +756,8 @@ class Box(Shaped, metaclass=BoxMeta):
             raise ValueError("Number of ports must be strictly positive.")
         return cls._spider(t, num_ports)
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def _spider(cls, t: Type, num_ports: int) -> Self:
         """
         Protected version of :meth:`Box.spider`, to be implemented by subclasses.

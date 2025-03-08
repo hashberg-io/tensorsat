@@ -25,7 +25,7 @@ def __all_ancestors(classes: tuple[type, ...]) -> set[type]:
     q = deque(classes)
     while q:
         t = q.popleft()
-        new_bases = (s for s in t.__bases__ if s not in ancestors)
+        new_bases = tuple(s for s in t.__bases__ if s not in ancestors)
         ancestors.update(new_bases)
         q.extend(new_bases)
     return ancestors

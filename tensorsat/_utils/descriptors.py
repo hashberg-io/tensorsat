@@ -89,6 +89,16 @@ class cached_property(Generic[InstanceT, ValueT]):
     cached property name and appending `_cache`.
     For example, if the cached property is named `prop`, the slot used to store the
     cached value is `__prop_cache`.
+
+    Can be used as a decorator to turn a method into a cached property:
+
+        .. code-block:: python
+
+            class MyClass:
+
+                @cached_property
+                def prop(self) -> int:
+                    return 10
     """
 
     @staticmethod
@@ -108,20 +118,7 @@ class cached_property(Generic[InstanceT, ValueT]):
     __slots__ = ("__name", "__owner", "__func", "__mangled_attrname")
 
     def __new__(cls, func: Callable[[InstanceT], ValueT]) -> Self:
-        """
-        Public constructor, can be used as a decorator to turn a method into a cached
-        property, as in the following example:
-
-        .. code-block:: python
-
-            class MyClass:
-
-                @cached_property
-                def prop(self) -> int:
-                    return 10
-
-        :meta public:
-        """
+        """Public initialiser"""
         self = super().__new__(cls)
         self.__func = func
         return self
@@ -156,12 +153,12 @@ class cached_property(Generic[InstanceT, ValueT]):
         self.__mangled_attrname = name_mangle(owner, "__" + name + "_cache")
 
     @overload
-    def __get__(self, instance: None, _: Type[Any]) -> Self: ...
+    def __get__(self, instance: None, _: Type[Any] | None = None) -> Self: ...
 
     @overload
-    def __get__(self, instance: InstanceT, _: Type[Any]) -> ValueT: ...
+    def __get__(self, instance: InstanceT, _: Type[Any] | None = None) -> ValueT: ...
 
-    def __get__(self, instance: InstanceT | None, _: Type[Any]) -> ValueT | Self:
+    def __get__(self, instance: InstanceT | None, _: Type[Any] | None = None) -> ValueT | Self:
         """
         Gets the value of the cached_property on the given instance.
         If no instance is passed, returns the descriptor itsef.
@@ -175,7 +172,7 @@ class cached_property(Generic[InstanceT, ValueT]):
         try:
             return cast(ValueT, getattr(instance, self.__mangled_attrname))
         except AttributeError:
-            value = self.__func(instance)
+            value = self.func(instance)
             setattr(instance, self.__mangled_attrname, value)
             return value
 
@@ -198,7 +195,8 @@ class cached_property(Generic[InstanceT, ValueT]):
 
         :meta public:
         """
-        delattr(instance, self.__mangled_attrname)
+        if hasattr(instance, self.__mangled_attrname):
+            delattr(instance, self.__mangled_attrname)
 
     def __str__(self) -> str:
         try:

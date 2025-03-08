@@ -43,7 +43,7 @@ class TensorSatMeta(AutoReadonlyMeta, AutoSlottedMeta):
         cached_properties: dict[str, cached_property] = {}
         for member_name, member in namespace.items():
             if isinstance(member, cached_property):
-                cached_properties[member_name]
+                cached_properties[member_name] = member
         for prop_name, prop in cached_properties.items():
             backing_attr_name = "__" + prop_name + "_cache"
             if backing_attr_name in annotations:

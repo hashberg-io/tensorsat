@@ -241,7 +241,6 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
                 raise ValueError(
                     f"Invalid rhs for contraction {(lhs, rhs) = } at {idx = }."
                 )
-        # TODO: check that the wiring types are compatible with box class
         # Construct and return contraction:
         return cls._new(box_class, wiring, path)
 
