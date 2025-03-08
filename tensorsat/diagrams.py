@@ -41,6 +41,8 @@ from typing import (
 )
 from weakref import WeakValueDictionary
 from hashcons import InstanceStore
+
+from ._utils.descriptors import cached_property
 from ._utils.meta import TensorSatMeta, InheritanceForestMeta
 
 if TYPE_CHECKING:
@@ -224,135 +226,11 @@ class Slotted(metaclass=TensorSatMeta):
                 )
 
 
-class WiringBase(Shaped, Slotted, metaclass=TensorSatMeta):
-    """Abstract base class for wiring and wiring builder."""
-
-    @property
-    @abstractmethod
-    def wire_types(self) -> Shape:
-        """Wire types."""
-
-    @property
-    @abstractmethod
-    def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
-        """Assignment of (the index of) a wire to each port of each slot."""
-
-    @property
-    @abstractmethod
-    def out_wires(self) -> tuple[Wire, ...]:
-        """Assignment of (the index of) a wire to each outer port."""
-
-    @final
-    @property
-    def num_wires(self) -> int:
-        """Number of wires."""
-        return len(self.wire_types)
-
-    @final
-    @property
-    def wires(self) -> Sequence[Wire]:
-        """Sequence of (the indices of) wires."""
-        return range(self.num_wires)
-
-    def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
-        """Sequence of (the indices of) wires for the given slot."""
-        assert validate(slot, Slot)
-        if slot not in range(self.num_slots):
-            raise ValueError(f"Invalid slot {slot}.")
-        return self.slot_wires_list[slot]
-
-    @property
-    def dangling_wires(self) -> frozenset[Wire]:
-        """The set of "dangling" wires, wires not connected to any slot ports."""
-        return frozenset(self.wires) - frozenset(
-            w for ws in self.slot_wires_list for w in ws
-        )
-
-    @property
-    def discarded_wires(self) -> frozenset[Wire]:
-        """The set of "discarded" wires, wires not connected to any out ports."""
-        return frozenset(self.wires) - set(self.out_wires)
-
-    @property
-    def scalar_wires(self) -> frozenset[Wire]:
-        """The set of "scalar" wires, wires not connected to any ports."""
-        return frozenset(self.wires) - set(self.out_wires) - set(self.dangling_wires)
-
-    @final
-    @property
-    def wired_slot_ports(self) -> Mapping[Wire, tuple[tuple[Slot, Port], ...]]:
-        """
-        Computes and returns a mapping of wires to the collection of ``(slot, port)``
-        pairs connected by that wire.
-        Wires not appearing as keys in the mapping are "dangling", i.e. they don't
-        connect to any slot ports.
-        """
-        wired_slot_ports: dict[Wire, list[tuple[Slot, Port]]] = {}
-        for slot, wires in enumerate(self.slot_wires_list):
-            for port, wire in enumerate(wires):
-                wired_slot_ports.setdefault(wire, []).append((slot, port))
-        return MappingProxyType(
-            {w: tuple(w_slot_ports) for w, w_slot_ports in wired_slot_ports.items()}
-        )
-
-    @final
-    @property
-    def wired_slots(self) -> Mapping[Wire, tuple[Slot, ...]]:
-        """
-        Computes and returns a mapping of wires to the collection of slots
-        connected by that wire.
-        Wires not appearing as keys in the mapping are "dangling", i.e. they don't
-        connect to any slots.
-        """
-        wired_slots: dict[Wire, list[Slot]] = {}
-        for slot, wires in enumerate(self.slot_wires_list):
-            for wire in wires:
-                wired_slots.setdefault(wire, []).append(slot)
-        return MappingProxyType(
-            {w: tuple(w_slots) for w, w_slots in wired_slots.items()}
-        )
-
-    @final
-    @property
-    def wired_out_ports(self) -> Mapping[Wire, tuple[Port, ...]]:
-        """
-        Computes and returns a mapping of wires to the collection of out ports
-        connected by that wire.
-        Wires not appearing as keys in the mapping are "discarded", i.e. they don't
-        connect to any out ports.
-        """
-        wired_out_ports: dict[Wire, list[Port]] = {}
-        for port, wire in enumerate(self.out_wires):
-            wired_out_ports.setdefault(wire, []).append(port)
-        return MappingProxyType(
-            {w: tuple(w_out_ports) for w, w_out_ports in wired_out_ports.items()}
-        )
-
-    @final
-    @property
-    def wired_ports(self) -> Mapping[Wire, tuple[Port | tuple[Slot, Port], ...]]:
-        """
-        Computes and returns a mapping of wires to the collection of ports connected by
-        that wire: ``(slot, port)`` pairs for slot ports and individual out ports.
-        Wires not appearing as keys in the mapping are "scalar", i.e. they don't
-        connect to any ports.
-        """
-        wired_ports: dict[Wire, list[Port | tuple[Slot, Port]]] = {}
-        for slot, wires in enumerate(self.slot_wires_list):
-            for port, wire in enumerate(wires):
-                wired_ports.setdefault(wire, []).append((slot, port))
-        for port, wire in enumerate(self.out_wires):
-            wired_ports.setdefault(wire, []).append(port)
-        return MappingProxyType(
-            {w: tuple(w_out_ports) for w, w_out_ports in wired_ports.items()}
-        )
-
-
 @final
-class Wiring(WiringBase):
+class Wiring(Shaped, Slotted, metaclass=TensorSatMeta):
     """An immutable wiring."""
 
-    _store: ClassVar[InstanceStore] = InstanceStore()
+    __store: ClassVar[InstanceStore] = InstanceStore()
 
     @classmethod
     def _new(
@@ -371,7 +249,7 @@ class Wiring(WiringBase):
             slot_wires_list,
             out_wires,
         )
-        with Wiring._store.instance(cls, instance_key) as self:
+        with Wiring.__store.instance(cls, instance_key) as self:
             if self is None:
                 self = super().__new__(cls)
                 self.__slot_shapes = slot_shapes
@@ -379,7 +257,7 @@ class Wiring(WiringBase):
                 self.__wire_types = wire_types
                 self.__slot_wires_list = slot_wires_list
                 self.__out_wires = out_wires
-                Wiring._store.register(self)
+                Wiring.__store.register(self)
             return self
 
     __slot_shapes: tuple[Shape, ...]
@@ -387,8 +265,6 @@ class Wiring(WiringBase):
     __wire_types: Shape
     __slot_wires_list: tuple[tuple[Wire, ...], ...]
     __out_wires: tuple[Wire, ...]
-    __dangling_wires: frozenset[Wire]
-    __discarded_wires: frozenset[Wire]
 
     def __new__(cls, **data: Unpack[WiringData]) -> Self:
         """
@@ -429,31 +305,118 @@ class Wiring(WiringBase):
 
     @property
     def wire_types(self) -> Shape:
+        """Wire types."""
         return self.__wire_types
 
     @property
+    def num_wires(self) -> int:
+        """Number of wires."""
+        return len(self.__wire_types)
+
+    @property
+    def wires(self) -> Sequence[Wire]:
+        """Sequence of (the indices of) wires."""
+        return range(self.num_wires)
+
+    @property
     def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
+        """Assignment of (the index of) a wire to each port of each slot."""
         return self.__slot_wires_list
 
     @property
     def out_wires(self) -> tuple[Wire, ...]:
+        """Assignment of (the index of) a wire to each outer port."""
         return self.__out_wires
+
+    def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
+        """Sequence of (the indices of) wires for the given slot."""
+        assert validate(slot, Slot)
+        if slot not in range(self.num_slots):
+            raise ValueError(f"Invalid slot {slot}.")
+        return self.slot_wires_list[slot]
 
     @property
     def dangling_wires(self) -> frozenset[Wire]:
-        try:
-            return self.__dangling_wires
-        except AttributeError:
-            self.__dangling_wires = ws = super().dangling_wires
-            return ws
+        """The set of "dangling" wires, wires not connected to any slot ports."""
+        return frozenset(self.wires) - frozenset(
+            w for ws in self.slot_wires_list for w in ws
+        )
 
     @property
     def discarded_wires(self) -> frozenset[Wire]:
-        try:
-            return self.__discarded_wires
-        except AttributeError:
-            self.__discarded_wires = ws = super().discarded_wires
-            return ws
+        """The set of "discarded" wires, wires not connected to any out ports."""
+        return frozenset(self.wires) - set(self.out_wires)
+
+    @property
+    def scalar_wires(self) -> frozenset[Wire]:
+        """The set of "scalar" wires, wires not connected to any ports."""
+        return frozenset(self.wires) - set(self.out_wires) - set(self.dangling_wires)
+
+    @property
+    def wired_slot_ports(self) -> Mapping[Wire, tuple[tuple[Slot, Port], ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of ``(slot, port)``
+        pairs connected by that wire.
+        Wires not appearing as keys in the mapping are "dangling", i.e. they don't
+        connect to any slot ports.
+        """
+        wired_slot_ports: dict[Wire, list[tuple[Slot, Port]]] = {}
+        for slot, wires in enumerate(self.slot_wires_list):
+            for port, wire in enumerate(wires):
+                wired_slot_ports.setdefault(wire, []).append((slot, port))
+        return MappingProxyType(
+            {w: tuple(w_slot_ports) for w, w_slot_ports in wired_slot_ports.items()}
+        )
+
+    @property
+    def wired_slots(self) -> Mapping[Wire, tuple[Slot, ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of slots
+        connected by that wire.
+        Wires not appearing as keys in the mapping are "dangling", i.e. they don't
+        connect to any slots.
+        """
+        wired_slots: dict[Wire, list[Slot]] = {}
+        for slot, wires in enumerate(self.slot_wires_list):
+            for wire in wires:
+                wired_slots.setdefault(wire, []).append(slot)
+        return MappingProxyType(
+            {w: tuple(w_slots) for w, w_slots in wired_slots.items()}
+        )
+
+    @property
+    def wired_out_ports(self) -> Mapping[Wire, tuple[Port, ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of out ports
+        connected by that wire.
+        Wires not appearing as keys in the mapping are "discarded", i.e. they don't
+        connect to any out ports.
+        """
+        wired_out_ports: dict[Wire, list[Port]] = {}
+        for port, wire in enumerate(self.out_wires):
+            wired_out_ports.setdefault(wire, []).append(port)
+        return MappingProxyType(
+            {w: tuple(w_out_ports) for w, w_out_ports in wired_out_ports.items()}
+        )
+
+    @property
+    def wired_ports(self) -> Mapping[Wire, tuple[Port | tuple[Slot, Port], ...]]:
+        """
+        Computes and returns a mapping of wires to the collection of ports connected by
+        that wire: ``(slot, port)`` pairs for slot ports and individual out ports.
+        Wires not appearing as keys in the mapping are "scalar", i.e. they don't
+        connect to any ports.
+        """
+        wired_ports: dict[Wire, list[Port | tuple[Slot, Port]]] = {}
+        for slot, wires in enumerate(self.slot_wires_list):
+            for port, wire in enumerate(wires):
+                wired_ports.setdefault(wire, []).append((slot, port))
+        for port, wire in enumerate(self.out_wires):
+            wired_ports.setdefault(wire, []).append(port)
+        return MappingProxyType(
+            {w: tuple(w_out_ports) for w, w_out_ports in wired_ports.items()}
+        )
+
 
     def compose(self, wirings: Mapping[Slot, Wiring]) -> Wiring:
         """Composes this wiring with the given wirings for (some of) its slots."""
@@ -561,7 +524,7 @@ class Wiring(WiringBase):
 
 
 @final
-class WiringBuilder(WiringBase):
+class WiringBuilder(Shaped, Slotted):
     """Utility class to build wirings."""
 
     __slot_shapes: list[list[Type]]
@@ -591,6 +554,16 @@ class WiringBuilder(WiringBase):
         return self
 
     @property
+    def num_wires(self) -> int:
+        """Number of wires."""
+        return len(self.wire_types)
+
+    @property
+    def wires(self) -> Sequence[Wire]:
+        """Sequence of (the indices of) wires."""
+        return range(self.num_wires)
+
+    @property
     def slot_shapes(self) -> tuple[Shape, ...]:
         slot_shapes = self.__slot_shapes_cache
         if slot_shapes is None:
@@ -608,6 +581,7 @@ class WiringBuilder(WiringBase):
 
     @property
     def wire_types(self) -> Shape:
+        """Wire types."""
         wire_types = self.__wire_types_cache
         if wire_types is None:
             self.__wire_types_cache = wire_types = tuple(self.__wire_types)
@@ -615,6 +589,7 @@ class WiringBuilder(WiringBase):
 
     @property
     def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
+        """Assignment of (the index of) a wire to each port of each slot."""
         slot_wires_list = self.__slot_wires_list_cache
         if slot_wires_list is None:
             self.__slot_wires_list_cache = slot_wires_list = tuple(
@@ -624,6 +599,7 @@ class WiringBuilder(WiringBase):
 
     @property
     def out_wires(self) -> tuple[Wire, ...]:
+        """Assignment of (the index of) a wire to each outer port."""
         out_wires = self.__out_wires_cache
         if out_wires is None:
             self.__out_wires_cache = out_wires = tuple(self.__out_wires)
@@ -640,7 +616,7 @@ class WiringBuilder(WiringBase):
             self.out_wires,
         )
 
-    @override
+    # @override
     def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
         # Overridden for more efficient implementation.
         assert validate(slot, Slot)
