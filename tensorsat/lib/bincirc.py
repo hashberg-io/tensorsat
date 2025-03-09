@@ -108,14 +108,12 @@ def rc_adder(diag: DiagramBuilder, num_bits: int) -> None:
         raise ValueError("Number of bits must be positive.")
     a = diag.add_inputs(bits(num_bits))
     b = diag.add_inputs(bits(num_bits))
-    (c,) = diag.add_inputs([bit])
-    outputs: list[Wire] = []
+    c = diag.add_input(bit)
     for i in range(num_bits):
         # a, b = inputs[2 * i + 1 : 2 * i + 3]
         s, c = full_adder @ diag[a[i], b[i], c]
-        outputs.append(s)
-    outputs.append(c)
-    diag.add_outputs(outputs)
+        diag.add_output(s)
+    diag.add_output(c)
 
 
 @Diagram.recipe

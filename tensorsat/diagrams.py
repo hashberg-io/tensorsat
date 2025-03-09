@@ -1375,6 +1375,14 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         self.__blocks[slot] = block
         return output_wires
 
+    def add_input(self, t: Type) -> Wire:
+        """
+        Creates a new wires of the given type,
+        then adds a port connected to that wire.
+        """
+        assert validate(t, Type)
+        return self._add_inputs((t,))[0]
+
     def add_inputs(self, ts: Iterable[Type]) -> tuple[Wire, ...]:
         """
         Creates new wires of the given types,
@@ -1390,7 +1398,14 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         wiring._add_out_ports(wires)
         return wires
 
-    def add_outputs(self, wires: Iterable[Wire]) -> None:
+    def add_output(self, wire: Wire) -> Port:
+        """Adds a port connected to the given wire."""
+        assert validate(wire, Wire)
+        if wire not in self.wiring.wires:
+            raise ValueError(f"Invalid wire index {wire}.")
+        return self._add_outputs((wire,))[0]
+
+    def add_outputs(self, wires: Iterable[Wire]) -> tuple[Port, ...]:
         """Adds ports connected to the given wires."""
         wires = tuple(wires)
         assert validate(wires, tuple[Wire, ...])
@@ -1398,10 +1413,10 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         for wire in wires:
             if wire not in diag_wires:
                 raise ValueError(f"Invalid wire index {wire}.")
-        self._add_outputs(wires)
+        return self._add_outputs(wires)
 
-    def _add_outputs(self, wires: tuple[Wire, ...]) -> None:
-        self.wiring._add_out_ports(wires)
+    def _add_outputs(self, wires: tuple[Wire, ...]) -> tuple[Port, ...]:
+        return self.wiring._add_out_ports(wires)
 
     def __getitem__(
         self, wires: Wire | Sequence[Wire] | Mapping[Port, Wire]
