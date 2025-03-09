@@ -28,24 +28,26 @@ from ..lang.fin_rel import FinSet, FinRel, FinSetShape
 bit: Final[FinSet] = FinSet(2)
 """The set {0, 1} of binary values."""
 
-
 def bits(n: int) -> FinSetShape:
     """Shape consisting of the given number of bits."""
     if n < 0:
         raise ValueError("Number of bits must be non-negative.")
     return (bit,) * n
 
+# We define a constant for the 2-bit shape, because binary operations are very common:
+bits2: Final[FinSetShape] = bits(2)
+"""The shape of 2 bits."""
 
-not_: Final[FinRel] = FinRel.from_callable(bit, bit, lambda b: 1 - b)
+not_: Final[FinRel] = FinRel.from_callable(bit, bit, lambda b: 1 - b, name="not_")
 """The NOT gate."""
 
-and_: Final[FinRel] = FinRel.from_callable(bits(2), bit, lambda a, b: a & b)
+and_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a & b, name="and_")
 """The AND gate."""
 
-or_: Final[FinRel] = FinRel.from_callable(bits(2), bit, lambda a, b: a | b)
+or_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a | b, name="or_")
 """The OR gate."""
 
-xor_: Final[FinRel] = FinRel.from_callable(bits(2), bit, lambda a, b: a ^ b)
+xor_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a ^ b, name="xor_")
 """The XOR gate."""
 
 bit_0: Final[FinRel] = FinRel.singleton(bit, 0)

@@ -829,7 +829,7 @@ class Box(Shaped, metaclass=BoxMeta):
         times in ``out_wires``, or not at all.
         """
 
-    def __new__(cls) -> Self:
+    def __new__(cls, name: str | None = None) -> Self:
         """
         Constructs a new box.
 
@@ -837,7 +837,16 @@ class Box(Shaped, metaclass=BoxMeta):
         """
         if not cls.__final__:
             raise TypeError("Only final subclasses of Box can be instantiated.")
-        return super().__new__(cls)
+        self = super().__new__(cls)
+        self.__name = name
+        return self
+
+    __name: str | None
+
+    @property
+    def name(self) -> str | None:
+        """An optional name for the box."""
+        return self.__name
 
     @final
     def rewire(self, out_ports: Sequence[Port]) -> Self:
@@ -860,7 +869,10 @@ class Box(Shaped, metaclass=BoxMeta):
     def __repr__(self) -> str:
         cls_name = type(self).__name__
         num_ports = len(self.shape)
-        return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
+        box_name = self.name
+        if box_name is None:
+            return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
+        return f"<{cls_name} {id(self):#x}: {num_ports} ports, named {box_name!r}>"
 
 
 BoxClass: TypeAlias = SubclassOf[Box]

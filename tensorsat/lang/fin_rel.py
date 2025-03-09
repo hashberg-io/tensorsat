@@ -171,6 +171,8 @@ class FinRel(TensorLikeBox):
         cls,
         shape: ItemOrIterable[Size | FinSet],
         points: Iterable[El | Point],
+        *,
+        name: str | None = None
     ) -> Self:
         """Constructs a relation from a set of points."""
         shape = _extract_sizes(shape)
@@ -187,7 +189,7 @@ class FinRel(TensorLikeBox):
             if not all(0 <= i < d for i, d in zip(point, data.shape)):
                 raise ValueError(f"Values of {point = } are invalid for {shape = }.")
             data[point] = 1
-        return cls._new(data)
+        return cls._new(data, name)
 
     @classmethod
     def from_mapping(
@@ -195,6 +197,8 @@ class FinRel(TensorLikeBox):
         input_shape: ItemOrIterable[Size | FinSet],
         output_shape: ItemOrIterable[Size | FinSet],
         mapping: Mapping[Point, El | Point],
+        *,
+        name: str | None = None
     ) -> Self:
         """
         Constructs a function graph from a mapping of points to points.
@@ -205,6 +209,7 @@ class FinRel(TensorLikeBox):
         rel = cls.from_set(
             input_shape + output_shape,
             (k + _wrap_el(v) for k, v in mapping.items()),
+            name=name
         )
         if len(mapping) != prod(input_shape):
             raise ValueError("Mapping does not cover the entire input space.")
@@ -215,9 +220,11 @@ class FinRel(TensorLikeBox):
         cls,
         shape: FinSet | Iterable[Size],
         point: El | Point,
+        *,
+        name: str | None = None
     ) -> Self:
         """Constructs a singleton relation with the given point."""
-        return cls.from_mapping((), shape, {(): point})
+        return cls.from_mapping((), shape, {(): point}, name=name)
 
     @classmethod
     def from_callable(
@@ -228,6 +235,8 @@ class FinRel(TensorLikeBox):
         # Without type bounds for ParamSpec or TypeVarTuple,
         # there is no good way to type this as a function which can take
         # any fixed number of El arguments, but we don't care how many.
+        *,
+        name: str | None = None
     ) -> Self:
         """
         Constructs a function graph from a callable mapping points to points
@@ -239,7 +248,7 @@ class FinRel(TensorLikeBox):
         input_shape = _extract_sizes(input_shape)
         output_shape = _extract_sizes(output_shape)
         mapping = {idx: func(*idx) for idx in np.ndindex(input_shape)}
-        return cls.from_mapping(input_shape, output_shape, mapping)
+        return cls.from_mapping(input_shape, output_shape, mapping, name=name)
 
     @staticmethod
     def _contract2(
@@ -285,7 +294,7 @@ class FinRel(TensorLikeBox):
         return FinRel._new(tensor)
 
     @classmethod
-    def _new(cls, tensor: NumpyUInt8Array) -> Self:
+    def _new(cls, tensor: NumpyUInt8Array, name: str | None = None,) -> Self:
         """
         Protected constructor.
         Presumes that the tensor is already validated, and that it is not going to be
@@ -294,7 +303,7 @@ class FinRel(TensorLikeBox):
         if tensor.flags["OWNDATA"]:
             tensor.setflags(write=False)
             tensor = tensor.view()
-        self = super().__new__(cls)
+        self = super().__new__(cls, name=name)
         self.__tensor = tensor
         return self
 
