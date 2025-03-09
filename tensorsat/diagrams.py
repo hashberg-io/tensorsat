@@ -51,8 +51,11 @@ else:
 if __debug__:
     from typing_validation import validate
 
+class TypeMeta(TensorSatMeta):
+    """Metaclass for typeclasses."""
 
-class Type(metaclass=TensorSatMeta):
+
+class Type(metaclass=TypeMeta):
     """
     Abstract base class for types in diagrams.
 
@@ -61,18 +64,12 @@ class Type(metaclass=TensorSatMeta):
     By sharing common types, boxes from multiple languages can be wired together in the
     same diagram.
     """
-
-    def __init_subclass__(cls) -> None:
-        cls.__final__ = False
-
     def __new__(cls) -> Self:
         """
         Constructs a new type.
 
         :meta public:
         """
-        if not cls.__final__:
-            raise TypeError("Only final subclasses of Type can be instantiated.")
         return super().__new__(cls)
 
 
@@ -657,21 +654,25 @@ class BoxMeta(InheritanceForestMeta, TensorSatMeta):
     :meth:`Box.class_join`, is always well-defined.
     """
 
+    def __new__(
+        mcs,
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+    ) -> Any:
+        cls = super().__new__(mcs, name, bases, namespace)
+        if not getattr(cls, "__abstractmethods__", None):
+            try:
+                import autoray  # type: ignore[import-untyped]
+                autoray.register_backend(cls, "tensorsat._autoray")
+            except ModuleNotFoundError:
+                pass
+        return cls
 
 class Box(Shaped, metaclass=BoxMeta):
     """
     Abstract base class for boxes in diagrams.
     """
-
-    def __init_subclass__(cls) -> None:
-        cls.__final__ = False
-        if not getattr(cls, "__abstractmethods__", None):
-            try:
-                import autoray  # type: ignore[import-untyped]
-
-                autoray.register_backend(cls, "tensorsat._autoray")
-            except ModuleNotFoundError:
-                pass
 
     @staticmethod
     def class_join(bases: Iterable[BoxClass]) -> BoxClass:
