@@ -10,6 +10,7 @@ dependencies = [
     "hashcons>=0.1.0",
     "typing-validation>=1.2.11",
     "xxhash>=3.5.0",
+    "opt_einsum>=3.4.0",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

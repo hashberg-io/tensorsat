@@ -17,12 +17,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from itertools import product
 from types import MappingProxyType
-from typing import Any, Final
+from typing import Final
 
 if __debug__:
     from typing_validation import validate
 
-from ..diagrams import Diagram, DiagramBuilder, DiagramRecipe, Wire
+from ..diagrams import Diagram, DiagramBuilder, Wire
 from ..lang.fin_rel import FinSet, FinRel, FinSetShape
 
 bit: Final[FinSet] = FinSet(2)
@@ -67,73 +67,62 @@ binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
 """Labels for binary operations."""
 
 
-half_adder: Diagram
-"""
-Diagram for a half adder circuit.
-See `Half adder <https://en.wikipedia.org/wiki/Adder_(electronics)#Half_adder>`_.
-"""
-
-
-@Diagram.from_recipe  # type: ignore[no-redef]
+@Diagram.from_recipe
 def half_adder(diag: DiagramBuilder) -> None:
+    """
+    Diagram for a half adder circuit.
+    See `Half adder <https://en.wikipedia.org/wiki/Adder_(electronics)#Half_adder>`_.
+    """
     a, b = diag.add_inputs(bits(2))
     (s,) = xor_ @ diag[a, b]
     (c,) = and_ @ diag[a, b]
     diag.add_outputs([s, c])
 
 
-full_adder: Diagram
-"""
-Diagram for a full adder circuit.
-See `Full adder <https://en.wikipedia.org/wiki/Adder_(electronics)#Full_adder>`_.
-"""
-
-
-@Diagram.from_recipe  # type: ignore[no-redef]
+@Diagram.from_recipe
 def full_adder(diag: DiagramBuilder) -> None:
-    a, b, c_in = diag.add_inputs(bits(3))
+    """
+    Diagram for a full adder circuit.
+    See `Full adder <https://en.wikipedia.org/wiki/Adder_(electronics)#Full_adder>`_.
+    """
+    a, b, c_in = diag.add_inputs(bits(3))  # 001
     (x1,) = xor_ @ diag[a, b]
     (x2,) = and_ @ diag[a, b]
     (x3,) = and_ @ diag[x1, c_in]
-    (s,) = xor_ @ diag[x1, x3]
+    (s,) = xor_ @ diag[x1, c_in]
     (c_out,) = or_ @ diag[x2, x3]
     diag.add_outputs([s, c_out])
 
 
-rc_adder: DiagramRecipe[Any, FinSet]
-"""
-Recipe to create a ripple carry adder circuit,
-given the number ``num_bits`` of bits for each summand.
-See `Ripple-carry adder <https://en.wikipedia.org/wiki/Adder_(electronics)#Ripple-carry_adder>`_.
-"""
-
-
-@Diagram.recipe  # type: ignore[no-redef]
+@Diagram.recipe
 def rc_adder(diag: DiagramBuilder, num_bits: int) -> None:
+    """
+    Recipe to create a ripple carry adder circuit,
+    given the number ``num_bits`` of bits for each summand.
+    See `Ripple-carry adder <https://en.wikipedia.org/wiki/Adder_(electronics)#Ripple-carry_adder>`_.
+    """
     assert validate(num_bits, int)
     if num_bits <= 0:
         raise ValueError("Number of bits must be positive.")
-    inputs = diag.add_inputs(bits(2 * num_bits + 1))
+    a = diag.add_inputs(bits(num_bits))
+    b = diag.add_inputs(bits(num_bits))
+    (c,) = diag.add_inputs([bit])
     outputs: list[Wire] = []
-    c = inputs[0]
     for i in range(num_bits):
-        a, b = inputs[2 * i + 1 : 2 * i + 3]
-        s, c = full_adder @ diag[c, a, b]
+        # a, b = inputs[2 * i + 1 : 2 * i + 3]
+        s, c = full_adder @ diag[a[i], b[i], c]
         outputs.append(s)
     outputs.append(c)
     diag.add_outputs(outputs)
 
 
-wallace_multiplier: DiagramRecipe[Any]
-"""
-Recipe to create a Wallace multiplier circuit,
-given the number ``num_bits`` of bits for each factor.
-See `Wallace tree <https://en.wikipedia.org/wiki/Wallace_tree>`_.
-"""
-
-
-@Diagram.recipe  # type: ignore[no-redef]
+@Diagram.recipe
 def wallace_multiplier(diag: DiagramBuilder, num_bits: int) -> None:
+    """
+    Recipe to create a Wallace multiplier circuit,
+    given the number ``num_bits`` of bits for each factor.
+    See `Wallace tree <https://en.wikipedia.org/wiki/Wallace_tree>`_.
+    """
     assert validate(num_bits, int)
     if num_bits <= 0:
         raise ValueError("Number of bits must be positive.")

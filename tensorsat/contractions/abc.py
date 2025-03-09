@@ -17,7 +17,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Generic, Self, Type as SubclassOf, final
 
-from .._utils.meta.tensorsat import TensorSatMeta
+from .._utils.meta import TensorSatMeta
 from ..diagrams import Box, BoxT_inv, Diagram
 
 if __debug__:
@@ -27,16 +27,20 @@ if __debug__:
 class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
     """Abstract base class for contractions."""
 
-    box_class: SubclassOf[BoxT_inv]
-    """Box class associated with this contraction."""
+    __box_class: SubclassOf[BoxT_inv]
 
     def __new__(cls, box_class: SubclassOf[BoxT_inv]) -> Self:
         assert validate(box_class, SubclassOf[Box])
         if not box_class.can_be_contracted():
             raise ValueError("Given box class cannot be contracted.")
         self = super().__new__(cls)
-        self.box_class = box_class
+        self.__box_class = box_class
         return self
+
+    @property
+    def box_class(self) -> SubclassOf[BoxT_inv]:
+        """Box class associated with this contraction."""
+        return self.__box_class
 
     @final
     def can_contract(self, diagram: Diagram) -> bool:
@@ -51,15 +55,15 @@ class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
     def validate(self, diagram: Diagram) -> None:
         """Raises :class:`ValueError` if the diagram cannot be contracted."""
         assert validate(diagram, Diagram)
-        if not issubclass(diagram.box_class, self.box_class):
+        if not issubclass(diagram.box_class, self.__box_class):
             raise ValueError(
                 f"Cannot contract diagram: diagram box class {diagram.box_class} is"
-                f" not a subclass of contraction box class {self.box_class}"
+                f" not a subclass of contraction box class {self.__box_class}"
             )
         self._validate(diagram)
 
     @final
-    def contract(self, diagram: Diagram) -> Box:
+    def contract(self, diagram: Diagram) -> BoxT_inv:
         """
         Contracts the diagram using this contraction.
 
@@ -74,7 +78,7 @@ class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
         return self._contract(diagram)
 
     @abstractmethod
-    def _contract(self, diagram: Diagram) -> Box:
+    def _contract(self, diagram: Diagram) -> BoxT_inv:
         """Diagram contraction logic, to be implemented by subclasses."""
 
     @abstractmethod

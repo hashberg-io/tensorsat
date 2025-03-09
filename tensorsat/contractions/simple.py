@@ -18,10 +18,10 @@ Simple contractions, based on explicit contraction paths.
 from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, Literal, Self, Type as SubclassOf, TypeAlias, cast, final
+import opt_einsum  # type: ignore[import-untyped]
 
 from .abc import Contraction
 from ..diagrams import (
-    Box,
     Diagram,
     TensorLikeBox,
     TensorLikeBoxT_inv,
@@ -78,12 +78,14 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     """A simple contraction based on an explicit contraction path."""
 
     @classmethod
-    def from_opt_einsum(
+    def from_opt_einsum[
+        _S: TensorLikeBox
+    ](
         cls,
-        box_class: SubclassOf[TensorLikeBoxT_inv],
+        box_class: SubclassOf[_S],
         wiring: Wiring,
         optimize: OptEinsumOptimize = "auto",
-    ) -> Self:
+    ) -> SimpleContraction[_S]:
         """
         Creates a simple contraction using :func:`opt_einsum.contract_path`.
 
@@ -93,12 +95,6 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             Pull request to fix this is under review:
             https://github.com/dgasmith/opt_einsum/pull/247
         """
-        try:
-            import opt_einsum  # type: ignore[import-untyped]
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError(
-                "SimpleContraction.using_opt_einsum requires the opt_einsum library"
-            ) from None
         assert validate(box_class, SubclassOf[TensorLikeBox])
         assert validate(wiring, Wiring)
         if wiring.num_wires == 0:
@@ -112,8 +108,13 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             contract_path_operands.append(tuple(wire_dims[w] for w in slot_wires))
             contract_path_operands.append(slot_wires)
         contract_path_operands.append(wiring.out_wires)
-        path, _ = opt_einsum.contract_path(*contract_path_operands, optimize=optimize)
-        return cls._new(box_class, wiring, path)
+        path, _ = opt_einsum.contract_path(
+            *contract_path_operands,
+            optimize=optimize,
+            use_blas=False,
+            shapes=True,
+        )
+        return cls._new(box_class, wiring, path)  # type: ignore
 
     @classmethod
     def _new(
@@ -123,7 +124,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         path: ContractionPath,
     ) -> Self:
         self = super().__new__(cls, box_class)
-        self.wiring = wiring
+        self.__wiring = wiring
         if path:
             # == non-trivial contraction case ==
             # Compute arguments to contract2 calls:
@@ -132,7 +133,8 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             ] = []
             wires_list = list(wiring.slot_wires_list)
             for lhs_idx, rhs_idx in path:
-                lhs_wires, rhs_wires = wires_list.pop(lhs_idx), wires_list.pop(rhs_idx)
+                lhs_wires = wires_list.pop(lhs_idx)
+                rhs_wires = wires_list.pop(rhs_idx - int(lhs_idx < rhs_idx))
                 common_wireset = set(lhs_wires) & set(rhs_wires)
                 if common_wireset:
                     lhs_only_wires = tuple(
@@ -157,10 +159,10 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             for w in discarded_wires:
                 for _, _, _, _, _res_wires in reversed(contract2_args):
                     if w in _res_wires:
-                        _res_wires.pop(w)
+                        _res_wires.remove(w)
                         break
             # Store contract2 calls and wires of last contraction result:
-            self.contract2_args = tuple(
+            self.__contract2_args = tuple(
                 (lhs, lhs_wires, rhs, rhs_wires, tuple(_res_wires))
                 for lhs, lhs_wires, rhs, rhs_wires, _res_wires in contract2_args
             )
@@ -168,7 +170,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         else:
             # == trivial contraction cases ==
             # No contract2 calls necessary:
-            self.contract2_args = ()
+            self.__contract2_args = ()
             # There may be a single box, or none:
             if wiring.num_slots == 0:
                 self.__box_out_wires = ()
@@ -179,12 +181,8 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         self.__dangling_wires = tuple(sorted(wiring.dangling_wires))
         return self
 
-    wiring: Wiring
-    """The wiring upon which the contraction is defined."""
-
-    contract2_args: tuple[Contract2Args, ...]
-    """The arguments to contract2 calls in the contraction."""
-
+    __wiring: Wiring
+    __contract2_args: tuple[Contract2Args, ...]
     __box_out_wires: tuple[Wire, ...]
     __dangling_wires: tuple[Wire, ...]
 
@@ -244,7 +242,17 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         # Construct and return contraction:
         return cls._new(box_class, wiring, path)
 
-    def _contract(self, diagram: Diagram) -> Box:
+    @property
+    def wiring(self) -> Wiring:
+        """The wiring upon which the contraction is defined."""
+        return self.__wiring
+
+    @property
+    def contract2_args(self) -> tuple[Contract2Args, ...]:
+        """The arguments to contract2 calls in the contraction."""
+        return self.__contract2_args
+
+    def _contract(self, diagram: Diagram) -> TensorLikeBoxT_inv:
         box_class, wiring = self.box_class, self.wiring
         contract2 = box_class.contract2
         rewire = box_class.rewire
@@ -255,11 +263,11 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         # 1. Contract all boxes using contract2:
         boxes = cast(list[TensorLikeBoxT_inv], list(diagram.boxes))
         #       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ may be removed with box-generic diagrams
-        box: Box | None = None
+        box: TensorLikeBoxT_inv | None = None
         if boxes:
             for lhs_idx, lhs_wires, rhs_idx, rhs_wires, res_wires in contract2_args:
                 lhs = boxes.pop(lhs_idx)
-                rhs = boxes.pop(rhs_idx)
+                rhs = boxes.pop(rhs_idx - int(lhs_idx < rhs_idx))
                 assert len(lhs.shape) == len(lhs_wires)
                 assert len(rhs.shape) == len(rhs_wires)
                 res = contract2(lhs, lhs_wires, rhs, rhs_wires, res_wires)

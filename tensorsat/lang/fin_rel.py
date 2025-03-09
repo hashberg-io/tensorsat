@@ -23,12 +23,13 @@ from typing import Any, ClassVar, Self, TypeAlias, Unpack, final, overload
 
 import numpy as np
 from hashcons import InstanceStore
+import opt_einsum  # type: ignore[import-untyped]
 import xxhash
 
 
 from ..diagrams import Port, TensorLikeBox, TensorLikeType, Type, Wire
 from .._utils.misc import rewire_array
-from .._utils.descriptors import cached_property
+from .._utils.meta import cached_property
 
 if __debug__:
     from typing_validation import validate
@@ -85,12 +86,11 @@ class FinSet(TensorLikeType):
         with FinSet._store.instance(cls, size) as self:
             if self is None:
                 self = super().__new__(cls)
-                self.size = size
+                self.__size = size
                 FinSet._store.register(self)
             return self
 
-    size: Size
-    """Size of the finite set."""
+    __size: Size
 
     def __new__(cls, size: int) -> Self:
         """
@@ -104,9 +104,14 @@ class FinSet(TensorLikeType):
         return cls._new(size)
 
     @property
+    def size(self) -> Size:
+        """Size of the finite set."""
+        return self.__size
+
+    @property
     def tensor_dim(self) -> Size:
         """Tensor dimension of a finite set coincides with its size."""
-        return self.size
+        return self.__size
 
     def __repr__(self) -> str:
         return f"FinSet({self.size})"
@@ -256,14 +261,14 @@ class FinRel(TensorLikeBox):
         )
         out_wireset = set(out_wires)
         if len(out_wireset) == len(out_wires):
-            res_tensor = np.einsum(
+            res_tensor = opt_einsum.contract(
                 lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, out_wires
             )
             res_tensor = np.sign(res_tensor, dtype=np.uint8)
             return FinRel._new(res_tensor)
         einsum_out_wires = sorted(out_wireset)
         rewire_out_ports = [einsum_out_wires.index(w) for w in out_wires]
-        res_tensor = np.einsum(
+        res_tensor = opt_einsum.contract(
             lhs_tensor, lhs_wires, rhs_tensor, rhs_wires, einsum_out_wires
         )
         res_tensor = rewire_array(res_tensor, rewire_out_ports)
@@ -290,17 +295,10 @@ class FinRel(TensorLikeBox):
             tensor.setflags(write=False)
             tensor = tensor.view()
         self = super().__new__(cls)
-        self.tensor = tensor
+        self.__tensor = tensor
         return self
 
-    tensor: NumpyUInt8Array
-    """The Boolean tensor defining the relation."""
-
-    @cached_property
-    def shape(self) -> FinSetShape: # type: ignore[override]
-        """The shape of the relation."""
-        return tuple(map(FinSet._new, self.tensor.shape))
-
+    __tensor: NumpyUInt8Array
     __hash_cache: int
 
     def __new__(cls, tensor: NumpyUInt8Array) -> Self:
@@ -313,6 +311,16 @@ class FinRel(TensorLikeBox):
         if not np.all(tensor <= 1):
             raise ValueError("Values in a Boolean tensor must be 0 or 1.")
         return cls._new(tensor)
+
+    @property
+    def tensor(self) -> NumpyUInt8Array:
+        """The Boolean tensor defining the relation."""
+        return self.__tensor
+
+    @cached_property
+    def shape(self) -> FinSetShape:  # type: ignore[override]
+        """The shape of the relation."""
+        return tuple(map(FinSet._new, self.tensor.shape))
 
     def _rewire(self, out_ports: Sequence[Port]) -> Self:
         out_portset = frozenset(out_ports)

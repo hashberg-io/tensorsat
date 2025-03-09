@@ -41,8 +41,7 @@ from typing import (
 from weakref import WeakValueDictionary
 from hashcons import InstanceStore
 
-from ._utils.descriptors import cached_property
-from ._utils.meta import TensorSatMeta, InheritanceForestMeta
+from ._utils.meta import TensorSatMeta, InheritanceForestMeta, cached_property
 
 if TYPE_CHECKING:
     from .contractions import Contraction
@@ -62,8 +61,6 @@ class Type(metaclass=TensorSatMeta):
     By sharing common types, boxes from multiple languages can be wired together in the
     same diagram.
     """
-
-    __final__: ClassVar[bool]
 
     def __init_subclass__(cls) -> None:
         cls.__final__ = False
@@ -167,24 +164,17 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         with Wiring.__store.instance(cls, instance_key) as self:
             if self is None:
                 self = super().__new__(cls)
-                self.slot_shapes = slot_shapes
-                self.wire_types = wire_types
-                self.slot_wires_list = slot_wires_list
-                self.out_wires = out_wires
+                self.__slot_shapes = slot_shapes
+                self.__wire_types = wire_types
+                self.__slot_wires_list = slot_wires_list
+                self.__out_wires = out_wires
                 Wiring.__store.register(self)
             return self
 
-    slot_shapes: tuple[Shape, ...]
-    """Shapes for the slots of the wiring."""
-
-    wire_types: Shape
-    """Wire types."""
-
-    slot_wires_list: tuple[tuple[Wire, ...], ...]
-    """Assignment of (the index of) a wire to each port of each slot."""
-
-    out_wires: tuple[Wire, ...]
-    """Assignment of (the index of) a wire to each outer port."""
+    __slot_shapes: tuple[Shape, ...]
+    __wire_types: Shape
+    __slot_wires_list: tuple[tuple[Wire, ...], ...]
+    __out_wires: tuple[Wire, ...]
 
     def __new__(cls, **data: Unpack[WiringData]) -> Self:
         """
@@ -214,8 +204,28 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         )
         return cls._new(slot_shapes, wire_types, slot_wires_list, out_wires)
 
+    @property
+    def slot_shapes(self) -> tuple[Shape, ...]:
+        """Shapes for the slots of the wiring."""
+        return self.__slot_shapes
+
+    @property
+    def wire_types(self) -> Shape:
+        """Wire types."""
+        return self.__wire_types
+
+    @property
+    def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
+        """Assignment of (the index of) a wire to each port of each slot."""
+        return self.__slot_wires_list
+
+    @property
+    def out_wires(self) -> tuple[Wire, ...]:
+        """Assignment of (the index of) a wire to each outer port."""
+        return self.__out_wires
+
     @cached_property
-    def shape(self) -> Shape: # type: ignore[override]
+    def shape(self) -> Shape:  # type: ignore[override]
         """Shape of the wiring, i.e. types of its outer ports."""
         return tuple(self.wire_types[o] for o in self.out_wires)
 
@@ -653,8 +663,6 @@ class Box(Shaped, metaclass=BoxMeta):
     Abstract base class for boxes in diagrams.
     """
 
-    __final__: ClassVar[bool]
-
     def __init_subclass__(cls) -> None:
         cls.__final__ = False
         if not getattr(cls, "__abstractmethods__", None):
@@ -883,9 +891,7 @@ class TensorLikeBox(Box):
 BoxT_inv = TypeVar("BoxT_inv", bound=Box, default=Box)
 """Invariant type variable for boxes."""
 
-TensorLikeBoxT_inv = TypeVar(
-    "TensorLikeBoxT_inv", bound=TensorLikeBox, default=TensorLikeBox
-)
+TensorLikeBoxT_inv = TypeVar("TensorLikeBoxT_inv", bound=TensorLikeBox)
 """Invariant type variable for tensor-like boxes."""
 
 
@@ -902,25 +908,47 @@ RecipeParams = ParamSpec("RecipeParams")
 """Parameter specification variable for the parameters of a recipe."""
 
 
+@final
 class DiagramRecipe(Generic[RecipeParams], metaclass=TensorSatMeta):
     """A Recipe to produce diagrams from given perameters."""
 
+    __WRAPPER_ASSIGNMENTS: ClassVar[tuple[str, ...]] = (
+        "__module__",
+        "__name__",
+        "__qualname__",
+        "__doc__",
+        "__annotations__",
+    )
+
+    __module__: str
+    __name__: str
+    __qualname__: str
+    __doc__: str
+    __annotations__: dict[str, Any]
+
     __diagrams: WeakValueDictionary[Any, Diagram]
-    __recipe: Callable[Concatenate[DiagramBuilder, RecipeParams], None]
+    __wrapped__: Callable[Concatenate[DiagramBuilder, RecipeParams], None]
 
     def __new__(
         cls,
         recipe: Callable[Concatenate[DiagramBuilder, RecipeParams], None],
     ) -> Self:
         self = super().__new__(cls)
-        self.__recipe = recipe
+        # Adapted from functools.update_wrapper:
+        for attr in self.__WRAPPER_ASSIGNMENTS:
+            try:
+                value = getattr(recipe, attr)
+                setattr(self, attr, value)
+            except AttributeError:
+                pass
+        self.__wrapped__ = recipe
         self.__diagrams = WeakValueDictionary()
         return self
 
     @property
     def name(self) -> str:
         """The name of this recipe."""
-        return self.__recipe.__name__
+        return self.__wrapped__.__name__
 
     def __call__(
         self, *args: RecipeParams.args, **kwargs: RecipeParams.kwargs
@@ -934,7 +962,7 @@ class DiagramRecipe(Generic[RecipeParams], metaclass=TensorSatMeta):
         if key in self.__diagrams:
             return self.__diagrams[key]
         builder: DiagramBuilder = DiagramBuilder()
-        self.__recipe(builder, *args, **kwargs)
+        self.__wrapped__(builder, *args, **kwargs)
         diagram = builder.diagram
         diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
         self.__diagrams[key] = diagram
@@ -942,7 +970,7 @@ class DiagramRecipe(Generic[RecipeParams], metaclass=TensorSatMeta):
 
     def __repr__(self) -> str:
         """Representation of the recipe."""
-        recipe = self.__recipe
+        recipe = self.__wrapped__
         mod = recipe.__module__
         name = recipe.__name__
         return f"Diagram.recipe({mod}.{name})"
@@ -984,6 +1012,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         builder: DiagramBuilder = DiagramBuilder()
         recipe(builder)
         diagram = builder.diagram
+        diagram._Diagram__recipe_used = recipe  # type: ignore[attr-defined]
         return diagram
 
     @staticmethod
@@ -1023,21 +1052,14 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
     def _new(cls, wiring: Wiring, blocks: tuple[Block | None, ...]) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
-        self.wiring = wiring
-        self.blocks = blocks
+        self.__wiring = wiring
+        self.__blocks = blocks
         self.__recipe_used = None
         return self
 
-    wiring: Wiring
-    """Wiring for the diagram."""
-
-    blocks: tuple[Box | Diagram | None, ...]
-    """
-    Sequence of blocks associated to the slots in the diagram's wiring,
-    or :obj:`None` to indicate that a slot is open.
-    """
-
-    __recipe_used: DiagramRecipe[Any, Type] | None
+    __wiring: Wiring
+    __blocks: tuple[Box | Diagram | None, ...]
+    __recipe_used: Callable[Concatenate[DiagramBuilder, ...], Diagram] | None
     __hash_cache: int
 
     def __new__(cls, wiring: Wiring, blocks: Mapping[Slot, Block]) -> Self:
@@ -1050,6 +1072,19 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         wiring.validate_slot_data(blocks)
         _blocks = tuple(map(blocks.get, wiring.slots))
         return cls._new(wiring, _blocks)
+
+    @property
+    def wiring(self) -> Wiring:
+        """Wiring for the diagram."""
+        return self.__wiring
+
+    @property
+    def blocks(self) -> tuple[Box | Diagram | None, ...]:
+        """
+        Sequence of blocks associated to the slots in the diagram's wiring,
+        or :obj:`None` to indicate that a slot is open.
+        """
+        return self.__blocks
 
     @property
     def shape(self) -> Shape:
@@ -1104,7 +1139,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         return 1 + max(diag.depth for diag in subdiagrams)
 
     @property
-    def recipe_used(self) -> DiagramRecipe[Any, Type] | None:
+    def recipe_used(self) -> Callable[Concatenate[DiagramBuilder, ...], Diagram] | None:
         """The recipe used to construct this diagram, if any."""
         return self.__recipe_used
 
@@ -1200,8 +1235,8 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
             attrs.append(f"depth {depth}")
         if num_ports > 0:
             attrs.append(f"{num_ports} ports")
-        if recipe:
-            attrs.append(f"from recipe {recipe.name!r}")
+        if recipe is not None:
+            attrs.append(f"from recipe {recipe.__name__!r}")
         return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
 
     def __eq__(self, other: Any) -> bool:
@@ -1418,21 +1453,12 @@ class SelectedInputWires(metaclass=TensorSatMeta):
     ) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
-        self.builder = builder
-        self.wires = wires
+        self.__builder = builder
+        self.__wires = wires
         return self
 
-    builder: DiagramBuilder
-    """The builder to which the selected input wires belong."""
-
-    wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
-    """
-    The selected input wires, as either:
-
-    - a tuple of wires, implying contiguous port selection starting at index 0
-    - a mapping of ports to wires
-
-    """
+    __builder: DiagramBuilder
+    __wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
 
     def __new__(
         cls,
@@ -1454,6 +1480,22 @@ class SelectedInputWires(metaclass=TensorSatMeta):
             if wire not in builder_wires:
                 raise ValueError(f"Invalid wire index {wire}.")
         return cls._new(builder, _wires)
+
+    @property
+    def builder(self) -> DiagramBuilder:
+        """The builder to which the selected input wires belong."""
+        return self.__builder
+
+    @property
+    def wires(self) -> MappingProxyType[Port, Wire] | tuple[Wire, ...]:
+        """
+        The selected input wires, as either:
+
+        - a tuple of wires, implying contiguous port selection starting at index 0
+        - a mapping of ports to wires
+
+        """
+        return self.__wires
 
     def __rmatmul__(self, block: Block) -> tuple[Wire, ...]:
         """
