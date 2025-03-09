@@ -51,6 +51,7 @@ else:
 if __debug__:
     from typing_validation import validate
 
+
 class TypeMeta(TensorSatMeta):
     """Metaclass for typeclasses."""
 
@@ -64,6 +65,7 @@ class Type(metaclass=TypeMeta):
     By sharing common types, boxes from multiple languages can be wired together in the
     same diagram.
     """
+
     def __new__(cls) -> Self:
         """
         Constructs a new type.
@@ -664,10 +666,12 @@ class BoxMeta(InheritanceForestMeta, TensorSatMeta):
         if not getattr(cls, "__abstractmethods__", None):
             try:
                 import autoray  # type: ignore[import-untyped]
+
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
         return cls
+
 
 class Box(Shaped, metaclass=BoxMeta):
     """

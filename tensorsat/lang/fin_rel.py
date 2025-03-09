@@ -172,7 +172,7 @@ class FinRel(TensorLikeBox):
         shape: ItemOrIterable[Size | FinSet],
         points: Iterable[El | Point],
         *,
-        name: str | None = None
+        name: str | None = None,
     ) -> Self:
         """Constructs a relation from a set of points."""
         shape = _extract_sizes(shape)
@@ -198,7 +198,7 @@ class FinRel(TensorLikeBox):
         output_shape: ItemOrIterable[Size | FinSet],
         mapping: Mapping[Point, El | Point],
         *,
-        name: str | None = None
+        name: str | None = None,
     ) -> Self:
         """
         Constructs a function graph from a mapping of points to points.
@@ -209,7 +209,7 @@ class FinRel(TensorLikeBox):
         rel = cls.from_set(
             input_shape + output_shape,
             (k + _wrap_el(v) for k, v in mapping.items()),
-            name=name
+            name=name,
         )
         if len(mapping) != prod(input_shape):
             raise ValueError("Mapping does not cover the entire input space.")
@@ -221,7 +221,7 @@ class FinRel(TensorLikeBox):
         shape: FinSet | Iterable[Size],
         point: El | Point,
         *,
-        name: str | None = None
+        name: str | None = None,
     ) -> Self:
         """Constructs a singleton relation with the given point."""
         return cls.from_mapping((), shape, {(): point}, name=name)
@@ -236,7 +236,7 @@ class FinRel(TensorLikeBox):
         # there is no good way to type this as a function which can take
         # any fixed number of El arguments, but we don't care how many.
         *,
-        name: str | None = None
+        name: str | None = None,
     ) -> Self:
         """
         Constructs a function graph from a callable mapping points to points
@@ -294,7 +294,11 @@ class FinRel(TensorLikeBox):
         return FinRel._new(tensor)
 
     @classmethod
-    def _new(cls, tensor: NumpyUInt8Array, name: str | None = None,) -> Self:
+    def _new(
+        cls,
+        tensor: NumpyUInt8Array,
+        name: str | None = None,
+    ) -> Self:
         """
         Protected constructor.
         Presumes that the tensor is already validated, and that it is not going to be
