@@ -17,7 +17,7 @@ and relations between them, represented as Boolean tensors (cf. :class:`FinRel`)
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from math import prod
 from typing import Any, ClassVar, Self, TypeAlias, Unpack, final, overload
 
@@ -337,7 +337,7 @@ class FinRel(TensorLikeBox):
 
     def _rewire(self, out_ports: Sequence[Port]) -> Self:
         out_portset = frozenset(out_ports)
-        if len(out_portset) == len(out_ports):
+        if len(out_portset) == len(out_ports) == self.num_ports:
             return FinRel._new(np.transpose(self.tensor, out_ports))
         tensor = self.tensor
         tensor_shape = tensor.shape
@@ -349,17 +349,17 @@ class FinRel(TensorLikeBox):
             (tensor,) = _to_safe_contraction_dtype(contraction_size, tensor)
         res_tensor = rewire_array(tensor, out_ports)
         res_tensor = np.sign(res_tensor, dtype=np.uint8)
-        return FinRel._new(tensor)
+        return FinRel._new(res_tensor)
 
-    def to_set(self) -> Iterator[Point]:
+    def to_set(self) -> frozenset[Point]:
         """
         Iterates over the subset of points in the relation.
         An inverse to the constructor :meth:`FinRel.from_set`.
         """
         tensor = self.tensor
-        for idxs in np.ndindex(tensor.shape):
-            if tensor[*idxs]:
-                yield tuple(map(int, idxs))
+        return frozenset(
+            tuple(map(int, idxs)) for idxs in np.ndindex(tensor.shape) if tensor[*idxs]
+        )
 
     def _function_matrix(
         self, input_ports: tuple[Port, ...], /
