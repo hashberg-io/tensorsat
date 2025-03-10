@@ -123,8 +123,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         wiring: Wiring,
         path: ContractionPath,
     ) -> Self:
-        self = super().__new__(cls, box_class)
-        self.__wiring = wiring
+        self = super().__new__(cls, box_class, wiring)
         if path:
             # == non-trivial contraction case ==
             # Compute arguments to contract2 calls:
@@ -194,27 +193,17 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     ) -> Self:
         """
         Constructs a simple contraction for a given wiring, from a contraction path.
-        Simple contractions can contract diagrams satisfying the following conditions:
-
-        - the diagram's wiring matches the contraction's wiring
-        - the diagram is flat
-        - the diagram has no open slots
-        - the diagram's boxes are instances of the given box class
-
-        :raises ValueError: if the wiring is empty
-        :raises ValueError: if the path contains invalid contraction indices
-        :raises ValueError: if the wiring is not fully contracted by the path
         """
         path = tuple(path)
         # Validate arguments:
         assert validate(box_class, SubclassOf[TensorLikeBox])
-        assert validate(wiring, Wiring)
         assert validate(path, ContractionPath)
+        assert validate(wiring, Wiring)
+        if wiring.num_wires == 0:
+            raise ValueError("Cannot define contraction for empty wiring.")
         for t in wiring.wire_types:
             if not isinstance(t, TensorLikeType):
                 raise ValueError("Wiring must have tensor-like wire types.")
-        if wiring.num_wires == 0:
-            raise ValueError("Cannot define contraction for empty wiring.")
         n = wiring.num_slots
         if not path and n >= 2:
             raise ValueError(
@@ -243,20 +232,15 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         return cls._new(box_class, wiring, path)
 
     @property
-    def wiring(self) -> Wiring:
-        """The wiring upon which the contraction is defined."""
-        return self.__wiring
-
-    @property
     def contract2_args(self) -> tuple[Contract2Args, ...]:
         """The arguments to contract2 calls in the contraction."""
         return self.__contract2_args
 
     def _contract(self, diagram: Diagram) -> TensorLikeBoxT_inv:
         box_class, wiring = self.box_class, self.wiring
-        contract2 = box_class.contract2
-        rewire = box_class.rewire
-        spider = box_class.spider
+        contract2 = box_class._contract2
+        rewire = box_class._rewire
+        spider = box_class._spider
         wire_types, out_wires = wiring.wire_types, wiring.out_wires
         contract2_args = self.contract2_args
         box_out_wires, dangling_wires = self.__box_out_wires, self.__dangling_wires
@@ -287,11 +271,3 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             box = rewire(box, [box_out_wires.index(w) for w in out_wires])
         # 4. Return contracted box:
         return box
-
-    def _validate(self, diagram: Diagram) -> None:
-        if diagram.wiring != self.wiring:
-            raise ValueError("Diagram's wiring must match contraction wiring.")
-        if not diagram.is_flat:
-            raise ValueError("Diagram must be flat.")
-        if diagram.num_open_slots > 0:
-            raise ValueError("Diagram cannot have open slots.")

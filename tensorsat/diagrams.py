@@ -1166,10 +1166,15 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         The most specific common box class for the boxes in this diagram and its
         subdiagrams. See :meth:`Box.box_class_join`.
         """
-        box_classes = [type(box) for box in self.boxes] + [
-            subdiagram.box_class for subdiagram in self.subdiagrams
-        ]
-        return Box.class_join(cast(list[BoxClass], box_classes))
+        return Box.class_join(self.box_classes)
+
+    @cached_property
+    def box_classes(self) -> frozenset[BoxClass]:
+        """The set of box classes appearing in this diagram and its subdiagrams."""
+        box_classes: set[BoxClass] = {type(box) for box in self.boxes}
+        for diag in self.subdiagrams:
+            box_classes.update(diag.box_classes)
+        return frozenset(box_classes)
 
     def compose(self, new_blocks: Mapping[Slot, Block | Wiring]) -> Diagram:
         """

@@ -81,7 +81,7 @@ def weakref_slot_present(bases: tuple[type, ...]) -> bool:
 def namespace_union(classes: Iterable[type]) -> dict[str, Any]:
     """
     Union of namespaces from the given classes, with names from earlier classes in the
-    iterable shawoding the same names from later classes (if any).
+    iterable shadowing the same names from later classes (if any).
     """
     classes = reversed(tuple(classes))
     namespace: dict[str, Any] = {}

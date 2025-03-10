@@ -20,7 +20,7 @@ import re
 from typing import Literal, Self, TypeAlias
 import numpy as np
 
-from .._utils.meta.tensorsat import TensorSatMeta
+from .._utils.meta import TensorSatMeta
 from ..diagrams import Diagram, DiagramBuilder
 from .bincirc import bits, not_, or_
 
@@ -103,15 +103,12 @@ class CNFInstance(metaclass=TensorSatMeta):
     def _new(cls, num_vars: int, clauses: tuple[Clause, ...]) -> Self:
         """Protected constructor for SAT instances."""
         self = super().__new__(cls)
-        self.num_vars = num_vars
-        self.clauses = clauses
+        self.__num_vars = num_vars
+        self.__clauses = clauses
         return self
 
-    num_vars: int
-    """Number of variables in the SAT instance."""
-
-    clauses: tuple[Clause, ...]
-    """Clauses in the SAT instance."""
+    __num_vars: int
+    __clauses: tuple[Clause, ...]
 
     def __new__(cls, num_vars: int, clauses: Sequence[Sequence[int]]) -> Self:
         """
@@ -124,6 +121,16 @@ class CNFInstance(metaclass=TensorSatMeta):
         if num_vars < max(abs(lit) for clause in clauses for lit in clause):
             raise ValueError("Clauses contain invalid variables.")
         return cls._new(num_vars, tuple(tuple(clause) for clause in clauses))
+
+    @property
+    def num_vars(self) -> int:
+        """Number of variables in the SAT instance."""
+        return self.__num_vars
+
+    @property
+    def clauses(self) -> tuple[Clause, ...]:
+        """Clauses in the SAT instance."""
+        return self.__clauses
 
     def to_dimacs(self) -> str:
         """Convert the SAT instance to the DIMACS format."""
@@ -146,7 +153,7 @@ class CNFInstance(metaclass=TensorSatMeta):
 
     def _diagram_bintree(self) -> Diagram:
         num_vars, clauses = self.num_vars, self.clauses
-        circ = DiagramBuilder()
+        circ: DiagramBuilder = DiagramBuilder()
         circ.add_inputs(bits(num_vars))
         for clause in clauses:
             layer = [x - 1 if x > 0 else (not_ @ circ[-x - 1])[0] for x in clause]
