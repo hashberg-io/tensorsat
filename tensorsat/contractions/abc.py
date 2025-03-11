@@ -30,11 +30,7 @@ class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
     __box_class: SubclassOf[BoxT_inv]
     __wiring: Wiring
 
-    def __new__(
-        cls,
-        box_class: SubclassOf[BoxT_inv],
-        wiring: Wiring
-    ) -> Self:
+    def __new__(cls, box_class: SubclassOf[BoxT_inv], wiring: Wiring) -> Self:
         assert validate(box_class, SubclassOf[Box])
         assert validate(wiring, Wiring)
         if not box_class.can_be_contracted():
@@ -72,8 +68,8 @@ class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
           :attr:`Contraction.box_class` or a subclass thereof.
         - The diagram's :attr:`~Diagram.wiring` must be the same as the
           contraction's :attr:`~Contraction.wiring`.
-        - The diagram must be flat (cf. :attr:`~Diagram.is_flat`).
         - The diagram cannot have :attr:`~Diagram.open_slots`.
+        - The diagram must be flat (cf. :attr:`~Diagram.is_flat`).
 
         This method can be overridden by subclasses for additional validation.
         """
@@ -85,10 +81,10 @@ class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
             )
         if diagram.wiring != self.wiring:
             raise ValueError("Diagram's wiring must match contraction wiring.")
-        if not diagram.is_flat:
-            raise ValueError("Diagram must be flat.")
         if diagram.num_open_slots > 0:
             raise ValueError("Diagram cannot have open slots.")
+        if not diagram.is_flat:
+            raise ValueError("Diagram must be flat.")
 
     @final
     def contract(self, diagram: Diagram) -> BoxT_inv:

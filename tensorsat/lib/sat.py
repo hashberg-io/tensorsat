@@ -36,6 +36,7 @@ with the integer sign determining whether the literal is positive or negative.
 CNFDiagramMode: TypeAlias = Literal["bintree"]
 """Type alias for available diagram creation modes in :class:`CNFInstance`."""
 
+
 class CNFInstance(metaclass=TensorSatMeta):
     """A SAT instance in CNF form."""
 
@@ -147,7 +148,7 @@ class CNFInstance(metaclass=TensorSatMeta):
                 raise ValueError("Inputs must be specified by a non-negative number.")
             inputs = f"{inputs:0>{n}b}"
         elif inputs is None:
-            inputs = "?"*n
+            inputs = "?" * n
         else:
             assert validate(inputs, str)
             if not all(b in "01?_" for b in inputs):
@@ -164,7 +165,8 @@ class CNFInstance(metaclass=TensorSatMeta):
     def inputs(
         self,
         inputs: str | int | None,
-        /, *,
+        /,
+        *,
         discard_unk: bool = True,
     ) -> Diagram:
         """
@@ -189,17 +191,17 @@ class CNFInstance(metaclass=TensorSatMeta):
             w: Wire
             match b:
                 case "0":
-                    w, = bit_0 @ builder
+                    (w,) = bit_0 @ builder
                 case "1":
-                    w, = bit_1 @ builder
+                    (w,) = bit_1 @ builder
                 case "?":
                     if discard_unk:
                         w = builder.wiring.add_wire(bit)
                     else:
-                        w, = bit_unk @ builder
+                        (w,) = bit_unk @ builder
                 case None:
                     w = builder.add_input(bit)
-            assert w == i # Added wires correspond to variable indices.
+            assert w == i  # Added wires correspond to variable indices.
         builder.add_outputs(builder.wiring.wires)
         return builder.diagram
 

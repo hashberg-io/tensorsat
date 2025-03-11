@@ -27,6 +27,7 @@ from ..diagrams import (
     TensorLikeBoxT_inv,
     TensorLikeType,
     Wire,
+    Wires,
     Wiring,
 )
 
@@ -44,9 +45,7 @@ contraction is to be performed in the path, the boxes at those indices are remov
 contracted, and the result is appended to the end of the list.
 """
 
-Contract2Args: TypeAlias = tuple[
-    int, tuple[Wire, ...], int, tuple[Wire, ...], tuple[Wire, ...]
-]
+Contract2Args: TypeAlias = tuple[int, Wires, int, Wires, Wires]
 """
 Type alias for data used to specify arguments to :meth:`Box.contract2` calls as part
 of :meth:`SimpleContraction.contract`.
@@ -57,10 +56,10 @@ underlying :obj:`ContractionPath`.
 .. code-block:: python
 
     lhs_idx: int
-    lhs_wires: tuple[Wire, ...]
+    lhs_wires: Wires
     rhs_idx: int
-    rhs_wires: tuple[Wire, ...]
-    res_wires: tuple[Wire, ...]
+    rhs_wires: Wires
+    res_wires: Wires
 
 """
 
@@ -127,9 +126,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         if path:
             # == non-trivial contraction case ==
             # Compute arguments to contract2 calls:
-            contract2_args: list[
-                tuple[int, tuple[Wire, ...], int, tuple[Wire, ...], list[Wire]]
-            ] = []
+            contract2_args: list[tuple[int, Wires, int, Wires, list[Wire]]] = []
             wires_list = list(wiring.slot_wires_list)
             for lhs_idx, rhs_idx in path:
                 lhs_wires = wires_list.pop(lhs_idx)
@@ -182,8 +179,8 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
 
     __wiring: Wiring
     __contract2_args: tuple[Contract2Args, ...]
-    __box_out_wires: tuple[Wire, ...]
-    __dangling_wires: tuple[Wire, ...]
+    __box_out_wires: Wires
+    __dangling_wires: Wires
 
     def __new__(
         cls,
@@ -237,6 +234,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         return self.__contract2_args
 
     def _contract(self, diagram: Diagram) -> TensorLikeBoxT_inv:
+        assert diagram.is_flat, "Diagram must be flat."
         box_class, wiring = self.box_class, self.wiring
         contract2 = box_class._contract2
         rewire = box_class._rewire
