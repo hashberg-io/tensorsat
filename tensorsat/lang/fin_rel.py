@@ -27,7 +27,7 @@ import opt_einsum  # type: ignore[import-untyped]
 import xxhash
 
 
-from ..diagrams import Port, TensorLikeBox, TensorLikeType, Type, Wire
+from ..diagrams import Port, Ports, TensorLikeBox, TensorLikeType, Type, Wire
 from .._utils.misc import rewire_array
 from .._utils.meta import cached_property
 
@@ -250,8 +250,9 @@ class FinRel(TensorLikeBox):
         mapping = {idx: func(*idx) for idx in np.ndindex(input_shape)}
         return cls.from_mapping(input_shape, output_shape, mapping, name=name)
 
-    @staticmethod
+    @classmethod
     def _contract2(
+        cls,
         lhs: FinRel,
         lhs_wires: Sequence[Wire],
         rhs: FinRel,
@@ -291,7 +292,12 @@ class FinRel(TensorLikeBox):
         tensor = np.zeros(shape=(size,) * num_ports, dtype=np.uint8)
         for i in range(size):
             tensor[(i,) * num_ports] = 1
-        return FinRel._new(tensor)
+        rel = FinRel._new(tensor)
+        return rel
+
+    @classmethod
+    def _scalar(cls, scalar: bool, /) -> Self:
+        return FinRel._new(np.array(int(scalar), dtype=np.uint8))
 
     @classmethod
     def _new(
@@ -335,6 +341,27 @@ class FinRel(TensorLikeBox):
         """The shape of the relation."""
         return tuple(map(FinSet._new, self.tensor.shape))
 
+    def as_function_graph(
+        self, input_ports: Iterable[Port], /, name: str | None = None
+    ) -> Self:
+        """
+        Constructs a function graph with the given input-output ports,
+        by rewiring this relation to have shape with input ports first
+        and output ports after.
+
+        :raises ValueError: if this relation is not a function graph with the given
+                            input-output ports.
+        :raises ValueError: if any input port is repeated, or if a port is invalid.
+
+        """
+        input_ports = tuple(input_ports)
+        if not self.is_function_graph(input_ports):
+            raise ValueError("Relation is not function graph with given input ports.")
+        output_ports = tuple(port for port in self.ports if port not in input_ports)
+        rel = self._rewire(input_ports + output_ports)
+        rel.__name = name
+        return rel
+
     def _rewire(self, out_ports: Sequence[Port]) -> Self:
         out_portset = frozenset(out_ports)
         if len(out_portset) == len(out_ports) == self.num_ports:
@@ -361,9 +388,7 @@ class FinRel(TensorLikeBox):
             tuple(map(int, idxs)) for idxs in np.ndindex(tensor.shape) if tensor[*idxs]
         )
 
-    def _function_matrix(
-        self, input_ports: tuple[Port, ...], /
-    ) -> tuple[tuple[Port, ...], NumpyUInt8Array]:
+    def _function_matrix(self, input_ports: Ports, /) -> tuple[Ports, NumpyUInt8Array]:
         ports = self.ports
         if not all(p in ports for p in input_ports):
             raise ValueError("Invalid input ports.")
@@ -422,12 +447,16 @@ class FinRel(TensorLikeBox):
         :raises ValueError: if the relation is not a function graph for the given
                             selection of input ports (see :meth:`is_function_graph`).
         """
+        assert validate(input_ports, Sequence[Port])
         mapping = self.to_mapping(input_ports)
         args_list = ", ".join(f"i{i}" for i in input_ports)
         code = f"func = lambda {args_list}: mapping[({args_list})]"
         namespace = {"mapping": mapping}
         exec(code, namespace)
         return namespace["func"]  # type: ignore
+
+    def _as_scalar(self) -> bool:
+        return bool(np.all(self.tensor == 1))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FinRel):
