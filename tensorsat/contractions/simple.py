@@ -77,7 +77,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     """A simple contraction based on an explicit contraction path."""
 
     @classmethod
-    def from_opt_einsum[
+    def using_opt_einsum[
         _S: TensorLikeBox
     ](
         cls,
@@ -114,6 +114,22 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
             shapes=True,
         )
         return cls._new(box_class, wiring, path)  # type: ignore
+
+    @classmethod
+    def contract_using_opt_einsum[
+        _S: TensorLikeBox
+    ](
+        cls,
+        box_class: SubclassOf[_S],
+        diagram: Diagram,
+        optimize: OptEinsumOptimize = "auto",
+    ) -> _S:
+        """
+        Generates a contraction from the diagram's wiring
+        using :meth:`SimpleContraction.from_opt_einsum`, then contracts the diagram.s
+        """
+        contraction = cls.using_opt_einsum(box_class, diagram.wiring, optimize=optimize)
+        return contraction.contract(diagram)
 
     @classmethod
     def _new(

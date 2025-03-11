@@ -167,7 +167,7 @@ class CNFInstance(metaclass=TensorSatMeta):
         inputs: str | int | None,
         /,
         *,
-        discard_unk: bool = True,
+        discard_unk: bool = False,
     ) -> Diagram:
         """
         Returns a diagram corresponding to the given selection of input values.
