@@ -95,16 +95,26 @@ Shape: TypeAlias = tuple[Type, ...]
 """A shape, as a tuple of types."""
 
 Slot: TypeAlias = int
-"""Type alias for (the index of) a slot in a diagram."""
+"""Type alias for (the index of) a slot in a wiring/diagram."""
 
 Port: TypeAlias = int
-"""Type alias for (the index of) a port in a diagram."""
+"""Type alias for (the index of) a port in a wiring/diagram."""
 
 Wire: TypeAlias = int
 """
-Type alias for (the index of) a wire in a diagram.
+Type alias for (the index of) a wire in a wiring/diagram.
+
 Each port is connected to exactly one wire, but a wire can connect any number of ports.
 """
+
+Slots: TypeAlias = tuple[Slot, ...]
+"""Type alias for a fixed sequence of slots in a wiring/diagram."""
+
+Ports: TypeAlias = tuple[Port, ...]
+"""Type alias for a fixed sequence of ports in a wiring/diagram."""
+
+Wires: TypeAlias = tuple[Wire, ...]
+"""Type alias for a fixed sequence of wires in a wiring/diagram."""
 
 
 class WiringData(TypedDict, total=True):
@@ -150,8 +160,8 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         cls,
         slot_shapes: tuple[Shape, ...],
         wire_types: Shape,
-        slot_wires_list: tuple[tuple[Wire, ...], ...],
-        out_wires: tuple[Wire, ...],
+        slot_wires_list: tuple[Wires, ...],
+        out_wires: Wires,
     ) -> Self:
         """Protected constructor."""
         instance_key = (
@@ -172,8 +182,8 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
 
     __slot_shapes: tuple[Shape, ...]
     __wire_types: Shape
-    __slot_wires_list: tuple[tuple[Wire, ...], ...]
-    __out_wires: tuple[Wire, ...]
+    __slot_wires_list: tuple[Wires, ...]
+    __out_wires: Wires
 
     def __new__(cls, **data: Unpack[WiringData]) -> Self:
         """
@@ -214,12 +224,12 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         return self.__wire_types
 
     @property
-    def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
+    def slot_wires_list(self) -> tuple[Wires, ...]:
         """Assignment of (the index of) a wire to each port of each slot."""
         return self.__slot_wires_list
 
     @property
-    def out_wires(self) -> tuple[Wire, ...]:
+    def out_wires(self) -> Wires:
         """Assignment of (the index of) a wire to each outer port."""
         return self.__out_wires
 
@@ -270,7 +280,7 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         """Sequence of (the indices of) wires."""
         return range(self.num_wires)
 
-    def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
+    def slot_wires(self, slot: Slot) -> Wires:
         """Sequence of (the indices of) wires for the given slot."""
         assert validate(slot, Slot)
         if slot not in range(self.num_slots):
@@ -311,7 +321,7 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         )
 
     @property
-    def wired_slots(self) -> Mapping[Wire, tuple[Slot, ...]]:
+    def wired_slots(self) -> Mapping[Wire, Slots]:
         """
         Computes and returns a mapping of wires to the collection of slots
         connected by that wire.
@@ -327,7 +337,7 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
         )
 
     @property
-    def wired_out_ports(self) -> Mapping[Wire, tuple[Port, ...]]:
+    def wired_out_ports(self) -> Mapping[Wire, Ports]:
         """
         Computes and returns a mapping of wires to the collection of out ports
         connected by that wire.
@@ -431,7 +441,7 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
                     slot_wire_remap[sw] = len(wire_types)
                     wire_types.append(wiring_wire_types[w])
         # 4. Compute new slot wires:
-        new_slot_wires_list: list[tuple[Wire, ...]] = []
+        new_slot_wires_list: list[Wires] = []
         for slot in self.slots:
             if slot in wirings:
                 new_slot_wires_list.extend(
@@ -522,12 +532,12 @@ class WiringBuilder(Shaped):
         return tuple(self.__wire_types)
 
     @cached_property
-    def slot_wires_list(self) -> tuple[tuple[Wire, ...], ...]:
+    def slot_wires_list(self) -> tuple[Wires, ...]:
         """Assignment of (the index of) a wire to each port of each slot."""
         return tuple(map(tuple, self.__slot_wires_list))
 
     @cached_property
-    def out_wires(self) -> tuple[Wire, ...]:
+    def out_wires(self) -> Wires:
         """Assignment of (the index of) a wire to each outer port."""
         return tuple(self.__out_wires)
 
@@ -541,7 +551,7 @@ class WiringBuilder(Shaped):
             self.out_wires,
         )
 
-    def slot_wires(self, slot: Slot) -> tuple[Wire, ...]:
+    def slot_wires(self, slot: Slot) -> Wires:
         """Sequence of (the indices of) wires for the given slot."""
         assert validate(slot, Slot)
         if slot not in range(self.num_slots):
@@ -563,12 +573,12 @@ class WiringBuilder(Shaped):
         assert validate(t, Type)
         return self._add_wires([t])[0]
 
-    def add_wires(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
+    def add_wires(self, ts: Sequence[Type]) -> Wires:
         """Adds new wires with the given types."""
         assert validate(ts, Sequence[Type])
         return self._add_wires(ts)
 
-    def _add_wires(self, ts: Sequence[Type]) -> tuple[Wire, ...]:
+    def _add_wires(self, ts: Sequence[Type]) -> Wires:
         del self.wire_types
         wire_types = self.__wire_types
         len_before = len(wire_types)
@@ -587,13 +597,13 @@ class WiringBuilder(Shaped):
         self._validate_wires([wire])
         return self.add_out_ports([wire])[0]
 
-    def add_out_ports(self, wires: Sequence[Wire]) -> tuple[Port, ...]:
+    def add_out_ports(self, wires: Sequence[Wire]) -> Ports:
         """Adds new outer ports, connected the given wires."""
         assert validate(wires, Sequence[Wire])
         self._validate_wires(wires)
         return self._add_out_ports(wires)
 
-    def _add_out_ports(self, wires: Sequence[Wire]) -> tuple[Port, ...]:
+    def _add_out_ports(self, wires: Sequence[Wire]) -> Ports:
         del self.shape
         del self.out_wires
         shape, wire_types = self.__shape, self.__wire_types
@@ -618,14 +628,14 @@ class WiringBuilder(Shaped):
             raise ValueError(f"Invalid slot {slot}.")
         return self.add_slot_ports(slot, [wire])[0]
 
-    def add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[Port, ...]:
+    def add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> Ports:
         """Adds new ports for the given slot, connected the given wires."""
         if slot not in range(self.num_slots):
             raise ValueError(f"Invalid slot {slot}.")
         self._validate_wires(wires)
         return self._add_slot_ports(slot, wires)
 
-    def _add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> tuple[Port, ...]:
+    def _add_slot_ports(self, slot: Slot, wires: Sequence[Wire]) -> Ports:
         del self.slot_shapes
         del self.slot_wires_list
         slot_shape, wire_types = self.__slot_shapes[slot], self.__wire_types
@@ -779,6 +789,20 @@ class Box(Shaped, metaclass=BoxMeta):
 
     @final
     @classmethod
+    def scalar(cls, scalar: bool, /) -> Self:
+        """The box corresponding to the given Boolean scalar."""
+        box = cls._scalar(scalar)
+        assert box.shape == ()
+        assert box._as_scalar() == scalar
+        return box
+
+    @classmethod
+    @abstractmethod
+    def _scalar(cls, scalar: bool, /) -> Self:
+        """Protected version of :meth:`Box.scalar`, to be implemented by subclasses."""
+
+    @final
+    @classmethod
     def contract2(
         cls,
         lhs: Self,
@@ -866,10 +890,34 @@ class Box(Shaped, metaclass=BoxMeta):
     def _rewire(self, out_ports: Sequence[Port]) -> Self:
         """
         Protected version of :meth:`Box.rewire`, to be implemented by subclasses.
+
         It is guaranteed that the output ports are valid for this box.
         It is possible for ports to appear multiple times in ``out_ports``,
         or not at all.
         """
+
+    @abstractmethod
+    def _as_scalar(self) -> bool:
+        """
+        Conversion of box to a Boolean scalar, to be implemented by subclasses.
+
+        It is guaranteed that this method is invoked only when the box's shape is empty.
+        """
+
+    @final
+    def __bool__(self) -> bool:
+        """
+        Converts the box to a Boolean scalar.
+
+        :raises ValueError: if the box's shape is not empty.
+        """
+        if self.shape:
+            raise ValueError("Box is not a scalar.")
+        return self._as_scalar()
+
+    def __getitem__(self, ports: Port | Sequence[Port]) -> SelectedBlockPorts:
+        """Selects the given ports from this box."""
+        return SelectedBlockPorts(self, ports)
 
     def __repr__(self) -> str:
         cls_name = type(self).__name__
@@ -1078,6 +1126,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
     __blocks: tuple[Box | Diagram | None, ...]
     __recipe_used: Callable[Concatenate[DiagramBuilder, ...], Diagram] | None
     __hash_cache: int
+    __seq_blocks: tuple[Block, ...]
 
     def __new__(cls, wiring: Wiring, blocks: Mapping[Slot, Block]) -> Self:
         """
@@ -1109,7 +1158,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         return self.wiring.shape
 
     @property
-    def open_slots(self) -> tuple[Slot, ...]:
+    def open_slots(self) -> Slots:
         """Slots of the diagram wiring which are open in the diagram."""
         return tuple(slot for slot, block in enumerate(self.blocks) if block is None)
 
@@ -1119,7 +1168,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         return self.blocks.count(None)
 
     @property
-    def subdiagram_slots(self) -> tuple[Slot, ...]:
+    def subdiagram_slots(self) -> Slots:
         """Slots of the diagram wiring which have a diagram as a block."""
         return tuple(
             slot for slot, block in enumerate(self.blocks) if isinstance(block, Diagram)
@@ -1131,7 +1180,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         return tuple(block for block in self.blocks if isinstance(block, Diagram))
 
     @property
-    def box_slots(self) -> tuple[Slot, ...]:
+    def box_slots(self) -> Slots:
         """Slots of the diagram wiring which have a diagram as a block."""
         return tuple(
             slot for slot, block in enumerate(self.blocks) if isinstance(block, Box)
@@ -1206,7 +1255,8 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
                     merged_blocks.extend([None] * new_block.num_slots)
             else:
                 merged_blocks.append(None)
-        return Diagram._new(merged_wiring, tuple(merged_blocks))
+        diagram = Diagram._new(merged_wiring, tuple(merged_blocks))
+        return diagram
 
     def flatten(self, *, cache: bool = True) -> Diagram:
         """
@@ -1238,6 +1288,28 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         if cache is not None:
             cache[self] = flat_diagram
         return flat_diagram
+
+    def __getitem__(self, ports: Port | Sequence[Port]) -> SelectedBlockPorts:
+        """Selects the given ports from this diagram."""
+        return SelectedBlockPorts(self, ports)
+
+    def __rshift__(self, other: Block | SelectedBlockPorts) -> Diagram:
+        """
+        Returns the sequential composition of this diagram with another diagram/box.
+        See :meth:`Diagram.seq`.
+
+        :meta public:
+        """
+        return self[self.ports] >> other
+
+    def __rrshift__(self, other: Box) -> Diagram:
+        """
+        Returns the sequential composition of another box with this diagram.
+        See :meth:`Diagram.seq`.
+
+        :meta public:
+        """
+        return other[other.ports] >> self
 
     def __repr__(self) -> str:
         attrs: list[str] = []
@@ -1277,11 +1349,115 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
 
 
 @final
+class SelectedBlockPorts(metaclass=TensorSatMeta):
+    """
+    Utility class wrapping a selection of ports in a given box or diagram,
+    to be used for the purposes of composition.
+
+    Supports usage of the ``@`` operator with selected wires from a diagram builder
+    on the rhs, enabling special syntax for addition of blocks to diagrams.
+
+    Supports usage of the ``>>`` operator with a block or block port selection on the
+    rhs, enabling special syntax for sequential composition of diagrams.
+
+    See :meth:`DiagramBuilder.__getitem__`.
+    """
+
+    @classmethod
+    def _new(cls, block: Block, ports: Ports) -> Self:
+        """Protected constructor."""
+        self = super().__new__(cls)
+        self.__block = block
+        self.__ports = ports
+        return self
+
+    __block: Block
+    __ports: Ports
+
+    def __new__(cls, block: Block, ports: Port | Sequence[Port]) -> Self:
+        assert validate(block, Box | Diagram)
+        if isinstance(ports, Port):
+            ports = (ports,)
+        else:
+            assert validate(ports, Sequence[Port])
+            ports = tuple(ports)
+        block_ports = block.ports
+        for port in ports:
+            if port not in block_ports:
+                raise ValueError(f"Invalid port {port} selected for {block}")
+        return cls._new(block, ports)
+
+    @property
+    def block(self) -> Block:
+        """The block to which the selected ports belong."""
+        return self.__block
+
+    @property
+    def ports(self) -> Ports:
+        """The selected ports."""
+        return self.__ports
+
+    def __rshift__(self, other: Block | SelectedBlockPorts) -> Diagram:
+        """
+        Sequentially composes the block (from which ports were selected)
+        with another block.
+
+        :meta public:
+        """
+        self_ports = self.ports
+        if isinstance(other, (Box, Diagram)):
+            if other.num_ports < len(self_ports):
+                raise ValueError(
+                    f"Cannot sequentially compose: {len(self.ports)} selected on LHS,"
+                    f" {other.num_ports} ports available on RHS."
+                )
+            other = SelectedBlockPorts(other, range(len(self_ports)))
+        elif isinstance(other, SelectedBlockPorts):
+            if len(other.ports) != len(self_ports):
+                raise ValueError(
+                    f"Cannot sequentially compose: {len(self.ports)} selected on LHS,"
+                    f" {len(other.ports)} ports selected on RHS."
+                )
+        else:
+            return NotImplemented
+        blocks: list[Block] = []
+        if isinstance(self.block, Diagram) and hasattr(
+            self.block, "_Diagram__seq_blocks"
+        ):
+            blocks.extend(self.block._Diagram__seq_blocks)
+        else:
+            blocks.append(self.block)
+        if isinstance(other.block, Diagram) and hasattr(
+            other.block, "_Diagram__seq_blocks"
+        ):
+            blocks.extend(other.block._Diagram__seq_blocks)
+        else:
+            blocks.append(other.block)
+        fst_block_in_ports = tuple(p for p in blocks[0].ports if p not in self.ports)
+        fst_block_shape = blocks[0].shape
+        builder = DiagramBuilder()
+        wires = builder.add_inputs(fst_block_shape[i] for i in fst_block_in_ports)
+        for block in blocks:
+            wires = block @ builder[wires]
+        builder.add_outputs(wires)
+        diagram = builder.diagram
+        diagram._Diagram__seq_blocks = tuple(blocks)  # type: ignore
+        return diagram
+
+    def __repr__(self) -> str:
+        if isinstance(self.block, Box):
+            return f"<Box {id(self.block):#x}>[{self.ports}]"
+        return f"<Diagram {id(self.block):#x}>[{self.ports}]"
+
+
+@final
 class DiagramBuilder(metaclass=TensorSatMeta):
     """Utility class to build diagrams."""
 
     __wiring_builder: WiringBuilder
     __blocks: dict[Slot, Block]
+    __input_ports: list[Port]
+    __output_ports: list[Port]
 
     def __new__(cls) -> DiagramBuilder:
         """
@@ -1292,6 +1468,8 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         self = super().__new__(cls)
         self.__wiring_builder = WiringBuilder()
         self.__blocks = {}
+        self.__input_ports = []
+        self.__output_ports = []
         return self
 
     def copy(self) -> DiagramBuilder:
@@ -1299,6 +1477,8 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         clone: DiagramBuilder = DiagramBuilder.__new__(DiagramBuilder)
         clone.__wiring_builder = self.__wiring_builder.copy()
         clone.__blocks = self.__blocks.copy()
+        clone.__input_ports = self.__input_ports.copy()
+        clone.__output_ports = self.__output_ports.copy()
         return clone
 
     @property
@@ -1317,12 +1497,11 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         wiring = self.__wiring_builder.wiring
         blocks = self.__blocks
         _blocks = tuple(blocks.get(slot) for slot in wiring.slots)
-        diagram = Diagram._new(wiring, _blocks)
-        return diagram
+        return Diagram._new(wiring, _blocks)
 
     def set_block(self, slot: Slot, block: Block) -> None:
         """Sets a block for an existing open slot."""
-        assert validate(block, Block)
+        assert validate(block, Box | Diagram)
         blocks = self.__blocks
         if slot not in range(self.wiring.num_slots):
             raise ValueError(f"Invalid slot {slot}.")
@@ -1336,10 +1515,8 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         self.__blocks[slot] = block
 
     def add_block(
-        self,
-        block: Block,
-        inputs: Mapping[Port, Wire] = MappingProxyType({})
-    ) -> tuple[Wire, ...]:
+        self, block: Block, inputs: Mapping[Port, Wire] = MappingProxyType({})
+    ) -> Wires:
         """
         Adds a new slot to the diagram with the given block assigned to it.
         Specifically:
@@ -1376,7 +1553,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
                 raise ValueError(f"Invalid wire index {wire}.") from None
         return self._add_block(block, inputs)
 
-    def _add_block(self, block: Block, inputs: Mapping[Port, Wire]) -> tuple[Wire, ...]:
+    def _add_block(self, block: Block, inputs: Mapping[Port, Wire]) -> Wires:
         wiring_builder = self.__wiring_builder
         block_ports, block_shape = block.ports, block.shape
         output_ports = tuple(port for port in block_ports if port not in inputs)
@@ -1398,7 +1575,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         assert validate(t, Type)
         return self._add_inputs((t,))[0]
 
-    def add_inputs(self, ts: Iterable[Type]) -> tuple[Wire, ...]:
+    def add_inputs(self, ts: Iterable[Type]) -> Wires:
         """
         Creates new wires of the given types,
         then adds ports connected to those wires.
@@ -1407,10 +1584,11 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         assert validate(ts, tuple[Type, ...])
         return self._add_inputs(ts)
 
-    def _add_inputs(self, ts: tuple[Type, ...]) -> tuple[Wire, ...]:
+    def _add_inputs(self, ts: tuple[Type, ...]) -> Wires:
         wiring = self.wiring
         wires = wiring._add_wires(ts)
-        wiring._add_out_ports(wires)
+        ports = wiring._add_out_ports(wires)
+        self.__input_ports.extend(ports)
         return wires
 
     def add_output(self, wire: Wire) -> Port:
@@ -1420,22 +1598,22 @@ class DiagramBuilder(metaclass=TensorSatMeta):
             raise ValueError(f"Invalid wire index {wire}.")
         return self._add_outputs((wire,))[0]
 
-    def add_outputs(self, wires: Iterable[Wire]) -> tuple[Port, ...]:
+    def add_outputs(self, wires: Iterable[Wire]) -> Ports:
         """Adds ports connected to the given wires."""
         wires = tuple(wires)
-        assert validate(wires, tuple[Wire, ...])
+        assert validate(wires, Wires)
         diag_wires = self.wiring.wires
         for wire in wires:
             if wire not in diag_wires:
                 raise ValueError(f"Invalid wire index {wire}.")
         return self._add_outputs(wires)
 
-    def _add_outputs(self, wires: tuple[Wire, ...]) -> tuple[Port, ...]:
-        return self.wiring._add_out_ports(wires)
+    def _add_outputs(self, wires: Wires) -> Ports:
+        ports = self.wiring._add_out_ports(wires)
+        self.__output_ports.extend(ports)
+        return ports
 
-    def __getitem__(
-        self, wires: Wire | Sequence[Wire] | Mapping[Port, Wire]
-    ) -> SelectedInputWires:
+    def __getitem__(self, wires: Wire | Sequence[Wire]) -> SelectedBuilderWires:
         """
         Enables special syntax for addition of blocks to the diagram:
 
@@ -1458,9 +1636,9 @@ class DiagramBuilder(metaclass=TensorSatMeta):
 
         :meta public:
         """
-        return SelectedInputWires(self, wires)
+        return SelectedBuilderWires(self, wires)
 
-    def __rmatmul__(self, block: Block) -> tuple[Wire, ...]:
+    def __rmatmul__(self, block: Block) -> Wires:
         """
         An alias of ``self.add_block(block)``.
 
@@ -1486,9 +1664,9 @@ class DiagramBuilder(metaclass=TensorSatMeta):
 
 
 @final
-class SelectedInputWires(metaclass=TensorSatMeta):
+class SelectedBuilderWires(metaclass=TensorSatMeta):
     """
-    Utility class wrapping a selection of input wires in a given diagram builder,
+    Utility class wrapping a selection of wires in a given diagram builder,
     to be used for the purposes of adding blocks to the builder.
 
     Supports usage of the ``@`` operator with a block on the lhs,
@@ -1500,7 +1678,7 @@ class SelectedInputWires(metaclass=TensorSatMeta):
     def _new(
         cls,
         builder: DiagramBuilder,
-        wires: MappingProxyType[Port, Wire] | tuple[Wire, ...],
+        wires: Wires,
     ) -> Self:
         """Protected constructor."""
         self = super().__new__(cls)
@@ -1509,58 +1687,59 @@ class SelectedInputWires(metaclass=TensorSatMeta):
         return self
 
     __builder: DiagramBuilder
-    __wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
+    __wires: Wires
 
     def __new__(
         cls,
         builder: DiagramBuilder,
-        wires: Wire | Sequence[Wire] | Mapping[Port, Wire],
+        wires: Wire | Sequence[Wire],
     ) -> Self:
         assert validate(builder, DiagramBuilder)
-        _wires: MappingProxyType[Port, Wire] | tuple[Wire, ...]
+
         if isinstance(wires, Wire):
-            _wires = (wires,)
-        elif isinstance(wires, Mapping):
-            assert validate(wires, Mapping[Port, Wire])
-            _wires = MappingProxyType({**wires})
+            wires = (wires,)
         else:
-            assert validate(wires, Sequence[Wire])
-            _wires = tuple(wires)
+            assert validate(wires, Sequence[Port])
+            wires = tuple(wires)
         builder_wires = builder.wiring.wires
-        for wire in _wires if isinstance(_wires, tuple) else _wires.values():
+        for wire in wires:
             if wire not in builder_wires:
-                raise ValueError(f"Invalid wire index {wire}.")
-        return cls._new(builder, _wires)
+                raise ValueError(f"Invalid wire {wire} selected for {builder}")
+        return cls._new(builder, wires)
 
     @property
     def builder(self) -> DiagramBuilder:
-        """The builder to which the selected input wires belong."""
+        """The builder to which the selected wires belong."""
         return self.__builder
 
     @property
-    def wires(self) -> MappingProxyType[Port, Wire] | tuple[Wire, ...]:
-        """
-        The selected input wires, as either:
-
-        - a tuple of wires, implying contiguous port selection starting at index 0
-        - a mapping of ports to wires
-
-        """
+    def wires(self) -> Wires:
+        """The selected wires."""
         return self.__wires
 
-    def __rmatmul__(self, block: Block) -> tuple[Wire, ...]:
+    def __rmatmul__(self, other: Block | SelectedBlockPorts) -> Wires:
         """
-        Adds the given block to the diagram, applied to the selected input wires.
+        Adds the given block to the diagram, applied to the selected wires.
 
         :meta public:
         """
-        if not isinstance(block, (Box, Diagram)):
-            return NotImplemented
-        if isinstance(self.wires, MappingProxyType):
-            wires = self.wires
+        wires = self.wires
+        if isinstance(other, (Box, Diagram)):
+            if len(other.ports) < len(wires):
+                raise ValueError(
+                    f"Cannot apply block: {len(wires)} wires selected,"
+                    f" {other.num_ports} ports available on RHS."
+                )
+            other = SelectedBlockPorts(other, range(len(wires)))
+        elif isinstance(other, SelectedBlockPorts):
+            if len(other.ports) != len(wires):
+                raise ValueError(
+                    f"Cannot apply block: {len(wires)} wires selected,"
+                    f" {len(other.ports)} ports selected on block."
+                )
         else:
-            wires = MappingProxyType(dict(enumerate(self.wires)))
-        return self.builder.add_block(block, wires)
+            return NotImplemented
+        return self.builder.add_block(other.block, dict(zip(other.ports, wires)))
 
     def __repr__(self) -> str:
         return f"<DiagramBuilder {id(self.builder):#x}>[{self.wires}]"
