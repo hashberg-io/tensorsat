@@ -16,7 +16,7 @@ FinRel
 .. autoclass:: tensorsat.lang.fin_rel.FinRel
     :show-inheritance:
     :members:
-    :special-members: __mul__, __new__
+    :special-members: __new__
 
 FinSet
 ------
@@ -24,7 +24,12 @@ FinSet
 .. autoclass:: tensorsat.lang.fin_rel.FinSet
     :show-inheritance:
     :members:
-    :special-members: __mul__, __pow__, __new__
+    :special-members: __new__
+
+FinSetShape
+-----------
+
+.. autodata:: tensorsat.lang.fin_rel.FinSetShape
 
 ItemOrIterable
 --------------

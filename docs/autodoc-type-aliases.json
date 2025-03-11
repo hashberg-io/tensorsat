@@ -1,16 +1,25 @@
 {
-    "Block": "tensorsat.diagrams.Block",
     "Box": "tensorsat.diagrams.Box",
+    "Shape": "tensorsat.diagrams.Shape",
     "Slot": "tensorsat.diagrams.Slot",
+    "Block": "tensorsat.diagrams.Block",
     "Port": "tensorsat.diagrams.Port",
     "Wire": "tensorsat.diagrams.Wire",
+    "Slots": "tensorsat.diagrams.Slots",
+    "Ports": "tensorsat.diagrams.Ports",
+    "Wires": "tensorsat.diagrams.Wires",
+    "BoxClass": "tensorsat.diagrams.BoxClass",
     "Size": "tensorsat.lang.fin_rel.Size",
     "El": "tensorsat.lang.fin_rel.El",
     "Point": "tensorsat.lang.fin_rel.Point",
     "NumpyUInt8Array": "tensorsat.lang.fin_rel.NumpyUInt8Array",
+    "FinSetShape": "tensorsat.lang.fin_rel.FinSetShape",
     "Clause": "tensorsat.lib.sat.Clause",
     "CNFDiagramMode": "tensorsat.lib.sat.CNFDiagramMode",
     "DiagramGraphNodeKind": "tensorsat.viz.diagrams.DiagramGraphNodeKind",
     "DiagramGraphNode": "tensorsat.viz.diagrams.DiagramGraphNode",
-    "Contraction": "tensorsat.contraction.Contraction"
+    "Contraction": "tensorsat.contractions.Contraction",
+    "ContractionPath": "tensorsat.contractions.simple.ContractionPath",
+    "Contract2Args": "tensorsat.contractions.simple.Contract2Args",
+    "OptEinsumOptimize": "tensorsat.contractions.simple.OptEinsumOptimize"
 }

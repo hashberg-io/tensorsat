@@ -28,6 +28,21 @@ bit_1
 
 .. autodata:: tensorsat.lib.bincirc.bit_1
 
+bit_unk
+-------
+
+.. autodata:: tensorsat.lib.bincirc.bit_unk
+
+bits
+----
+
+.. autofunction:: tensorsat.lib.bincirc.bits
+
+bits2
+-----
+
+.. autodata:: tensorsat.lib.bincirc.bits2
+
 full_adder
 ----------
 

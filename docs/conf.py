@@ -118,6 +118,8 @@ skip_missing_references: set[str] = {
     "tensorsat.viz.diagrams._T",
     "numpy.uint8",
     "np.random.Generator",
+    "np.ndarray",
+    "SubclassOf",
 }
 
 def on_missing_reference(app: Sphinx, env: BuildEnvironment, node: pending_xref, contnode: Any) -> Any:

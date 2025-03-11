@@ -13,6 +13,7 @@
             "xor_",
             "bit_0",
             "bit_1",
+            "bit_unk",
             "binop_labels",
             "half_adder",
             "full_adder",
@@ -21,11 +22,12 @@
         ]
     },
     "type_aliases": {
-        "tensorsat.diagrams": ["Box", "Slot", "Port", "Wire"],
-        "tensorsat.lang.fin_rel": ["Size", "El", "Point", "NumpyUInt8Array"],
+        "tensorsat.diagrams": ["Box", "Shape", "Slot", "Block", "Port", "Wire", "Slots", "Ports", "Wires", "BoxClass"],
+        "tensorsat.lang.fin_rel": ["Size", "El", "Point", "NumpyUInt8Array", "FinSetShape"],
         "tensorsat.lib.sat": ["Clause", "CNFDiagramMode"],
         "tensorsat.viz.diagrams": ["DiagramGraphNodeKind", "DiagramGraphNode"],
-        "tensorsat.contraction": ["Contraction"]
+        "tensorsat.contractions": ["Contraction"],
+        "tensorsat.contractions.simple": ["ContractionPath", "Contract2Args", "OptEinsumOptimize"]
     },
     "exclude_members": {},
     "include_modules": [],

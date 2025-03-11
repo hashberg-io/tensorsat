@@ -663,7 +663,7 @@ class BoxMeta(InheritanceForestMeta, TensorSatMeta):
     Metaclass for box classes, forcing box classes to form an inheritance tree
     with :class:`Box` as the root.
     This guarantees that the class join of box classes, returned by the static method
-    :meth:`Box.class_join`, is always well-defined.
+    :func:`Box.class_join`, is always well-defined.
     """
 
     def __new__(
@@ -700,7 +700,7 @@ class Box(Shaped, metaclass=BoxMeta):
         """
         Whether this box class can be contracted,
         i.e. whether it provides implementations for the (protected versions of)
-        :meth:`Box.contract2`, :meth:`Box.rewire` and :meth:`Box.spider`.
+        :func:`Box.contract2`, :meth:`Box.rewire` and :func:`Box.spider`.
         """
         abstract_methods = cls.__abstractmethods__
         return (
@@ -783,7 +783,7 @@ class Box(Shaped, metaclass=BoxMeta):
     @abstractmethod
     def _spider(cls, t: Type, num_ports: int) -> Self:
         """
-        Protected version of :meth:`Box.spider`, to be implemented by subclasses.
+        Protected version of :func:`Box.spider`, to be implemented by subclasses.
         It is guaranteed that ``num_ports`` is strictly positive.
         """
 
@@ -799,7 +799,7 @@ class Box(Shaped, metaclass=BoxMeta):
     @classmethod
     @abstractmethod
     def _scalar(cls, scalar: bool, /) -> Self:
-        """Protected version of :meth:`Box.scalar`, to be implemented by subclasses."""
+        """Protected version of :func:`Box.scalar`, to be implemented by subclasses."""
 
     @final
     @classmethod
@@ -847,7 +847,7 @@ class Box(Shaped, metaclass=BoxMeta):
         out_wires: Sequence[Wire],
     ) -> Self:
         """
-        Protected version of :meth:`Box.contract2`, to be implemented by subclasses.
+        Protected version of :func:`Box.contract2`, to be implemented by subclasses.
         It is guaranteed that:
 
         - The length of ``lhs_wires`` matches the length of ``lhs.shape``
@@ -1408,7 +1408,6 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
     def __rshift__(self, other: Block | SelectedBlockPorts) -> Diagram:
         """
         Returns the sequential composition of this diagram with another diagram/box.
-        See :meth:`Diagram.seq`.
 
         :meta public:
         """
@@ -1417,7 +1416,6 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
     def __rrshift__(self, other: Box) -> Diagram:
         """
         Returns the sequential composition of another box with this diagram.
-        See :meth:`Diagram.seq`.
 
         :meta public:
         """

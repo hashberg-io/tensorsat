@@ -19,7 +19,12 @@ Box
 .. autoclass:: tensorsat.diagrams.Box
     :show-inheritance:
     :members:
-    :special-members: __mul__, __new__
+    :special-members: __new__
+
+BoxClass
+--------
+
+.. autodata:: tensorsat.diagrams.BoxClass
 
 BoxMeta
 -------
@@ -39,7 +44,7 @@ Diagram
 .. autoclass:: tensorsat.diagrams.Diagram
     :show-inheritance:
     :members:
-    :special-members: __new__
+    :special-members: __rshift__, __rrshift__, __new__
 
 DiagramBuilder
 --------------
@@ -47,7 +52,7 @@ DiagramBuilder
 .. autoclass:: tensorsat.diagrams.DiagramBuilder
     :show-inheritance:
     :members:
-    :special-members: __new__, __getitem__
+    :special-members: __rmatmul__, __new__, __getitem__
 
 DiagramRecipe
 -------------
@@ -64,15 +69,36 @@ Port
     :show-inheritance:
     :members:
 
+PortOrderStructure
+------------------
+
+.. autoclass:: tensorsat.diagrams.PortOrderStructure
+    :show-inheritance:
+    :members:
+    :special-members: __new__
+
+Ports
+-----
+
+.. autodata:: tensorsat.diagrams.Ports
+
 RecipeParams
 ------------
 
 .. autodata:: tensorsat.diagrams.RecipeParams
 
-SelectedInputWires
+SelectedBlockPorts
 ------------------
 
-.. autoclass:: tensorsat.diagrams.SelectedInputWires
+.. autoclass:: tensorsat.diagrams.SelectedBlockPorts
+    :show-inheritance:
+    :members:
+    :special-members: __rshift__
+
+SelectedBuilderWires
+--------------------
+
+.. autoclass:: tensorsat.diagrams.SelectedBuilderWires
     :show-inheritance:
     :members:
     :special-members: __rmatmul__
@@ -80,10 +106,7 @@ SelectedInputWires
 Shape
 -----
 
-.. autoclass:: tensorsat.diagrams.Shape
-    :show-inheritance:
-    :members:
-    :special-members: __mul__, __pow__, __new__, __getitem__
+.. autodata:: tensorsat.diagrams.Shape
 
 Shaped
 ------
@@ -99,17 +122,36 @@ Slot
     :show-inheritance:
     :members:
 
-Slotted
--------
+Slots
+-----
 
-.. autoclass:: tensorsat.diagrams.Slotted
-    :show-inheritance:
-    :members:
+.. autodata:: tensorsat.diagrams.Slots
 
 TYPE_CHECKING
 -------------
 
 .. autodata:: tensorsat.diagrams.TYPE_CHECKING
+
+TensorLikeBox
+-------------
+
+.. autoclass:: tensorsat.diagrams.TensorLikeBox
+    :show-inheritance:
+    :members:
+    :special-members: __new__
+
+TensorLikeBoxT_inv
+------------------
+
+.. autodata:: tensorsat.diagrams.TensorLikeBoxT_inv
+
+TensorLikeType
+--------------
+
+.. autoclass:: tensorsat.diagrams.TensorLikeType
+    :show-inheritance:
+    :members:
+    :special-members: __new__
 
 Type
 ----
@@ -117,17 +159,14 @@ Type
 .. autoclass:: tensorsat.diagrams.Type
     :show-inheritance:
     :members:
-    :special-members: __mul__, __pow__, __new__
+    :special-members: __new__
 
-TypeT_co
+TypeMeta
 --------
 
-.. autodata:: tensorsat.diagrams.TypeT_co
-
-TypeT_inv
----------
-
-.. autodata:: tensorsat.diagrams.TypeT_inv
+.. autoclass:: tensorsat.diagrams.TypeMeta
+    :show-inheritance:
+    :members:
 
 Wire
 ----
@@ -136,6 +175,11 @@ Wire
     :show-inheritance:
     :members:
 
+Wires
+-----
+
+.. autodata:: tensorsat.diagrams.Wires
+
 Wiring
 ------
 
@@ -143,13 +187,6 @@ Wiring
     :show-inheritance:
     :members:
     :special-members: __new__
-
-WiringBase
-----------
-
-.. autoclass:: tensorsat.diagrams.WiringBase
-    :show-inheritance:
-    :members:
 
 WiringBuilder
 -------------

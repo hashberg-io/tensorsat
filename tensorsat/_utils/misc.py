@@ -102,13 +102,13 @@ def dict_deep_update(to_update: Any, new: Any) -> Any:
 
 
 def rewire_array[
-    T: np.dtype[Any]
-](a: np.ndarray[Any, T], out_ports: Sequence[int]) -> np.ndarray[Any, T]:
+    _T: np.dtype[Any]
+](a: np.ndarray[Any, _T], out_ports: Sequence[int]) -> np.ndarray[Any, _T]:
     """Rewires an array, with ports duplication and discarding."""
     a_shape = a.shape
     a_ports = range(len(a_shape))
     b_shape = tuple(a_shape[port] for port in out_ports)
-    b = cast(np.ndarray[Any, T], np.zeros(b_shape, dtype=a.dtype))
+    b = cast(np.ndarray[Any, _T], np.zeros(b_shape, dtype=a.dtype))
     repeat_ports = sorted(p for p, c in Counter(out_ports).items() if c > 1)
     repeat_ports += sorted(set(a_ports) - set(out_ports))
     port_i = {p: i for i, p in enumerate(repeat_ports)}

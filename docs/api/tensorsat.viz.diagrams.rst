@@ -10,6 +10,13 @@ BFSLayoutKWArgs
     :show-inheritance:
     :members:
 
+CircuitLayoutKWArgs
+-------------------
+
+.. autoclass:: tensorsat.viz.diagrams.CircuitLayoutKWArgs
+    :show-inheritance:
+    :members:
+
 DIAGRAM_GRAPH_NODE_KIND
 -----------------------
 

@@ -38,7 +38,7 @@ if __debug__:
 ContractionPath = tuple[tuple[int, int], ...]
 """
 Type alias for a contraction path, as a sequence of pairs of indices to be contracted.
-Indices follow the convention of :func:`opt_einsum.contraction_path` and
+Indices follow the convention of :func:`opt_einsum.contract_path` and
 :func:`numpy.einsum_path`: an array of boxes is maintained, the indices of each
 contraction in the path are used to select boxes in the array at the time when that
 contraction is to be performed in the path, the boxes at those indices are removed,
@@ -47,9 +47,9 @@ contracted, and the result is appended to the end of the list.
 
 Contract2Args: TypeAlias = tuple[int, Wires, int, Wires, Wires]
 """
-Type alias for data used to specify arguments to :meth:`Box.contract2` calls as part
-of :meth:`SimpleContraction.contract`.
-Essentially the same as the arguments to :meth:`Box.contract2`, but with the ``lhs``
+Type alias for data used to specify arguments to :func:`Box.contract2` calls as part
+of a :meth:`~Contraction.contract` call on a :meth:`SimpleContraction`.
+Essentially the same as the arguments to :func:`Box.contract2`, but with the ``lhs``
 and ``rhs`` arguments replaced by indices ``lhs_idx`` and ``rhs_idx`` from the
 underlying :obj:`ContractionPath`.
 
@@ -68,7 +68,7 @@ OptEinsumOptimize: TypeAlias = Literal[
 ]
 """
 Possible values that can be passed to the ``optimize`` argument
-of :meth:`opt_einsum.contract_path`
+of :func:`opt_einsum.contract_path`
 """
 
 
@@ -126,7 +126,7 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
     ) -> _S:
         """
         Generates a contraction from the diagram's wiring
-        using :meth:`SimpleContraction.from_opt_einsum`, then contracts the diagram.s
+        using :meth:`SimpleContraction.using_opt_einsum`, then contracts the diagram.s
         """
         contraction = cls.using_opt_einsum(box_class, diagram.wiring, optimize=optimize)
         return contraction.contract(diagram)
