@@ -203,7 +203,7 @@ class CNFInstance(metaclass=TensorSatMeta):
                     w = builder.add_input(bit)
             assert w == i  # Added wires correspond to variable indices.
         builder.add_outputs(builder.wiring.wires)
-        return builder.diagram
+        return builder.diagram()
 
     def diagram(
         self,
@@ -259,7 +259,7 @@ class CNFInstance(metaclass=TensorSatMeta):
                 layer = new_layer
             assert len(layer) == 1
             bit_1 @ builder[layer[0]]
-        return builder.diagram
+        return builder.diagram()
 
     def __repr__(self) -> str:
         attrs: list[str] = [

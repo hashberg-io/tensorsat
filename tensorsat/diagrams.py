@@ -1028,7 +1028,7 @@ class DiagramRecipe(Generic[RecipeParams], metaclass=TensorSatMeta):
             return self.__diagrams[key]
         builder: DiagramBuilder = DiagramBuilder()
         self.__wrapped__(builder, *args, **kwargs)
-        diagram = builder.diagram
+        diagram = builder.diagram()
         diagram._Diagram__recipe_used = self  # type: ignore[attr-defined]
         self.__diagrams[key] = diagram
         return diagram
@@ -1039,6 +1039,99 @@ class DiagramRecipe(Generic[RecipeParams], metaclass=TensorSatMeta):
         mod = recipe.__module__
         name = recipe.__name__
         return f"Diagram.recipe({mod}.{name})"
+
+
+@final
+class PortOrderStructure(metaclass=TensorSatMeta):
+    """A port order structure for a diagram."""
+
+    @classmethod
+    def _new(
+        cls,
+        wiring: Wiring,
+        input_ports: frozenset[Port],
+        slot_input_ports_list: tuple[frozenset[Port], ...],
+        *,
+        __consolidate: bool = True,
+    ) -> Self:
+        """Protected constructor."""
+        if __consolidate:
+            representative = {fset: fset for fset in slot_input_ports_list}
+            slot_input_ports_list = tuple(
+                representative[fset] for fset in slot_input_ports_list
+            )
+        self = super().__new__(cls)
+        self.__wiring = wiring
+        self.__input_ports = input_ports
+        self.__slot_input_ports_list = slot_input_ports_list
+        return self
+
+    __wiring: Wiring
+    __input_ports: frozenset[Port]
+    __slot_input_ports_list: tuple[frozenset[Port], ...]
+
+    def __new__(
+        cls,
+        wiring: Wiring,
+        input_ports: Iterable[Port],
+        slot_input_ports_list: Iterable[Iterable[Port]],
+    ) -> Self:
+        """
+        Constructs a new diagram port order structure.
+
+        :meta public:
+        """
+        assert validate(wiring, Wiring)
+        input_ports = frozenset(input_ports)
+        _slot_input_ports_list = tuple(map(frozenset, slot_input_ports_list))
+        assert validate(input_ports, frozenset[Port])
+        assert validate(_slot_input_ports_list, tuple[frozenset[Port], ...])
+        for port in input_ports:
+            if port not in wiring.ports:
+                raise ValueError(f"Invalid input port {port}.")
+        if len(_slot_input_ports_list) != wiring.num_slots:
+            raise ValueError(
+                f"Expected {wiring.num_slots} slot input port sets,"
+                f" got {len(_slot_input_ports_list)}."
+            )
+        for slot, ports in enumerate(_slot_input_ports_list):
+            for port in ports:
+                if port not in wiring.slot_ports(slot):
+                    raise ValueError(f"Invalid input port {port} for slot {slot}.")
+        return cls._new(wiring, input_ports, _slot_input_ports_list)
+
+    @property
+    def wiring(self) -> Wiring:
+        """The wiring for this port order structure."""
+        return self.__wiring
+
+    @property
+    def input_ports(self) -> frozenset[Port]:
+        """The input ports for the wiring."""
+        return self.__input_ports
+
+    @property
+    def slot_input_ports_list(self) -> tuple[frozenset[Port], ...]:
+        """The input ports for each slot in the wiring."""
+        return self.__slot_input_ports_list
+
+    @property
+    def output_ports(self) -> frozenset[Port]:
+        """The output ports for the wiring."""
+        input_ports = self.input_ports
+        return frozenset(port for port in self.wiring.ports if port not in input_ports)
+
+    @property
+    def slot_output_ports_list(self) -> tuple[frozenset[Port], ...]:
+        """The output ports for each slot in the wiring."""
+        wiring, slot_input_ports_list = self.wiring, self.slot_input_ports_list
+        return tuple(
+            frozenset(p for p in wiring.slot_ports(slot) if p not in slot_inputs)
+            for slot, slot_inputs in enumerate(slot_input_ports_list)
+        )
+
+    def __repr__(self) -> str:
+        return f"<DiagramPortOrderStructure {id(self):#x}>"
 
 
 @final
@@ -1076,7 +1169,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         """
         builder: DiagramBuilder = DiagramBuilder()
         recipe(builder)
-        diagram = builder.diagram
+        diagram = builder.diagram()
         diagram._Diagram__recipe_used = recipe  # type: ignore[attr-defined]
         return diagram
 
@@ -1120,11 +1213,15 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
         self.__wiring = wiring
         self.__blocks = blocks
         self.__recipe_used = None
+        self.__port_order_struct = None
         return self
 
     __wiring: Wiring
     __blocks: tuple[Box | Diagram | None, ...]
     __recipe_used: Callable[Concatenate[DiagramBuilder, ...], Diagram] | None
+    __port_order_struct: PortOrderStructure | None
+
+    # Attributes only set in certain conditions:
     __hash_cache: int
     __seq_blocks: tuple[Block, ...]
 
@@ -1208,6 +1305,21 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
     def recipe_used(self) -> Callable[Concatenate[DiagramBuilder, ...], Diagram] | None:
         """The recipe used to construct this diagram, if any."""
         return self.__recipe_used
+
+    @property
+    def port_order_struct(self) -> PortOrderStructure | None:
+        """The port order structure associated to this diagram, if any."""
+        return self.__port_order_struct
+
+    def with_port_order_struct(self, struct: PortOrderStructure | None, /) -> Diagram:
+        """This diagram, with a different port order structure."""
+        if struct is not None and self.wiring != struct.wiring:
+            raise ValueError(
+                "Diagram wiring must coincide with that for port order structure."
+            )
+        clone = type(self)._new(self.__wiring, self.__blocks)
+        clone.__port_order_struct = struct
+        return clone
 
     @cached_property
     def box_class(self) -> BoxClass:
@@ -1440,7 +1552,7 @@ class SelectedBlockPorts(metaclass=TensorSatMeta):
         for block in blocks:
             wires = block @ builder[wires]
         builder.add_outputs(wires)
-        diagram = builder.diagram
+        diagram = builder.diagram()
         diagram._Diagram__seq_blocks = tuple(blocks)  # type: ignore
         return diagram
 
@@ -1456,8 +1568,9 @@ class DiagramBuilder(metaclass=TensorSatMeta):
 
     __wiring_builder: WiringBuilder
     __blocks: dict[Slot, Block]
-    __input_ports: list[Port]
-    __output_ports: list[Port]
+    __input_ports: set[Port]
+    __output_ports: set[Port]
+    __slot_input_ports_list: list[set[Port]]
 
     def __new__(cls) -> DiagramBuilder:
         """
@@ -1468,8 +1581,9 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         self = super().__new__(cls)
         self.__wiring_builder = WiringBuilder()
         self.__blocks = {}
-        self.__input_ports = []
-        self.__output_ports = []
+        self.__input_ports = set()
+        self.__output_ports = set()
+        self.__slot_input_ports_list = []
         return self
 
     def copy(self) -> DiagramBuilder:
@@ -1479,6 +1593,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         clone.__blocks = self.__blocks.copy()
         clone.__input_ports = self.__input_ports.copy()
         clone.__output_ports = self.__output_ports.copy()
+        clone.__slot_input_ports_list = self.__slot_input_ports_list.copy()
         return clone
 
     @property
@@ -1491,13 +1606,19 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         """Blocks in the diagram."""
         return MappingProxyType(self.__blocks)
 
-    @property
-    def diagram(self) -> Diagram:
+    def diagram(self, *, port_order: bool = True) -> Diagram:
         """The diagram built thus far."""
         wiring = self.__wiring_builder.wiring
         blocks = self.__blocks
         _blocks = tuple(blocks.get(slot) for slot in wiring.slots)
-        return Diagram._new(wiring, _blocks)
+        diagram = Diagram._new(wiring, _blocks)
+        if port_order:
+            diagram._Diagram__port_order_struct = PortOrderStructure._new(  # type: ignore
+                diagram.wiring,
+                frozenset(self.__input_ports),
+                tuple(map(frozenset, self.__slot_input_ports_list)),
+            )
+        return diagram
 
     def set_block(self, slot: Slot, block: Block) -> None:
         """Sets a block for an existing open slot."""
@@ -1565,6 +1686,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
             slot, [port_wire_mapping[port] for port in block_ports]
         )
         self.__blocks[slot] = block
+        self.__slot_input_ports_list.append(set(inputs.keys()))
         return output_wires
 
     def add_input(self, t: Type) -> Wire:
@@ -1588,7 +1710,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         wiring = self.wiring
         wires = wiring._add_wires(ts)
         ports = wiring._add_out_ports(wires)
-        self.__input_ports.extend(ports)
+        self.__input_ports.update(ports)
         return wires
 
     def add_output(self, wire: Wire) -> Port:
@@ -1610,7 +1732,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
 
     def _add_outputs(self, wires: Wires) -> Ports:
         ports = self.wiring._add_out_ports(wires)
-        self.__output_ports.extend(ports)
+        self.__output_ports.update(ports)
         return ports
 
     def __getitem__(self, wires: Wire | Sequence[Wire]) -> SelectedBuilderWires:

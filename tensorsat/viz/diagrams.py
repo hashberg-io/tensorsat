@@ -21,6 +21,7 @@ Visualisation utilities for diagrams.
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+from collections import deque
 from collections.abc import Sequence
 from types import MappingProxyType
 from typing import (
@@ -38,7 +39,7 @@ from typing import (
 )
 from numpy.typing import ArrayLike
 
-from ..diagrams import Slot, Box, Diagram, Wire, Port, DiagramRecipe
+from ..diagrams import PortOrderStructure, Slot, Box, Diagram, Wire, Port, DiagramRecipe
 from .._utils.misc import (
     ValueSetter,
     apply_setter,
@@ -65,16 +66,14 @@ except ModuleNotFoundError:
 if __debug__:
     from typing_validation import validate
 
-DiagramGraphNodeKind: TypeAlias = Literal[
-    "box", "open_slot", "subdiagram", "out_port", "wire"
-]
+DiagramGraphNodeKind: TypeAlias = Literal["box", "hole", "diagram", "port", "wire"]
 """Type alias for possible kinds of nodes in the NetworkX graph for a diagram."""
 
 DIAGRAM_GRAPH_NODE_KIND: Final[tuple[DiagramGraphNodeKind, ...]] = (
     "box",
-    "open_slot",
-    "subdiagram",
-    "out_port",
+    "hole",
+    "diagram",
+    "port",
     "wire",
 )
 """Possible kinds of nodes in the NetworkX graph for a diagram."""
@@ -82,9 +81,9 @@ DIAGRAM_GRAPH_NODE_KIND: Final[tuple[DiagramGraphNodeKind, ...]] = (
 
 DiagramGraphNode: TypeAlias = (
     tuple[Literal["box"], int, Box]  # ("box", slot, box)
-    | tuple[Literal["open_slot"], int, None]  # ("open_slot", slot, None)
-    | tuple[Literal["subdiagram"], int, Diagram]  # ("subdiagram", slot, diagram)
-    | tuple[Literal["out_port"], int, None]  # ("out_port", port, None)
+    | tuple[Literal["hole"], int, None]  # ("hole", slot, None)
+    | tuple[Literal["diagram"], int, Diagram]  # ("diagram", slot, diagram)
+    | tuple[Literal["port"], int, None]  # ("port", port, None)
     | tuple[Literal["wire"], int, None]  # ("wire", wire, None)
 )
 """
@@ -110,11 +109,11 @@ def diagram_to_nx_graph(
             assert isinstance(box, Box)
             return ("box", slot, box)
         if slot in open_slots:
-            return ("open_slot", slot, None)
+            return ("hole", slot, None)
         if slot in subdiagram_slots:
             subdiagram = blocks[slot]
             assert isinstance(subdiagram, Diagram)
-            return ("subdiagram", slot, subdiagram)
+            return ("diagram", slot, subdiagram)
         assert False, "Slot must be open, filled with a box, or filled with a diagram."
 
     wiring = diagram.wiring
@@ -145,7 +144,7 @@ def diagram_to_nx_graph(
     graph.add_nodes_from(
         [("wire", w, None) for w in wiring.wires if w not in simple_wires]
     )
-    graph.add_nodes_from([("out_port", p, None) for p in wiring.ports])
+    graph.add_nodes_from([("port", p, None) for p in wiring.ports])
     graph.add_nodes_from(list(map(slot_node, wiring.slots)))
     graph.add_edges_from(
         [
@@ -157,7 +156,7 @@ def diagram_to_nx_graph(
     )
     graph.add_edges_from(
         [
-            (("wire", w, None), ("out_port", p, None))
+            (("wire", w, None), ("port", p, None))
             for p, w in enumerate(wiring.out_wires)
             if w not in simple_wires
         ]
@@ -165,7 +164,7 @@ def diagram_to_nx_graph(
     if simplify_wires:
         graph.add_edges_from(
             [
-                (("out_port", port, None), slot_node(slot))
+                (("port", port, None), slot_node(slot))
                 for w, (slot, port) in slot_port_wires.items()
             ]
         )
@@ -176,6 +175,103 @@ def diagram_to_nx_graph(
             ]
         )
     return graph
+
+
+def _port_order_graph_layers(
+    diagram: Diagram, port_order: PortOrderStructure
+) -> dict[int, list[DiagramGraphNode]]:
+    wiring = diagram.wiring
+    slot_wires_list = wiring.slot_wires_list
+    wired_slot_ports = wiring.wired_slot_ports
+    slot_input_ports_list = port_order.slot_input_ports_list
+    slot_output_ports_list = port_order.slot_output_ports_list
+    slot_inputs = tuple(map(sorted, slot_input_ports_list))
+    slot_outputs = tuple(map(sorted, slot_output_ports_list))
+    wire_inputs = tuple(
+        tuple(
+            (slot, port)
+            for slot, port in wired_slot_ports[wire]
+            if port not in slot_input_ports_list[slot]
+        )
+        for wire in wiring.wires
+    )
+    wire_outputs = tuple(
+        tuple(
+            (slot, port)
+            for slot, port in wired_slot_ports[wire]
+            if port in slot_input_ports_list[slot]
+        )
+        for wire in wiring.wires
+    )
+    num_slot_inputs_to_visit = list(map(len, slot_inputs))
+    num_wire_inputs_to_visit = list(map(len, wire_inputs))
+    slot_queue: deque[Slot] = deque(
+        [
+            slot
+            for slot, num_to_visit in enumerate(num_slot_inputs_to_visit)
+            if num_to_visit == 0
+        ]
+    )
+    wire_queue: deque[Wire] = deque(
+        [
+            slot
+            for slot, num_to_visit in enumerate(num_wire_inputs_to_visit)
+            if num_to_visit == 0
+        ]
+    )
+    wire_layers: dict[Wire, int] = {wire: 1 for wire in wire_queue}
+    slot_layers: dict[Slot, int] = {slot: 1 for slot in slot_queue}
+    while wire_queue or slot_queue:
+        while wire_queue:
+            wire = wire_queue.popleft()
+            for slot, _ in wire_outputs[wire]:
+                num_slot_inputs_to_visit[slot] -= 1
+                if num_slot_inputs_to_visit[slot] == 0:
+                    slot_queue.append(slot)
+                    slot_layers[slot] = (
+                        max(
+                            [
+                                wire_layers[slot_wires_list[slot][port]]
+                                for port in slot_inputs[slot]
+                            ]
+                        )
+                        + 1
+                    )
+        while slot_queue:
+            slot = slot_queue.popleft()
+            for port in slot_outputs[slot]:
+                wire = slot_wires_list[slot][port]
+                num_wire_inputs_to_visit[wire] -= 1
+                if num_wire_inputs_to_visit[wire] == 0:
+                    wire_queue.append(wire)
+                    wire_layers[wire] = (
+                        max([slot_layers[slot] for slot, _ in wire_inputs[wire]]) + 1
+                    )
+    max_layer = (
+        max(
+            max(wire_layers.values(), default=-1),
+            max(slot_layers.values(), default=-1),
+        )
+        + 1
+    )
+    layers: dict[int, list[DiagramGraphNode]] = {i: [] for i in range(max_layer + 1)}
+    layers[0].extend(("port", port, None) for port in sorted(port_order.input_ports))
+    for wire, wire_layer in wire_layers.items():
+        layers[wire_layer].append(("wire", wire, None))
+    for slot, slot_layer in slot_layers.items():
+        slot_content = diagram.blocks[slot]
+        node: DiagramGraphNode
+        if isinstance(slot_content, Box):
+            node = ("box", slot, slot_content)
+        elif isinstance(slot_content, Diagram):
+            node = ("diagram", slot, slot_content)
+        else:
+            assert slot_content is None
+            node = ("hole", slot, None)
+        layers[slot_layer].append(node)
+    for port in sorted(port_order.output_ports):
+        layers[max_layer].append(("port", port, None))
+    return layers
 
 
 _T = TypeVar("_T")
@@ -209,6 +305,10 @@ class KamadaKawaiLayoutKWArgs(TypedDict, total=False):
     scale: int
     center: ArrayLike
     dim: int
+
+
+class CircuitLayoutKWArgs(TypedDict, total=False):
+    port_order: PortOrderStructure
 
 
 class BFSLayoutKWArgs(TypedDict, total=True):
@@ -248,7 +348,7 @@ class DrawDiagramOptions(TypedDict, total=False):
     edge_font_color: str
     """Font color for edge labels."""
 
-    simplify_wires: bool
+    simplify_wires: bool | None
     """Whether to simplify wires which could be represented by simple edges."""
 
 
@@ -270,37 +370,37 @@ class DiagramDrawer:
         self.__defaults = {
             "node_size": {
                 "box": 100,
-                "open_slot": 200,
-                "subdiagram": 200,
-                "out_port": 100,
+                "hole": 200,
+                "diagram": 200,
+                "port": 100,
                 "wire": 30,
             },
             "node_color": {
                 "box": "white",
-                "open_slot": "white",
-                "subdiagram": "white",
-                "out_port": "white",
+                "hole": "white",
+                "diagram": "white",
+                "port": "white",
                 "wire": "lightgray",
             },
             "node_label": {
                 "box": "",
-                "open_slot": "",
-                "subdiagram": "",
-                "out_port": str,
+                "hole": "",
+                "diagram": "",
+                "port": str,
                 "wire": "",
             },
             "node_border_thickness": {
                 "box": 1,
-                "open_slot": 1,
-                "subdiagram": 1,
-                "out_port": 0,
+                "hole": 1,
+                "diagram": 1,
+                "port": 0,
                 "wire": 0,
             },
             "node_border_color": {
                 "box": "gray",
-                "open_slot": "gray",
-                "subdiagram": "gray",
-                "out_port": "lightgray",
+                "hole": "gray",
+                "diagram": "gray",
+                "port": "lightgray",
                 "wire": "lightgray",
             },
             "edge_thickness": 1,
@@ -357,6 +457,18 @@ class DiagramDrawer:
         **options: Unpack[DrawDiagramOptions],
     ) -> None: ...
 
+    @overload
+    def __call__(
+        self,
+        diagram: Diagram,
+        *,
+        layout: Literal["circuit"],
+        layout_kwargs: CircuitLayoutKWArgs,
+        ax: Axes | None = None,
+        figsize: tuple[float, float] | None = None,
+        **options: Unpack[DrawDiagramOptions],
+    ) -> None: ...
+
     def __call__(
         self,
         diagram: Diagram,
@@ -399,7 +511,7 @@ class DiagramDrawer:
                     raise ValueError("Sources must be valid ports for diagram.")
                 layers_list = list(
                     nx.bfs_layers(
-                        graph, sources=[("out_port", i, None) for i in sorted(sources)]
+                        graph, sources=[("port", i, None) for i in sorted(sources)]
                     )
                 )
                 layers = dict(enumerate(layers_list))
@@ -411,6 +523,24 @@ class DiagramDrawer:
                 ]
                 if any(nodes_to_remove):
                     graph.remove_nodes_from(nodes_to_remove)
+                pos = nx.multipartite_layout(graph, subset_key=layers)
+            case "circuit":
+                out_ports = diagram.ports
+                assert validate(layout_kwargs, CircuitLayoutKWArgs)
+                _layout_kwargs = cast(CircuitLayoutKWArgs, layout_kwargs)
+                port_order = _layout_kwargs.get("port_order")
+                if port_order is None:
+                    port_order = diagram.port_order_struct
+                if port_order is None:
+                    raise ValueError(
+                        "No port order specified and diagram has no port order."
+                    )
+                layers = _port_order_graph_layers(diagram, port_order)
+                nodeset = frozenset(graph.nodes)
+                layers = {
+                    i: [node for node in layer if node in nodeset]
+                    for i, layer in layers.items()
+                }
                 pos = nx.multipartite_layout(graph, subset_key=layers)
             case _:
                 raise ValueError(f"Invalid layout choice {layout!r}.")
@@ -427,25 +557,25 @@ class DiagramDrawer:
                     if res is None:
                         res = apply_setter(setter["box"], (box_idx, box))
                     return cast(T | None, res)
-                case "open_slot":
+                case "hole":
                     _, slot_idx, _ = node
-                    res = apply_setter(setter["open_slot"], slot_idx)
+                    res = apply_setter(setter["hole"], slot_idx)
                     return cast(T | None, res)
-                case "subdiagram":
+                case "diagram":
                     _, slot_idx, subdiag = node
-                    res = apply_setter(setter["subdiagram"], slot_idx)
+                    res = apply_setter(setter["diagram"], slot_idx)
                     if res is None:
-                        res = apply_setter(setter["subdiagram"], subdiag)
+                        res = apply_setter(setter["diagram"], subdiag)
                     if res is None:
-                        res = apply_setter(setter["subdiagram"], (slot_idx, subdiag))
+                        res = apply_setter(setter["diagram"], (slot_idx, subdiag))
                     if res is None and cast(Diagram, subdiag).recipe_used is not None:
                         res = apply_setter(
-                            setter["subdiagram"], cast(Diagram, subdiag).recipe_used
+                            setter["diagram"], cast(Diagram, subdiag).recipe_used
                         )
                     return cast(T | None, res)
-                case "out_port":
+                case "port":
                     _, port_idx, _ = node
-                    return apply_setter(setter["out_port"], port_idx)
+                    return apply_setter(setter["port"], port_idx)
                 case "wire":
                     _, wire_idx, _ = node
                     return apply_setter(setter["wire"], wire_idx)
