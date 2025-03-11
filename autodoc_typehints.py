@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
+import functools
 import inspect
 import re
 import traceback
@@ -303,6 +304,9 @@ def class_tracking_handler(app: Sphinx, what: str, fullname: str, obj: Any, opti
     if what != "class":
         return
     _class_dict[fullname] = obj
+    # Make sure that tensorsat._utils.meta.cached_property is seen as a cached_property:
+    if fullname == "tensorsat._utils.meta.cached_property":
+        obj.__bases__ += (functools.cached_property,)
 
 
 ### 3. Document Function Parameter and Return Types ###

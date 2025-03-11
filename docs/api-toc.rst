@@ -9,6 +9,7 @@
     api/tensorsat._utils.misc
     api/tensorsat.contractions
     api/tensorsat.contractions.abc
+    api/tensorsat.contractions.cotengra
     api/tensorsat.contractions.simple
     api/tensorsat.diagrams
     api/tensorsat.lang
