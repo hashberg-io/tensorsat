@@ -58,6 +58,9 @@ bit_0: Final[FinRel] = FinRel.singleton(bit, 0)
 bit_1: Final[FinRel] = FinRel.singleton(bit, 1)
 """The constant binary value 1."""
 
+bit_unk: Final[FinRel] = FinRel.from_set(bit, {0, 1})
+"""The set ``{0, 1}`` of both possible binary values."""
+
 binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
     {
         not_: "~",
@@ -66,6 +69,7 @@ binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
         xor_: "^",
         bit_0: "0",
         bit_1: "1",
+        bit_unk: "?",
     }
 )
 """Labels for binary operations."""

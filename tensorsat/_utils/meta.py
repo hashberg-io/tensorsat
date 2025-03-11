@@ -388,12 +388,13 @@ class TensorSatMeta(ABCMeta):
     __final__: bool
     """Whether the class is marked final."""
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+    def __call__[_T](cls: Type[_T], *args: Any, **kwargs: Any) -> _T:
+        assert isinstance(cls, TensorSatMeta)
         if not cls.__final__:
             raise TypeError(
                 f"Class {cls.__name__} is not final, so it cannot be instantiated."
             )
-        return cls.__new__(cls, *args, **kwargs)  # type: ignore[arg-type]
+        return cls.__new__(cls, *args, **kwargs)
 
 
 class InheritanceForestMeta(ABCMeta):

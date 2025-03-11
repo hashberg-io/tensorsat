@@ -1283,7 +1283,7 @@ class DiagramBuilder(metaclass=TensorSatMeta):
     __wiring_builder: WiringBuilder
     __blocks: dict[Slot, Block]
 
-    def __new__(cls) -> Self:
+    def __new__(cls) -> DiagramBuilder:
         """
         Creates a blank diagram builder.
 
@@ -1335,7 +1335,11 @@ class DiagramBuilder(metaclass=TensorSatMeta):
             )
         self.__blocks[slot] = block
 
-    def add_block(self, block: Block, inputs: Mapping[Port, Wire]) -> tuple[Wire, ...]:
+    def add_block(
+        self,
+        block: Block,
+        inputs: Mapping[Port, Wire] = MappingProxyType({})
+    ) -> tuple[Wire, ...]:
         """
         Adds a new slot to the diagram with the given block assigned to it.
         Specifically:
@@ -1349,6 +1353,8 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         4. Sets the block for the slot.
         5. Returns the newly created wires (in port order).
 
+        By default, no inputs are passed, so a new wire is created for each port of the
+        given block.
         """
         wire_types = self.__wiring_builder.wire_types
         assert validate(block, Box | Diagram)
@@ -1453,6 +1459,14 @@ class DiagramBuilder(metaclass=TensorSatMeta):
         :meta public:
         """
         return SelectedInputWires(self, wires)
+
+    def __rmatmul__(self, block: Block) -> tuple[Wire, ...]:
+        """
+        An alias of ``self.add_block(block)``.
+
+        :meta public:
+        """
+        return self.add_block(block)
 
     def __repr__(self) -> str:
         attrs: list[str] = []

@@ -21,8 +21,8 @@ from typing import Literal, Self, TypeAlias
 import numpy as np
 
 from .._utils.meta import TensorSatMeta
-from ..diagrams import Diagram, DiagramBuilder
-from .bincirc import bits, not_, or_
+from ..diagrams import Diagram, DiagramBuilder, Wire, Wiring
+from .bincirc import bit, bit_0, bit_1, bit_unk, bits, not_, or_
 
 if __debug__:
     from typing_validation import validate
@@ -35,7 +35,6 @@ with the integer sign determining whether the literal is positive or negative.
 
 CNFDiagramMode: TypeAlias = Literal["bintree"]
 """Type alias for available diagram creation modes in :class:`CNFInstance`."""
-
 
 class CNFInstance(metaclass=TensorSatMeta):
     """A SAT instance in CNF form."""
@@ -141,31 +140,124 @@ class CNFInstance(metaclass=TensorSatMeta):
         ]
         return "\n".join(lines)
 
+    def _normalize_inputs(self, inputs: str | int | None) -> str:
+        n = self.num_vars
+        if isinstance(inputs, int):
+            if inputs < 0:
+                raise ValueError("Inputs must be specified by a non-negative number.")
+            inputs = f"{inputs:0>{n}b}"
+        elif inputs is None:
+            inputs = "?"*n
+        else:
+            assert validate(inputs, str)
+            if not all(b in "01?_" for b in inputs):
+                raise ValueError(
+                    "Input specification characters must be '0', '1', '?' or '_'."
+                )
+            if len(inputs) != n:
+                raise ValueError(
+                    f"Expected input specification string to be {n} characters long,"
+                    f" found {len(inputs)} characters instead."
+                )
+        return inputs
+
+    def inputs(
+        self,
+        inputs: str | int | None,
+        /, *,
+        discard_unk: bool = True,
+    ) -> Diagram:
+        """
+        Returns a diagram corresponding to the given selection of input values.
+        Input values for the formula's variables can be selected by
+
+        - Use '0' to set the input to the 0 value (i.e. the ``{0}`` subset).
+        - Use '1' to set the input to the 1 value (i.e. the ``{1}`` subset).
+        - Use '?' to set the input to an unknown value (i.e. the ``{0, 1}`` subset).
+        - Use '_' to leave the input open.
+
+        The integer form must be a non-negative integer, and it is converted to its
+        binary string representation.
+        If :obj:`None` is passed, all inputs are set to the unknown value.
+
+        If ``discard_unk`` is set to :obj:`True`, then unknown inputs are discarded;
+        otherwise, the unknown bit state :obj:`bit_unk` is used (default).
+        """
+        inputs = self._normalize_inputs(inputs)
+        builder = DiagramBuilder()
+        for i, b in enumerate(inputs):
+            w: Wire
+            match b:
+                case "0":
+                    w, = bit_0 @ builder
+                case "1":
+                    w, = bit_1 @ builder
+                case "?":
+                    if discard_unk:
+                        w = builder.wiring.add_wire(bit)
+                    else:
+                        w, = bit_unk @ builder
+                case None:
+                    w = builder.add_input(bit)
+            assert w == i # Added wires correspond to variable indices.
+        builder.add_outputs(builder.wiring.wires)
+        return builder.diagram
+
     def diagram(
         self,
         *,
         mode: CNFDiagramMode = "bintree",
     ) -> Diagram:
+        """
+        Returns the diagram associated with this CNF instance.
+
+        .. warning::
+
+            Currently, diagram building algorithms are selected via the ``mode`` kwarg,
+            but this may be deprecated in the future if we decide to implement a more
+            flexible diagram building mechanism for CNF instances.
+
+        """
         match mode:
             case "bintree":
-                return self._diagram_bintree()
-        raise NotImplementedError(f"Unknown diagram mode for CNFInstance: {mode!r}")
+                return self._build_diagram_bintree()
+            case _:
+                raise NotImplementedError(
+                    f"Unknown diagram mode for CNFInstance: {mode!r}"
+                )
 
-    def _diagram_bintree(self) -> Diagram:
-        num_vars, clauses = self.num_vars, self.clauses
-        circ: DiagramBuilder = DiagramBuilder()
-        circ.add_inputs(bits(num_vars))
-        for clause in clauses:
-            layer = [x - 1 if x > 0 else (not_ @ circ[-x - 1])[0] for x in clause]
+    def contraction_wiring(
+        self,
+        *,
+        mode: CNFDiagramMode = "bintree",
+    ) -> Wiring:
+        """
+        Returns a wiring which can be used to contract the sequential composition
+        of the :meth:`~CNFInstance.diagram` with an arbitrary specification of
+        :meth:`~CNFInstance.inputs`.
+
+        .. warning::
+
+            See :meth:`CNFInstance.diagram` for possible deprecation of ``mode`` kwarg.
+
+        """
+        return (self.inputs(0) >> self.diagram(mode=mode)).flatten().wiring
+
+    def _build_diagram_bintree(self) -> Diagram:
+        builder = DiagramBuilder()
+        builder.add_inputs(bits(self.num_vars))
+        for clause in self.clauses:
+            layer = [x - 1 if x > 0 else (not_ @ builder[-x - 1])[0] for x in clause]
             while (n := len(layer)) > 1:
                 new_layer = [
-                    (or_ @ circ[layer[2 * i : 2 * i + 2]])[0] for i in range(n // 2)
+                    (or_ @ builder[layer[2 * i : 2 * i + 2]])[0] for i in range(n // 2)
                 ]
                 if n % 2 == 1:
-                    (new_layer[-1],) = or_ @ circ[new_layer[-1], layer[-1]]
+                    (new_layer[-1],) = or_ @ builder[new_layer[-1], layer[-1]]
                 layer = new_layer
-            # bit_unk @ circ[layer[0]]
-        return circ.diagram
+            assert len(layer) == 1
+            bit_1 @ builder[layer[0]]
+        return builder.diagram
 
     def __repr__(self) -> str:
         attrs: list[str] = [
