@@ -22,8 +22,8 @@ from types import FunctionType, ModuleType
 from typing import Any, ForwardRef, Optional
 from sphinx.application import Sphinx
 from sphinx.util import logging
-from typed_descriptors import TypedDescriptor
-from typing_validation import inspect_type
+# from typed_descriptors import TypedDescriptor
+# from typing_validation import inspect_type
 
 logger = logging.getLogger(__name__)
 
@@ -422,10 +422,10 @@ def attr_doc_handler(app: Sphinx, what: str, fullname: str, obj: Any, options: A
             annotations = parent_class.__annotations__
             if attrname in annotations:
                 type_annotation = annotations[attrname]
-            elif isinstance(obj, TypedDescriptor):
-                ty = obj.__descriptor_type__
-                inspector = inspect_type(ty)
-                type_annotation = inspector.type_annotation
+            # elif isinstance(obj, TypedDescriptor):
+            #     ty = obj.__descriptor_type__
+            #     inspector = inspect_type(ty)
+            #     type_annotation = inspector.type_annotation
             else:
                 type_annotation = None
             if type_annotation is not None:
