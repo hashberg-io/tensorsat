@@ -271,4 +271,5 @@ class CNFInstance(metaclass=TensorSatMeta):
             attrs.append(f"k={ks.pop()}")
         else:
             attrs.extend(f"k in [{min(ks)}..{max(ks)}]")
-        return f"<CNFInstance {id(self):#x}: {", ".join(attrs)}>"
+        # return f"<CNFInstance {id(self):#x}: {", ".join(attrs)}>"
+        return f"<CNFInstance: {", ".join(attrs)}>"

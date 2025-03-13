@@ -193,7 +193,6 @@ class SimpleContraction(Contraction[Any, TensorLikeBoxT_inv]):
         self.__dangling_wires = tuple(sorted(wiring.dangling_wires))
         return self
 
-    __wiring: Wiring
     __contract2_args: tuple[Contract2Args, ...]
     __box_out_wires: Wires
     __dangling_wires: Wires
@@ -245,11 +244,6 @@ class SimpleContraction(Contraction[Any, TensorLikeBoxT_inv]):
         return cls._new(box_class, wiring, path)
 
     @property
-    def wiring(self) -> Wiring:
-        """The wiring of the contraction."""
-        return self.__wiring
-
-    @property
     def contract2_args(self) -> tuple[Contract2Args, ...]:
         """The arguments to contract2 calls in the contraction."""
         return self.__contract2_args
@@ -296,3 +290,6 @@ class SimpleContraction(Contraction[Any, TensorLikeBoxT_inv]):
         # 4. Return contracted box:
         assert box is not None
         return box
+
+    def __repr__(self) -> str:
+        return "<SimpleContraction>"
