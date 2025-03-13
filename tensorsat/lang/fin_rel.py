@@ -57,6 +57,7 @@ def _wrap_el(el_or_point: El | Point, /) -> Point:
 
 
 type ItemOrIterable[T] = T | Iterable[T]
+"""Type alias for a value or an iterable of values."""
 
 
 def _extract_sizes(
@@ -144,6 +145,7 @@ def _to_safe_contraction_dtype(
 def _to_safe_contraction_dtype(
     contraction_size: int, *tensors: NumpyUInt8Array
 ) -> tuple[_NumpyUIntArray, ...]:
+    """Converts the tensors to a safe dtype for contraction if needed."""
     assert contraction_size >= 0
     dt: np.dtype[Any]
     if contraction_size < 256:
@@ -300,6 +302,12 @@ class FinRel(TensorLikeBox):
         return FinRel._new(np.array(int(scalar), dtype=np.uint8))
 
     @classmethod
+    def _stack(cls, boxes: tuple[Self, ...], port: int = 0, /) -> Self:
+        tensors = tuple(box.tensor for box in boxes)
+        res_tensor = np.stack(tensors, axis=port)
+        return FinRel._new(res_tensor)
+
+    @classmethod
     def _new(
         cls,
         tensor: NumpyUInt8Array,
@@ -330,6 +338,12 @@ class FinRel(TensorLikeBox):
         if not np.all(tensor <= 1):
             raise ValueError("Values in a Boolean tensor must be 0 or 1.")
         return cls._new(tensor)
+
+    def _getitem(self, idxs: tuple[int | slice, ...]) -> Self:
+        return FinRel._new(self.tensor[idxs])
+
+    def _union(self, other: Self) -> Self:
+        return FinRel._new(self.tensor | other.tensor)
 
     @property
     def tensor(self) -> NumpyUInt8Array:

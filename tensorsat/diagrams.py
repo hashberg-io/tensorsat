@@ -680,6 +680,7 @@ class BoxMeta(InheritanceForestMeta, TensorSatMeta):
                 autoray.register_backend(cls, "tensorsat._autoray")
             except ModuleNotFoundError:
                 pass
+
         return cls
 
 
@@ -858,6 +859,41 @@ class Box(Shaped, metaclass=BoxMeta):
         times in ``out_wires``, or not at all.
         """
 
+    @final
+    @classmethod
+    def union(cls, boxes: Iterable[Self]) -> Self:
+        """Takes the union of a positive number of boxes of the same shape."""
+        boxes = tuple(boxes)
+        if not boxes:
+            raise ValueError("Cannot take an empty union: no shape info available.")
+        res = boxes[0]
+        shape = res.shape
+        for box in boxes[1:]:
+            if box.shape != shape:
+                raise ValueError("Shapes of boxes in a union must coincide.")
+            res = res._union(box)
+        return res
+
+    @final
+    @classmethod
+    def stack(cls, boxes: Iterable[Self], port: int = 0, /) -> Self:
+        from .lang.fin_rel import FinSet
+
+        boxes = tuple(boxes)
+        if not boxes:
+            raise ValueError("Need at least one box to stack.")
+        shape = boxes[0].shape
+        if port not in range(len(shape) + 1):
+            raise ValueError(f"Invalid port index {port} for stacking.")
+        box = cls._stack(boxes, port)
+        assert box.shape == shape[:port] + (FinSet(len(boxes)),) + shape[port:]
+        return box
+
+    @classmethod
+    @abstractmethod
+    def _stack(cls, boxes: tuple[Self, ...], port: int = 0, /) -> Self:
+        """Protected version of :func:`Box.stack`, to be implemented by subclasses."""
+
     def __new__(cls, name: str | None = None) -> Self:
         """
         Constructs a new box.
@@ -915,9 +951,43 @@ class Box(Shaped, metaclass=BoxMeta):
             raise ValueError("Box is not a scalar.")
         return self._as_scalar()
 
-    def __getitem__(self, ports: Port | Sequence[Port]) -> SelectedBlockPorts:
+    @final
+    def select(self, ports: Port | Sequence[Port]) -> SelectedBlockPorts:
         """Selects the given ports from this box."""
         return SelectedBlockPorts(self, ports)
+
+    @final
+    def __add__(self, other: Self) -> Self:
+        """Takes the union of this box and another box of the same shape."""
+        if self.shape != other.shape:
+            raise ValueError("Boxes in a union must have the same shape")
+        return self._union(other)
+
+    @final
+    def __getitem__(self, idxs: tuple[int | slice, ...]) -> Self:
+        assert validate(idxs, tuple)
+        from .lang.fin_rel import FinSet
+
+        shape = self.shape
+        for port, idx in enumerate(idxs):
+            if isinstance(idx, int):
+                if not isinstance(shape[port], FinSet):
+                    raise ValueError(
+                        "Port indexing is only allowed for finite enumerated sets."
+                    )
+            else:
+                assert validate(idx, slice)
+                if idx != slice(None, None, None):
+                    raise NotImplementedError("Non-trivial slicing is not implemented.")
+        return self._getitem(idxs)
+
+    @abstractmethod
+    def _getitem(self, idxs: tuple[int | slice, ...]) -> Self:
+        """Protected version of :meth:`__getitem__`, to be implemented by subclasses."""
+
+    @abstractmethod
+    def _union(self, other: Self) -> Self:
+        """Protected version of :meth:`__add__`, to be implemented by subclasses."""
 
     def __repr__(self) -> str:
         cls_name = type(self).__name__
@@ -1401,7 +1471,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
             cache[self] = flat_diagram
         return flat_diagram
 
-    def __getitem__(self, ports: Port | Sequence[Port]) -> SelectedBlockPorts:
+    def select(self, ports: Port | Sequence[Port]) -> SelectedBlockPorts:
         """Selects the given ports from this diagram."""
         return SelectedBlockPorts(self, ports)
 
@@ -1411,7 +1481,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
 
         :meta public:
         """
-        return self[self.ports] >> other
+        return self.select(self.ports) >> other
 
     def __rrshift__(self, other: Box) -> Diagram:
         """
@@ -1419,7 +1489,7 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
 
         :meta public:
         """
-        return other[other.ports] >> self
+        return other.select(other.ports) >> self
 
     def __repr__(self) -> str:
         attrs: list[str] = []
