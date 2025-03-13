@@ -33,9 +33,9 @@ author = 'Hashberg'
 # built documents.
 #
 # The full version, including alpha/beta/rc tags.
-release = "0.0.1"
+release = "0.1.0"
 # The short X.Y version.
-version = "0.0.1"
+version = "0.1.0"
 
 
 # -- General configuration ---------------------------------------------------
