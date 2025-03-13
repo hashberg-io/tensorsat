@@ -3,7 +3,7 @@ TensorSat is a suite of SAT/SMT solvers based on hyper-optimised contraction of 
 for the compact-closed category of finite sets and relations.
 
 Boxes from multiple languages (cf. :mod:`tensorsat.lang`) are allowed to coexist within
-the same diagram, and hybrid contraction strategies are supported.
+the same diagram, and hybrid contraction strategies will be supported.
 """
 
 # This program is free software: you can redistribute it and/or modify
