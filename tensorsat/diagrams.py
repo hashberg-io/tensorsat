@@ -471,7 +471,10 @@ class Wiring(Shaped, metaclass=TensorSatMeta):
             attrs.append(f"{num_slots} slot{'s' if num_slots!=1 else ''}")
         if num_out_ports > 0:
             attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
-        return f"<Wiring {id(self):#x}: {", ".join(attrs)}>"
+        # return f"<Wiring {id(self):#x}: {", ".join(attrs)}>"
+        if not attrs:
+            return "<Wiring (empty)>"
+        return f"<Wiring: {", ".join(attrs)}>"
 
 
 @final
@@ -655,7 +658,10 @@ class WiringBuilder(Shaped):
             attrs.append(f"{num_slots} slot{'s' if num_slots!=1 else ''}")
         if num_out_ports > 0:
             attrs.append(f"{num_out_ports} out port{'s' if num_out_ports!=1 else ''}")
-        return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
+        # return f"<WiringBuilder {id(self):#x}: {", ".join(attrs)}>"
+        if not attrs:
+            return "<WiringBuilder (empty)>"
+        return f"<WiringBuilder: {", ".join(attrs)}>"
 
 
 class BoxMeta(InheritanceForestMeta, TensorSatMeta):
@@ -994,8 +1000,10 @@ class Box(Shaped, metaclass=BoxMeta):
         num_ports = len(self.shape)
         box_name = self.name
         if box_name is None:
-            return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
-        return f"<{cls_name} {id(self):#x}: {num_ports} ports, named {box_name!r}>"
+            # return f"<{cls_name} {id(self):#x}: {num_ports} ports>"
+            return f"<{cls_name}: {num_ports} ports>"
+        # return f"<{cls_name} {id(self):#x}: {num_ports} ports, named {box_name!r}>"
+        return f"<{cls_name}: {num_ports} ports, named {box_name!r}>"
 
 
 BoxClass: TypeAlias = SubclassOf[Box]
@@ -1201,7 +1209,8 @@ class PortOrderStructure(metaclass=TensorSatMeta):
         )
 
     def __repr__(self) -> str:
-        return f"<DiagramPortOrderStructure {id(self):#x}>"
+        # return f"<DiagramPortOrderStructure {id(self):#x}>"
+        return "<DiagramPortOrderStructure>"
 
 
 @final
@@ -1511,7 +1520,10 @@ class Diagram(Shaped, metaclass=TensorSatMeta):
             attrs.append(f"{num_ports} ports")
         if recipe is not None:
             attrs.append(f"from recipe {recipe.__name__!r}")
-        return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
+        # return f"<Diagram {id(self):#x}: {", ".join(attrs)}>"
+        if not attrs:
+            return "<Diagram (empty)>"
+        return f"<Diagram: {", ".join(attrs)}>"
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Diagram):
@@ -1625,9 +1637,10 @@ class SelectedBlockPorts(metaclass=TensorSatMeta):
         return diagram
 
     def __repr__(self) -> str:
-        if isinstance(self.block, Box):
-            return f"<Box {id(self.block):#x}>[{self.ports}]"
-        return f"<Diagram {id(self.block):#x}>[{self.ports}]"
+        # if isinstance(self.block, Box):
+        #     return f"<Box {id(self.block):#x}>[{self.ports}]"
+        # return f"<Diagram {id(self.block):#x}>[{self.ports}]"
+        return f"{self.block}[{self.ports}]"
 
 
 @final
@@ -1850,7 +1863,10 @@ class DiagramBuilder(metaclass=TensorSatMeta):
             attrs.append(f"{num_blocks} blocks")
         if num_out_ports > 0:
             attrs.append(f"{num_out_ports} out ports")
-        return f"<DiagramBuilder {id(self):#x}: {", ".join(attrs)}>"
+        # return f"<DiagramBuilder {id(self):#x}: {", ".join(attrs)}>"
+        if not attrs:
+            return "<DiagramBuilder (empty)>"
+        return f"<DiagramBuilder: {", ".join(attrs)}>"
 
 
 @final
@@ -1932,4 +1948,5 @@ class SelectedBuilderWires(metaclass=TensorSatMeta):
         return self.builder.add_block(other.block, dict(zip(other.ports, wires)))
 
     def __repr__(self) -> str:
-        return f"<DiagramBuilder {id(self.builder):#x}>[{self.wires}]"
+        # return f"<DiagramBuilder {id(self.builder):#x}>[{self.wires}]"
+        return f"{self.builder}[{self.wires}]"

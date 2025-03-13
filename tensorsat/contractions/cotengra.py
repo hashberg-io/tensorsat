@@ -126,3 +126,6 @@ class CotengraContraction(Contraction[Any, TensorLikeBoxT_inv]):
         )
         assert isinstance(box, TensorLikeBox)
         return cast(TensorLikeBoxT_inv, box)
+
+    def __repr__(self) -> str:
+        return "<CotengraContraction>"

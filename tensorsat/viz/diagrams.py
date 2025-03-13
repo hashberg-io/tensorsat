@@ -551,11 +551,13 @@ class DiagramDrawer:
                 raise ValueError(f"Invalid layout choice {layout!r}.")
 
         # Define utility function to apply option setter to node:
-        def _apply[T](
+        def _apply[
+            T
+        ](
             setter: NodeOptionSetters[T],
             node: DiagramGraphNode,
             default: dict[DiagramGraphNodeKind, T] | None = None,
-        ) -> T | None:
+        ) -> (T | None):
             res: Any
             match node[0]:
                 case "box":
