@@ -6,3 +6,4 @@ numpy
 hashcons
 typing_validation
 xxhash
+opt_einsum
