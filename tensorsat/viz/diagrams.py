@@ -342,6 +342,9 @@ class DrawDiagramOptions(TypedDict, total=False):
     font_color: str
     """Font color for node labels."""
 
+    edge_color: str
+    """Edge color."""
+
     edge_font_size: int
     """Font size for edge labels."""
 
@@ -380,7 +383,7 @@ class DiagramDrawer:
                 "hole": "white",
                 "diagram": "white",
                 "port": "white",
-                "wire": "lightgray",
+                "wire": "darkgray",
             },
             "node_label": {
                 "box": "",
@@ -406,6 +409,7 @@ class DiagramDrawer:
             "edge_thickness": 1,
             "font_size": 6,
             "font_color": "black",
+            "edge_color": "lightgray",
             "edge_font_size": 6,
             "edge_font_color": "black",
             "simplify_wires": True,
@@ -487,8 +491,9 @@ class DiagramDrawer:
         assert validate(diagram, Diagram)
         # assert validate(options, DrawDiagramOptions) # FIXME: currently not supported by validate
         # Include default options:
+        default_options = self.__defaults
         _options: DrawDiagramOptions = dict_deep_update(
-            dict_deep_copy(self.__defaults), options
+            dict_deep_copy(default_options), options
         )
         # Create NetworkX graph for diagram + layout:
         graph = diagram_to_nx_graph(diagram, simplify_wires=_options["simplify_wires"])
@@ -546,7 +551,11 @@ class DiagramDrawer:
                 raise ValueError(f"Invalid layout choice {layout!r}.")
 
         # Define utility function to apply option setter to node:
-        def _apply[T](setter: NodeOptionSetters[T], node: DiagramGraphNode) -> T | None:
+        def _apply[T](
+            setter: NodeOptionSetters[T],
+            node: DiagramGraphNode,
+            default: dict[DiagramGraphNodeKind, T] | None = None,
+        ) -> T | None:
             res: Any
             match node[0]:
                 case "box":
@@ -556,10 +565,14 @@ class DiagramDrawer:
                         res = apply_setter(setter["box"], box)
                     if res is None:
                         res = apply_setter(setter["box"], (box_idx, box))
+                    if res is None and default is not None:
+                        res = default.get("box")
                     return cast(T | None, res)
                 case "hole":
                     _, slot_idx, _ = node
                     res = apply_setter(setter["hole"], slot_idx)
+                    if res is None and default is not None:
+                        res = default.get("hole")
                     return cast(T | None, res)
                 case "diagram":
                     _, slot_idx, subdiag = node
@@ -572,13 +585,21 @@ class DiagramDrawer:
                         res = apply_setter(
                             setter["diagram"], cast(Diagram, subdiag).recipe_used
                         )
+                    if res is None and default is not None:
+                        res = default.get("diagram")
                     return cast(T | None, res)
                 case "port":
                     _, port_idx, _ = node
-                    return apply_setter(setter["port"], port_idx)
+                    res = apply_setter(setter["port"], port_idx)
+                    if res is None and default is not None:
+                        res = default.get("port")
+                    return cast(T | None, res)
                 case "wire":
                     _, wire_idx, _ = node
-                    return apply_setter(setter["wire"], wire_idx)
+                    res = apply_setter(setter["wire"], wire_idx)
+                    if res is None and default is not None:
+                        res = default.get("wire")
+                    return cast(T | None, res)
                 case unknown_kind:
                     assert False, f"Unknown node kind {unknown_kind}"
 
@@ -590,7 +611,8 @@ class DiagramDrawer:
         ]
         node_color_options = _options["node_color"]
         draw_networkx_options["node_color"] = [
-            _apply(node_color_options, node) for node in graph.nodes
+            _apply(node_color_options, node, default_options["node_color"])
+            for node in graph.nodes
         ]
         node_label_options = _options["node_label"]
         draw_networkx_options["labels"] = {
@@ -606,7 +628,7 @@ class DiagramDrawer:
         draw_networkx_options["linewidths"] = [
             _apply(node_border_thickness_options, node) for node in graph.nodes
         ]
-        draw_networkx_options["edge_color"] = _options["node_color"]["wire"]
+        draw_networkx_options["edge_color"] = _options["edge_color"]
         draw_networkx_options["width"] = _options["edge_thickness"]
         draw_networkx_options["font_size"] = _options["font_size"]
         draw_networkx_options["font_color"] = _options["font_color"]

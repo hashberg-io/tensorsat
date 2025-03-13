@@ -69,7 +69,7 @@ def apply_setter[_K, _V](setter: ValueSetter[_K, _V], k: _K) -> _V | None:
     Returns :obj:`None` if the setter could not produce a value on the given key.
     """
     if callable(setter):
-        return default_on_error(setter, {KeyError: None}, k)
+        return default_on_error(setter, {KeyError: None, TypeError: None}, k)
     if isinstance(setter, Mapping):
         return setter.get(k)
     return setter
