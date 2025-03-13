@@ -21,4 +21,4 @@ the same diagram, and hybrid contraction strategies are supported.
 
 from __future__ import annotations
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
