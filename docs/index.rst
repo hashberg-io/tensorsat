@@ -1,8 +1,8 @@
 
-tensorsat
+TensorSat
 =========
 
-A brief description of the project.
+TensorSat is an experimental project to explore the usage of hyper-optimised tensor network contraction techniques in satisfiability (SAT/SMT solving).
 
 GitHub repo: https://github.com/hashberg-io/tensorsat
 

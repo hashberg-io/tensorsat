@@ -9,3 +9,8 @@ Contraction
 .. autoclass:: tensorsat.contractions.Contraction
     :show-inheritance:
     :members:
+
+P
+-
+
+.. autodata:: tensorsat.contractions.abc.P

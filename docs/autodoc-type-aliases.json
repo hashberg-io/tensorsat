@@ -21,5 +21,7 @@
     "Contraction": "tensorsat.contractions.Contraction",
     "ContractionPath": "tensorsat.contractions.simple.ContractionPath",
     "Contract2Args": "tensorsat.contractions.simple.Contract2Args",
-    "OptEinsumOptimize": "tensorsat.contractions.simple.OptEinsumOptimize"
+    "OptEinsumOptimize": "tensorsat.contractions.simple.OptEinsumOptimize",
+    "CotengraOptimizer": "tensorsat.contractions.cotengra.CotengraOptimizer",
+    "ReusableCotengraOptimizer": "tensorsat.contractions.cotengra.ReusableCotengraOptimizer"
 }

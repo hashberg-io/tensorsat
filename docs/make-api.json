@@ -27,7 +27,8 @@
         "tensorsat.lib.sat": ["Clause", "CNFDiagramMode"],
         "tensorsat.viz.diagrams": ["DiagramGraphNodeKind", "DiagramGraphNode"],
         "tensorsat.contractions": ["Contraction"],
-        "tensorsat.contractions.simple": ["ContractionPath", "Contract2Args", "OptEinsumOptimize"]
+        "tensorsat.contractions.simple": ["ContractionPath", "Contract2Args", "OptEinsumOptimize"],
+        "tensorsat.contractions.cotengra": ["CotengraOptimizer", "ReusableCotengraOptimizer"]
     },
     "exclude_members": {},
     "include_modules": [],
