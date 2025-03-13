@@ -73,7 +73,7 @@ of :func:`opt_einsum.contract_path`
 
 
 @final
-class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
+class SimpleContraction(Contraction[Any, TensorLikeBoxT_inv]):
     """A simple contraction based on an explicit contraction path."""
 
     @classmethod
@@ -245,12 +245,22 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         return cls._new(box_class, wiring, path)
 
     @property
+    def wiring(self) -> Wiring:
+        """The wiring of the contraction."""
+        return self.__wiring
+
+    @property
     def contract2_args(self) -> tuple[Contract2Args, ...]:
         """The arguments to contract2 calls in the contraction."""
         return self.__contract2_args
 
-    def _contract(self, diagram: Diagram) -> TensorLikeBoxT_inv:
-        assert diagram.is_flat, "Diagram must be flat."
+    def contract(self, diagram: Diagram) -> TensorLikeBoxT_inv:
+        """
+        Validates and contracts the given diagram.
+
+        :raises ValueError: if the diagram cannot be contracted.
+        """
+        self.validate(diagram)
         box_class, wiring = self.box_class, self.wiring
         contract2 = box_class._contract2
         rewire = box_class._rewire
@@ -284,4 +294,5 @@ class SimpleContraction(Contraction[TensorLikeBoxT_inv]):
         if out_wires != box_out_wires:
             box = rewire(box, [box_out_wires.index(w) for w in out_wires])
         # 4. Return contracted box:
+        assert box is not None
         return box

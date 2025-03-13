@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 from abc import abstractmethod
-from typing import Generic, Self, Type as SubclassOf, final
+from typing import Generic, ParamSpec, Self, Type as SubclassOf, final
 
 from .._utils.meta import TensorSatMeta
 from ..diagrams import Box, BoxT_inv, Diagram, Wiring
@@ -23,8 +23,10 @@ from ..diagrams import Box, BoxT_inv, Diagram, Wiring
 if __debug__:
     from typing_validation import validate
 
+P = ParamSpec("P")
 
-class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
+
+class Contraction(Generic[P, BoxT_inv], metaclass=TensorSatMeta):
     """Abstract base class for contractions."""
 
     __box_class: SubclassOf[BoxT_inv]
@@ -86,20 +88,10 @@ class Contraction(Generic[BoxT_inv], metaclass=TensorSatMeta):
         if not diagram.is_flat:
             raise ValueError("Diagram must be flat.")
 
-    @final
-    def contract(self, diagram: Diagram) -> BoxT_inv:
+    @abstractmethod
+    def contract(self, diagram: Diagram, *args: P.args, **kwargs: P.kwargs) -> BoxT_inv:
         """
-        Contracts the diagram using this contraction.
+        Validates and contracts the given diagram.
 
         :raises ValueError: if the diagram cannot be contracted.
-        """
-        self.validate(diagram)
-        return self._contract(diagram)
-
-    @abstractmethod
-    def _contract(self, diagram: Diagram) -> BoxT_inv:
-        """
-        Diagram contraction logic, to be implemented by subclasses.
-
-        It is guaranteed that the diagram has already been validated.
         """

@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Sequence
 from itertools import product
-from typing import Any, cast, Mapping, ParamSpec, Type, TypeVar
+from typing import Any, Protocol, TypeAlias, cast, Mapping, ParamSpec, Type, TypeVar
 import numpy as np
 
 
@@ -121,3 +121,14 @@ def rewire_array[
         )
         b[*b_idxs] += a[*a_idxs]
     return b
+
+
+class _SupportsDunderLT(Protocol):
+    def __lt__(self, other: Any) -> bool: ...
+
+
+class _SupportsDunderGT(Protocol):
+    def __gt__(self, other: Any) -> bool: ...
+
+
+SupportsRichComparison: TypeAlias = _SupportsDunderGT | _SupportsDunderLT
