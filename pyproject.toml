@@ -11,6 +11,8 @@ dependencies = [
     "typing-validation>=1.2.11",
     "xxhash>=3.5.0",
     "opt_einsum>=3.4.0",
+    "autoray>=0.7.0",
+    "cotengra>=0.7.0",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
