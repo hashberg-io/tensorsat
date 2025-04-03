@@ -46,8 +46,16 @@ tensorsat = ["README.md", "LICENSE"]
 target-version = ["py313"]
 
 [tool.mypy]
+files = [
+    "tensorsat/playground.py",
+    "tensorsat/diagrams.py",
+    "tensorsat/lib/*.py",
+    "tensorsat/lang/*.py",
+    "tensorsat/contractions/*.py",
+    "tensorsat/_utils/*.py"
+]
 python_version = "3.13"
 strict = true
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "mypy>=1.15.0"]
