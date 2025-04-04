@@ -13,6 +13,8 @@ dependencies = [
     "opt_einsum>=3.4.0",
     "autoray>=0.7.0",
     "cotengra>=0.7.0",
+    "optuna>=4.2.0",
+    "kahypar>=1.3.5"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
