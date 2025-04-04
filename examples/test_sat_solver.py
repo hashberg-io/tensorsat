@@ -105,3 +105,7 @@ def test_example_unit1():
 def test_example_unit2():
     is_sat: bool = check_sat_file("unit2")
     assert(not is_sat)
+
+def test_example_probe1():
+    is_sat: bool = check_sat_file("probe1")
+    assert(is_sat)
