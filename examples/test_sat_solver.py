@@ -1,4 +1,5 @@
-from tensorsat.lib.solver import *
+from tensorsat.lib.sat import CNFInstance
+from tensorsat.lib.solver import is_satisfiable
 
 def check_sat_file(filename: str) -> bool:
     dimacs = ""
