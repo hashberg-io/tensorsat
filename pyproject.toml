@@ -60,7 +60,11 @@ python_version = "3.13"
 strict = true
 
 [dependency-groups]
-dev = ["pytest>=8.0", "mypy>=1.15.0"]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.15.0",
+    "ruff>=0.11.4",
+]
 
 [project.scripts]
 benchmark = "tensorsat.benchmark:main"
