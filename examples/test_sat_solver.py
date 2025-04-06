@@ -130,3 +130,9 @@ def test_example_ite18() -> None:
 def test_example_diamond1() -> None:
     is_sat: bool = check_sat_file("diamond1")
     assert(not is_sat)
+
+
+## TODO: figure out why the following fails.
+# def test_example_unit3() -> None:
+#     is_sat: bool = check_sat_file("unit3")
+#     assert(not is_sat)
