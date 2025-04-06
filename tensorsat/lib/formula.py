@@ -4,7 +4,7 @@ from typing import List
 from enum import Enum
 from z3 import Bool, And, Or, BoolRef, Not, Implies
 from tensorsat.diagrams import Diagram, DiagramBuilder
-from tensorsat.lib.bincirc import bits, bit, or_, and_, bit_0, bit_1, impl_, biimpl_, not_
+from tensorsat.lib.bincirc import bits, bit, or_, and_, bit_0, bit_1, not_
 from tensorsat.contractions.cotengra import CotengraContraction
 from tensorsat.lang.fin_rel import FinRel
 from tensorsat.lib.sat import *
