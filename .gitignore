@@ -178,3 +178,6 @@ TODO.md
 
 # Local TEST notebook
 TEST.ipynb
+
+# OS-generated files
+.DS_Store
