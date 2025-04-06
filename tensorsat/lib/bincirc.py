@@ -49,6 +49,12 @@ and_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a & b, name=
 or_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a | b, name="or_")
 """The OR gate."""
 
+impl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: (1-a) | b, name="impl_")
+"""The IMPL  gate."""
+
+biimpl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a == b, name="impl_")
+"""The BI-IMPL  gate."""
+
 xor_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a ^ b, name="xor_")
 """The XOR gate."""
 
