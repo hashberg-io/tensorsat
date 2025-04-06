@@ -126,3 +126,7 @@ def test_example_ite17() -> None:
 def test_example_ite18() -> None:
     is_sat: bool = check_sat_file("ite18")
     assert(is_sat)
+
+def test_example_diamond1() -> None:
+    is_sat: bool = check_sat_file("diamond1")
+    assert(not is_sat)
