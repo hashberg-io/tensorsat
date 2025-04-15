@@ -28,14 +28,26 @@ if __debug__:
 
 try:
     import autoray  # type: ignore[import-untyped]
-
-    def einsum(contraction: str, /, lhs: BoxT_inv, rhs: BoxT_inv) -> BoxT_inv:
+    def einsum(
+        contraction: str,
+        /,
+        lhs: BoxT_inv,
+        rhs: BoxT_inv | None = None
+    ) -> BoxT_inv:
         """Contracts boxes using einsum notation."""
         assert validate(contraction, str)
+        _input_wires, _out_wires = contraction.split("->")
         assert validate(lhs, Box)
+        if rhs is None:
+            # Special case of single-tensor contraction, handled by rewire:
+            char_idxs = {
+                letter: idx
+                for idx, letter in reversed(list(enumerate(_input_wires)))
+            }
+            out_wires = [char_idxs[c] for c in _out_wires]
+            return lhs.rewire(out_wires)
         assert validate(rhs, Box)
         box_class = Box.class_join([type(lhs), type(rhs)])
-        _input_wires, _out_wires = contraction.split("->")
         _lhs_wires, _rhs_wires = _input_wires.split(",")
         char_idxs = {
             letter: idx

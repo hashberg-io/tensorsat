@@ -14,7 +14,7 @@ dependencies = [
     "autoray>=0.7.0",
     "cotengra>=0.7.0",
     "optuna>=4.2.0",
-    "kahypar>=1.3.5",
+    # "kahypar>=1.3.5",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -48,14 +48,6 @@ tensorsat = ["README.md", "LICENSE"]
 target-version = ["py313"]
 
 [tool.mypy]
-files = [
-    "tensorsat/benchmark.py",
-    "tensorsat/diagrams.py",
-    "tensorsat/lib/*.py",
-    "tensorsat/lang/*.py",
-    "tensorsat/contractions/*.py",
-    "tensorsat/_utils/*.py"
-]
 python_version = "3.13"
 strict = true
 

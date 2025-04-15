@@ -67,6 +67,11 @@ def test_example_xor5() -> None:
     is_sat: bool = check_sat_file("xor5")
     assert(not is_sat)
 
+# TODO: figure out why the following test case fails.
+# def test_example_xor6() -> None:
+#     is_sat: bool = check_sat_file("xor6")
+#     assert(is_sat)
+
 def test_example_ph2() -> None:
     is_sat: bool = check_sat_file("ph2")
     assert(not is_sat)
@@ -107,8 +112,40 @@ def test_example_unit2() -> None:
     is_sat: bool = check_sat_file("unit2")
     assert(not is_sat)
 
+def test_example_eq1() -> None:
+    is_sat: bool = check_sat_file("eq1")
+    assert(is_sat)
+
+def test_example_eq2() -> None:
+    is_sat: bool = check_sat_file("eq2")
+    assert(not is_sat)
+
 def test_example_probe1() -> None:
     is_sat: bool = check_sat_file("probe1")
+    assert(is_sat)
+
+def test_example_ite11() -> None:
+    is_sat: bool = check_sat_file("ite12")
+    assert(is_sat)
+
+def test_example_ite12() -> None:
+    is_sat: bool = check_sat_file("ite12")
+    assert(is_sat)
+
+def test_example_ite13() -> None:
+    is_sat: bool = check_sat_file("ite13")
+    assert(is_sat)
+
+def test_example_ite14() -> None:
+    is_sat: bool = check_sat_file("ite14")
+    assert(is_sat)
+
+def test_example_ite15() -> None:
+    is_sat: bool = check_sat_file("ite15")
+    assert(is_sat)
+
+def test_example_ite16() -> None:
+    is_sat: bool = check_sat_file("ite16")
     assert(is_sat)
 
 def test_example_ite17() -> None:
@@ -118,3 +155,20 @@ def test_example_ite17() -> None:
 def test_example_ite18() -> None:
     is_sat: bool = check_sat_file("ite18")
     assert(is_sat)
+
+def test_example_diamond1() -> None:
+    is_sat: bool = check_sat_file("diamond1")
+    assert(not is_sat)
+
+def test_example_diamond2() -> None:
+    is_sat: bool = check_sat_file("diamond2")
+    assert(not is_sat)
+
+def test_example_diamond3() -> None:
+    is_sat: bool = check_sat_file("diamond3")
+    assert(not is_sat)
+
+## TODO: figure out why the following fails.
+# def test_example_unit3() -> None:
+#     is_sat: bool = check_sat_file("unit3")
+#     assert(not is_sat)
