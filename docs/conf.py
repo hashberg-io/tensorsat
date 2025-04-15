@@ -122,6 +122,8 @@ skip_missing_references: set[str] = {
     "SubclassOf",
 }
 
+cached_property_descriptors = {"tensorsat._utils.meta.cached_property"}
+
 def on_missing_reference(app: Sphinx, env: BuildEnvironment, node: pending_xref, contnode: Any) -> Any:
     if node['reftarget'] in skip_missing_references:
         return contnode

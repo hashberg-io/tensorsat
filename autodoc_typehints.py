@@ -22,10 +22,16 @@ from types import FunctionType, ModuleType
 from typing import Any, ForwardRef, Optional
 from sphinx.application import Sphinx
 from sphinx.util import logging
-# from typed_descriptors import TypedDescriptor
-# from typing_validation import inspect_type
 
 logger = logging.getLogger(__name__)
+
+# In conf.py, can use property_descriptors and/or cached_property_descriptors
+# to specify descriptor classes which should be documented as (cached) properties.
+# For example, the following is in config.py for the tensorsat project:
+# cached_property_descriptors = {"tensorsat._utils.meta.cached_property"}
+
+PROPERTY_DESCRIPTORS: set[str] = set()
+CACHED_PROPERTY_DESCRIPTORS: set[str] = set()
 
 ### 1. Parse Type Annotations ###
 
@@ -305,7 +311,9 @@ def class_tracking_handler(app: Sphinx, what: str, fullname: str, obj: Any, opti
         return
     _class_dict[fullname] = obj
     # Make sure that tensorsat._utils.meta.cached_property is seen as a cached_property:
-    if fullname == "tensorsat._utils.meta.cached_property":
+    if fullname in PROPERTY_DESCRIPTORS:
+        obj.__bases__ += (property,)
+    elif fullname in CACHED_PROPERTY_DESCRIPTORS:
         obj.__bases__ += (functools.cached_property,)
 
 
@@ -422,10 +430,6 @@ def attr_doc_handler(app: Sphinx, what: str, fullname: str, obj: Any, options: A
             annotations = parent_class.__annotations__
             if attrname in annotations:
                 type_annotation = annotations[attrname]
-            # elif isinstance(obj, TypedDescriptor):
-            #     ty = obj.__descriptor_type__
-            #     inspector = inspect_type(ty)
-            #     type_annotation = inspector.type_annotation
             else:
                 type_annotation = None
             if type_annotation is not None:
@@ -626,7 +630,17 @@ def setup(app: Sphinx) -> None:
     r"""
         Registers handlers for Sphinx events.
     """
+    app.add_config_value('property_descriptors', default=set(), rebuild='env')
+    app.add_config_value('cached_property_descriptors', default=set(), rebuild='env')
+    app.connect('config-inited', on_config_inited)
+
     app.connect("autodoc-process-docstring", class_tracking_handler)
     app.connect("autodoc-process-docstring", signature_doc_handler)
     app.connect("autodoc-process-docstring", attr_doc_handler)
     app.connect("autodoc-process-docstring", local_crossref_handler)
+
+
+def on_config_inited(app: Sphinx, _: Any) -> None:
+    # Access the custom data from app.config
+    PROPERTY_DESCRIPTORS.update(app.config.property_descriptors)
+    CACHED_PROPERTY_DESCRIPTORS.update(app.config.cached_property_descriptors)
