@@ -22,6 +22,13 @@ def benchmark_formulae() -> None:
                     solver.push()
                     f = to_z3_formula(phi)
 
+                    diag = diagram_of_formula(phi)
+                    d = diag.diagram()
+                    d_sat = d.flatten()
+
+                    cnf_sat_contraction = CotengraContraction(FinRel, d_sat.wiring)
+                    print(bool(cnf_sat_contraction.contract(d_sat)))
+
                     start_time = time.time()
                     solver.add(f)
                     if solver.check() == sat:

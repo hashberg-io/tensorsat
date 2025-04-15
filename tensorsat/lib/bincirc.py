@@ -52,7 +52,7 @@ or_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a | b, name="
 impl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: (1-a) | b, name="impl_")
 """The IMPL  gate."""
 
-biimpl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a == b, name="impl_")
+biimpl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a == b, name="biimpl_")
 """The BI-IMPL  gate."""
 
 xor_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a ^ b, name="xor_")

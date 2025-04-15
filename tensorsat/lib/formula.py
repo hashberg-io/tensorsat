@@ -4,7 +4,7 @@ from typing import List
 from enum import Enum
 from z3 import Bool, And, Or, BoolRef, Not, Implies
 from tensorsat.diagrams import Diagram, DiagramBuilder
-from tensorsat.lib.bincirc import bits, bit, or_, and_, bit_0, bit_1, not_
+from tensorsat.lib.bincirc import bits, bit, or_, and_, bit_0, bit_1, not_, impl_, biimpl_
 from tensorsat.contractions.cotengra import CotengraContraction
 from tensorsat.lang.fin_rel import FinRel
 from tensorsat.lib.sat import *
@@ -219,7 +219,8 @@ def diagram_of_formula(phi: Formula) -> DiagramBuilder:
     diag = DiagramBuilder()
     vs: list[str] = sorted(list(variables(phi)))
     num_vars: int = len(vs)
-    inputs = diag.add_inputs(bits(num_vars))
+    # inputs = diag.add_inputs(bits(num_vars))
+    inputs = [ (bit_unk @ diag)[0] for _ in range(num_vars) ]
 
     def traversal_rec(psi: Formula) -> int:
         if psi.operation == Operation.VAR:
@@ -259,7 +260,7 @@ def diagram_of_formula(phi: Formula) -> DiagramBuilder:
             return out
 
     out = traversal_rec(phi)
-    diag.add_outputs((out,))
+    bit_1 @ diag[out]
 
     return diag
 
