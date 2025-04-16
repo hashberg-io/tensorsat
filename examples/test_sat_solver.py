@@ -185,6 +185,7 @@ def test_example_unit3() -> None:
 #     assert(not is_sat)
 
 # TODO: the following hangs.
-# def test_example_prime121() -> None:
-#     is_sat: bool = check_sat_file("prime121")
-#     assert(not is_sat)
+def test_example_prime121() -> None:
+    is_sat: bool = check_sat_file("prime121")
+    assert(is_sat)
+
