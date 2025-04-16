@@ -35,6 +35,9 @@ def bits(n: int) -> FinSetShape:
         raise ValueError("Number of bits must be non-negative.")
     return (bit,) * n
 
+def bit_eq(a, b):
+    return (a & b) | ((1-a) & (1-b))
+
 
 # We define a constant for the 2-bit shape, because binary operations are very common:
 bits2: Final[FinSetShape] = bits(2)
@@ -52,8 +55,22 @@ or_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a | b, name="
 impl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: (1-a) | b, name="impl_")
 """The IMPL  gate."""
 
-biimpl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a == b, name="biimpl_")
+
+biimpl_: Final[FinRel] = FinRel.from_callable(bits2, bit, bit_eq, name="biimpl_")
 """The BI-IMPL  gate."""
+
+for a in [0, 1]:
+    for b in [0, 1]:
+        assert(impl_.tensor[a][b][(1-a) | b] == 1)
+        assert(impl_.tensor[a][b][1-((1-a) | b)] == 0)
+        assert(biimpl_.tensor[a][b][int(a == b)] == 1)
+        assert(biimpl_.tensor[a][b][int(not (a == b))] == 0)
+        assert(or_.tensor[a][b][int(a or b)] == 1)
+        assert(or_.tensor[a][b][int(not (a or b))] == 0)
+        assert(and_.tensor[a][b][int(a and b)] == 1)
+        assert(and_.tensor[a][b][int(not (a and b))] == 0)
+        assert(not_.tensor[a][int(not a)] == 1)
+        assert(not_.tensor[a][int(a)] == 0)
 
 xor_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a ^ b, name="xor_")
 """The XOR gate."""
@@ -73,6 +90,8 @@ binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
         and_: "&",
         or_: "|",
         xor_: "^",
+        impl_: "=>",
+        biimpl_: "=",
         bit_0: "0",
         bit_1: "1",
         bit_unk: "?",
