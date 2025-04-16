@@ -1,0 +1,1 @@
+neg(disj(conj(impl(conj(variable("x1"), variable("x1")), neg(variable("x3"))), variable("x3")), disj(impl(neg(variable("x1")), disj(variable("x0"), variable("x3"))), impl(conj(variable("x3"), variable("x2")), neg(variable("x1"))))))

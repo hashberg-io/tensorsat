@@ -1,0 +1,1 @@
+neg(impl(variable("x2"), variable("x2")))

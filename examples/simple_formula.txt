@@ -1,0 +1,1 @@
+conj(conj(variable("x0"), neg(variable("x1"))), variable("x2"))

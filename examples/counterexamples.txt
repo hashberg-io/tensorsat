@@ -1,0 +1,118 @@
+neg(disj(disj(biimpl(disj(variable("x1"), variable("x1")), conj(variable("x1"), variable("x2"))), neg(neg(variable("x1")))), variable("x0")))
+
+conj(neg(disj(variable("x0"), biimpl(variable("x0"), disj(variable("x0"), variable("x0"))))), conj(neg(neg(variable("x1"))), conj(conj(variable("x2"), variable("x3")), impl(variable("x0"), variable("x0")))))
+
+neg(disj(disj(biimpl(neg(variable("x0")), variable("x1")), neg(variable("x3"))), impl(variable("x3"), variable("x3"))))
+
+conj(neg(disj(neg(conj(variable("x3"), variable("x2"))), disj(biimpl(variable("x0"), variable("x0")), neg(variable("x0"))))), biimpl(neg(variable("x2")), biimpl(conj(variable("x0"), variable("x0")), disj(variable("x2"), variable("x3")))))
+
+neg(biimpl(variable("x0"), variable("x0")))
+
+neg(impl(conj(variable("x1"), biimpl(variable("x0"), biimpl(variable("x3"), variable("x3")))), disj(impl(variable("x3"), biimpl(variable("x1"), variable("x0"))), biimpl(conj(variable("x3"), variable("x3")), biimpl(variable("x0"), variable("x3"))))))
+
+neg(impl(variable("x2"), variable("x2")))
+
+conj(conj(disj(biimpl(variable("x0"), variable("x0")), conj(variable("x3"), variable("x3"))), neg(impl(variable("x2"), variable("x2")))), neg(disj(biimpl(impl(variable("x1"), variable("x2")), neg(variable("x2"))), variable("x3"))))
+
+neg(impl(impl(conj(biimpl(variable("x2"), variable("x2")), biimpl(variable("x0"), variable("x1"))), biimpl(disj(variable("x0"), variable("x3")), impl(variable("x3"), variable("x2")))), disj(conj(impl(variable("x1"), variable("x3")), biimpl(variable("x2"), variable("x2"))), variable("x1"))))
+
+conj(variable("x3"), neg(impl(biimpl(biimpl(variable("x2"), variable("x0")), conj(variable("x3"), variable("x2"))), biimpl(variable("x2"), variable("x2")))))
+
+conj(neg(conj(biimpl(impl(variable("x1"), variable("x3")), impl(variable("x0"), variable("x0"))), disj(neg(variable("x3")), disj(variable("x3"), variable("x0"))))), conj(variable("x3"), neg(conj(variable("x2"), variable("x1")))))
+
+conj(conj(neg(impl(variable("x1"), variable("x1"))), neg(disj(variable("x3"), variable("x0")))), biimpl(neg(impl(variable("x3"), variable("x1"))), neg(biimpl(variable("x3"), variable("x3")))))
+
+neg(impl(neg(disj(conj(variable("x3"), variable("x3")), conj(variable("x3"), variable("x2")))), biimpl(disj(biimpl(variable("x0"), variable("x0")), biimpl(variable("x1"), variable("x0"))), disj(conj(variable("x1"), variable("x3")), impl(variable("x3"), variable("x3"))))))
+
+neg(disj(impl(variable("x3"), variable("x3")), biimpl(variable("x0"), impl(neg(variable("x3")), impl(variable("x2"), variable("x1"))))))
+
+conj(impl(conj(disj(variable("x1"), variable("x3")), conj(variable("x0"), variable("x3"))), neg(neg(variable("x0")))), neg(disj(biimpl(variable("x2"), impl(variable("x0"), variable("x1"))), disj(variable("x2"), impl(variable("x1"), variable("x1"))))))
+
+biimpl(variable("x3"), biimpl(variable("x3"), neg(impl(variable("x0"), variable("x0")))))
+
+conj(impl(disj(disj(variable("x0"), variable("x0")), variable("x3")), disj(disj(variable("x2"), variable("x3")), variable("x3"))), neg(impl(neg(impl(variable("x0"), variable("x0"))), variable("x2"))))
+
+conj(impl(disj(disj(variable("x0"), variable("x2")), biimpl(variable("x3"), variable("x3"))), biimpl(neg(variable("x0")), variable("x0"))), biimpl(conj(neg(variable("x0")), disj(variable("x0"), variable("x1"))), conj(neg(variable("x3")), neg(variable("x0")))))
+
+conj(impl(variable("x3"), neg(impl(variable("x0"), variable("x3")))), disj(variable("x3"), variable("x3")))
+
+neg(disj(biimpl(variable("x1"), variable("x1")), impl(disj(conj(variable("x1"), variable("x3")), disj(variable("x0"), variable("x1"))), biimpl(neg(variable("x1")), variable("x1")))))
+
+neg(impl(variable("x1"), variable("x1")))
+
+neg(disj(impl(disj(conj(variable("x0"), variable("x0")), variable("x3")), disj(impl(variable("x0"), variable("x0")), biimpl(variable("x2"), variable("x2")))), biimpl(disj(variable("x2"), conj(variable("x3"), variable("x2"))), biimpl(biimpl(variable("x2"), variable("x2")), conj(variable("x3"), variable("x2"))))))
+
+neg(disj(disj(variable("x1"), conj(disj(variable("x2"), variable("x1")), biimpl(variable("x1"), variable("x3")))), impl(variable("x2"), disj(variable("x0"), biimpl(variable("x0"), variable("x0"))))))
+
+conj(variable("x3"), conj(neg(conj(variable("x0"), variable("x0"))), conj(conj(variable("x0"), variable("x3")), conj(variable("x3"), variable("x3")))))
+
+neg(impl(conj(biimpl(disj(variable("x3"), variable("x3")), variable("x1")), neg(disj(variable("x0"), variable("x0")))), disj(biimpl(conj(variable("x3"), variable("x1")), conj(variable("x1"), variable("x1"))), variable("x0"))))
+
+neg(impl(variable("x3"), biimpl(neg(impl(variable("x0"), variable("x0"))), biimpl(neg(variable("x2")), biimpl(variable("x3"), variable("x2"))))))
+
+conj(conj(neg(impl(variable("x0"), variable("x0"))), variable("x2")), disj(impl(biimpl(variable("x0"), variable("x0")), impl(variable("x1"), variable("x3"))), variable("x2")))
+
+conj(variable("x2"), disj(neg(biimpl(variable("x2"), variable("x2"))), neg(biimpl(variable("x1"), variable("x1")))))
+
+neg(impl(conj(biimpl(variable("x2"), neg(variable("x1"))), variable("x3")), disj(impl(biimpl(variable("x0"), variable("x3")), conj(variable("x0"), variable("x0"))), biimpl(neg(variable("x0")), conj(variable("x0"), variable("x3"))))))
+
+neg(impl(neg(variable("x0")), neg(conj(disj(variable("x2"), variable("x3")), disj(variable("x0"), variable("x0"))))))
+
+biimpl(variable("x2"), biimpl(neg(biimpl(variable("x0"), variable("x0"))), variable("x2")))
+
+conj(disj(impl(variable("x0"), neg(variable("x0"))), biimpl(biimpl(variable("x1"), variable("x0")), impl(variable("x3"), variable("x1")))), neg(disj(conj(neg(variable("x3")), impl(variable("x1"), variable("x0"))), impl(disj(variable("x0"), variable("x0")), biimpl(variable("x3"), variable("x3"))))))
+
+conj(neg(impl(variable("x3"), impl(impl(variable("x0"), variable("x3")), conj(variable("x1"), variable("x1"))))), variable("x1"))
+
+conj(impl(disj(variable("x1"), variable("x0")), neg(biimpl(variable("x1"), variable("x1")))), variable("x0"))
+
+conj(neg(disj(disj(impl(variable("x2"), variable("x2")), neg(variable("x2"))), conj(impl(variable("x1"), variable("x3")), variable("x2")))), disj(neg(variable("x2")), impl(conj(variable("x3"), variable("x3")), neg(variable("x0")))))
+
+conj(conj(variable("x0"), impl(biimpl(variable("x3"), variable("x3")), neg(variable("x0")))), variable("x2"))
+
+conj(impl(conj(biimpl(variable("x0"), variable("x0")), disj(variable("x2"), variable("x3"))), neg(neg(variable("x2")))), neg(impl(neg(biimpl(variable("x1"), variable("x1"))), variable("x1"))))
+
+neg(disj(biimpl(variable("x1"), biimpl(variable("x0"), neg(variable("x1")))), disj(disj(biimpl(variable("x2"), variable("x0")), neg(variable("x3"))), disj(biimpl(variable("x0"), variable("x2")), impl(variable("x3"), variable("x3"))))))
+
+disj(conj(variable("x1"), biimpl(biimpl(variable("x1"), variable("x1")), neg(variable("x1")))), conj(neg(disj(variable("x1"), variable("x0"))), neg(neg(variable("x1")))))
+
+neg(impl(disj(impl(disj(variable("x2"), variable("x1")), neg(variable("x3"))), impl(variable("x1"), neg(variable("x3")))), impl(conj(biimpl(variable("x3"), variable("x0")), variable("x1")), neg(disj(variable("x0"), variable("x0"))))))
+
+neg(disj(biimpl(biimpl(variable("x3"), biimpl(variable("x2"), variable("x3"))), conj(variable("x2"), biimpl(variable("x3"), variable("x3")))), variable("x1")))
+
+conj(impl(biimpl(impl(variable("x0"), variable("x3")), variable("x3")), neg(biimpl(variable("x3"), variable("x3")))), variable("x3"))
+
+conj(biimpl(biimpl(conj(variable("x3"), variable("x1")), disj(variable("x2"), variable("x2"))), conj(biimpl(variable("x2"), variable("x0")), biimpl(variable("x0"), variable("x3")))), neg(disj(variable("x2"), biimpl(impl(variable("x3"), variable("x3")), impl(variable("x2"), variable("x2"))))))
+
+conj(biimpl(variable("x0"), biimpl(biimpl(variable("x1"), variable("x1")), neg(variable("x0")))), neg(variable("x1")))
+
+neg(neg(neg(biimpl(impl(neg(variable("x3")), biimpl(variable("x2"), variable("x2"))), disj(impl(variable("x1"), variable("x1")), disj(variable("x1"), variable("x3")))))))
+
+conj(disj(impl(conj(variable("x1"), variable("x3")), biimpl(variable("x2"), variable("x2"))), disj(variable("x2"), variable("x3"))), conj(neg(impl(variable("x0"), variable("x0"))), conj(impl(variable("x2"), variable("x3")), disj(variable("x1"), variable("x3")))))
+
+neg(disj(impl(variable("x1"), disj(biimpl(variable("x0"), variable("x0")), variable("x3"))), variable("x0")))
+
+neg(impl(biimpl(variable("x3"), impl(variable("x2"), neg(variable("x2")))), disj(biimpl(variable("x0"), variable("x0")), disj(disj(variable("x0"), variable("x3")), biimpl(variable("x2"), variable("x2"))))))
+
+neg(disj(impl(impl(variable("x1"), variable("x1")), impl(variable("x2"), impl(variable("x2"), variable("x1")))), disj(conj(impl(variable("x2"), variable("x0")), conj(variable("x0"), variable("x0"))), biimpl(disj(variable("x1"), variable("x1")), conj(variable("x2"), variable("x1"))))))
+
+conj(disj(biimpl(impl(variable("x3"), variable("x3")), neg(variable("x2"))), conj(conj(variable("x0"), variable("x2")), neg(variable("x2")))), variable("x2"))
+
+conj(impl(biimpl(biimpl(variable("x0"), variable("x0")), impl(variable("x3"), variable("x0"))), neg(disj(variable("x3"), variable("x1")))), neg(impl(conj(neg(variable("x3")), disj(variable("x1"), variable("x0"))), neg(neg(variable("x0"))))))
+
+conj(conj(neg(impl(variable("x2"), variable("x2"))), impl(impl(variable("x2"), variable("x3")), disj(variable("x1"), variable("x0")))), biimpl(biimpl(conj(variable("x1"), variable("x1")), disj(variable("x2"), variable("x2"))), biimpl(biimpl(variable("x1"), variable("x3")), disj(variable("x0"), variable("x1")))))
+
+conj(conj(biimpl(variable("x3"), conj(variable("x2"), variable("x1"))), neg(biimpl(variable("x3"), variable("x3")))), biimpl(impl(biimpl(variable("x0"), variable("x3")), variable("x1")), neg(variable("x3"))))
+
+neg(disj(neg(variable("x3")), biimpl(variable("x2"), biimpl(variable("x2"), biimpl(variable("x3"), variable("x3"))))))
+
+conj(disj(disj(variable("x3"), biimpl(variable("x2"), variable("x0"))), biimpl(disj(variable("x3"), variable("x1")), disj(variable("x1"), variable("x1")))), neg(impl(impl(disj(variable("x1"), variable("x0")), impl(variable("x0"), variable("x1"))), impl(impl(variable("x3"), variable("x2")), biimpl(variable("x3"), variable("x3"))))))
+
+neg(disj(biimpl(biimpl(conj(variable("x2"), variable("x2")), impl(variable("x2"), variable("x0"))), biimpl(neg(variable("x0")), neg(variable("x0")))), disj(impl(conj(variable("x3"), variable("x3")), biimpl(variable("x2"), variable("x2"))), neg(biimpl(variable("x2"), variable("x1"))))))
+
+biimpl(conj(disj(biimpl(variable("x3"), variable("x3")), disj(variable("x2"), variable("x3"))), neg(variable("x0"))), variable("x0"))
+
+conj(conj(impl(conj(variable("x1"), variable("x0")), neg(variable("x2"))), conj(neg(variable("x2")), neg(variable("x1")))), neg(disj(impl(biimpl(variable("x1"), variable("x0")), neg(variable("x3"))), biimpl(neg(variable("x0")), biimpl(variable("x3"), variable("x3"))))))
+
+neg(disj(impl(disj(variable("x1"), variable("x1")), impl(biimpl(variable("x3"), variable("x1")), disj(variable("x2"), variable("x3")))), neg(neg(variable("x2")))))
+

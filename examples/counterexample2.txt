@@ -1,0 +1,1 @@
+neg(disj(disj(biimpl(disj(variable("x1"), variable("x1")), conj(variable("x1"), variable("x2"))), neg(neg(variable("x1")))), variable("x0")))
