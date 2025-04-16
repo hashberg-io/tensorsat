@@ -178,3 +178,13 @@ def test_example_diamond3() -> None:
 def test_example_unit3() -> None:
     is_sat: bool = check_sat_file("unit3")
     assert(not is_sat)
+
+# TODO: the following hangs.
+# def test_example_unit6() -> None:
+#     is_sat: bool = check_sat_file("unit6")
+#     assert(not is_sat)
+
+# TODO: the following hangs.
+# def test_example_prime121() -> None:
+#     is_sat: bool = check_sat_file("prime121")
+#     assert(not is_sat)
