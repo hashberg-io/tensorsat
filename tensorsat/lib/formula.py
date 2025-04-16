@@ -195,7 +195,7 @@ def to_z3_formula(phi: Formula) -> BoolRef:
     elif phi.operation == Operation.IMPL:
         f1: BoolRef = to_z3_formula(phi.left_subformula_of_binary_formula())
         f2: BoolRef = to_z3_formula(phi.right_subformula_of_binary_formula())
-        return Or(f1, f2)
+        return Implies(f1, f2)
     else:
         f1: BoolRef = to_z3_formula(phi.left_subformula_of_binary_formula())
         f2: BoolRef = to_z3_formula(phi.right_subformula_of_binary_formula())
