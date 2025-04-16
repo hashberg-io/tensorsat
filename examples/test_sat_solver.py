@@ -5,7 +5,7 @@ from tensorsat.lang.fin_rel import FinRel
 def is_satisfiable(cnf: CNFInstance) -> bool:
     cnf_diagram = cnf.diagram()
     cnf_sat_diagram = (cnf.inputs(None)>>cnf_diagram).flatten()
-    cnf_sat_contraction = CotengraContraction(FinRel, cnf_sat_diagram.wiring)
+    cnf_sat_contraction = CotengraContraction(FinRel, cnf_sat_diagram.wiring, optimize="greedy")
     return bool(cnf_sat_contraction.contract(cnf_sat_diagram, progbar=False))
 
 
