@@ -35,7 +35,6 @@ def bits(n: int) -> FinSetShape:
         raise ValueError("Number of bits must be non-negative.")
     return (bit,) * n
 
-
 # We define a constant for the 2-bit shape, because binary operations are very common:
 bits2: Final[FinSetShape] = bits(2)
 """The shape of 2 bits."""
@@ -49,16 +48,28 @@ and_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a & b, name=
 or_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a | b, name="or_")
 """The OR gate."""
 
+impl_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: (1-a) | b, name="impl_")
+"""The IMPL  gate."""
+
+
+biimpl_: Final[FinRel] = FinRel.from_callable(
+    bits2,
+    bit,
+    lambda a, b: (a & b) | ((1-a) & (1-b)),
+    name="biimpl_"
+)
+"""The BI-IMPL  gate."""
+
 xor_: Final[FinRel] = FinRel.from_callable(bits2, bit, lambda a, b: a ^ b, name="xor_")
 """The XOR gate."""
 
-bit_0: Final[FinRel] = FinRel.singleton(bit, 0)
+bit_0: Final[FinRel] = FinRel.singleton(bit, 0, name="bit_0")
 """The constant binary value 0."""
 
-bit_1: Final[FinRel] = FinRel.singleton(bit, 1)
+bit_1: Final[FinRel] = FinRel.singleton(bit, 1, name="bit_1")
 """The constant binary value 1."""
 
-bit_unk: Final[FinRel] = FinRel.from_set(bit, {0, 1})
+bit_unk: Final[FinRel] = FinRel.from_set(bit, {0, 1}, name="bit_unk")
 """The set ``{0, 1}`` of both possible binary values."""
 
 binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
@@ -67,6 +78,8 @@ binop_labels: Final[Mapping[FinRel, str]] = MappingProxyType(
         and_: "&",
         or_: "|",
         xor_: "^",
+        impl_: "=>",
+        biimpl_: "=",
         bit_0: "0",
         bit_1: "1",
         bit_unk: "?",
