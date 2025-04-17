@@ -45,7 +45,9 @@ try:
                 for idx, letter in reversed(list(enumerate(_input_wires)))
             }
             out_wires = [char_idxs[c] for c in _out_wires]
-            return lhs.rewire(out_wires)
+            raise NotImplementedError(
+                "This case needs to be handled specially."
+            )
         assert validate(rhs, Box)
         box_class = Box.class_join([type(lhs), type(rhs)])
         _lhs_wires, _rhs_wires = _input_wires.split(",")
