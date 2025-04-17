@@ -42,7 +42,7 @@ def benchmark_formulae() -> None:
                     # )
                     d_sat = d.flatten()
                     # print("Done.")
-                    rgo = ctg.pathfinders.path_basic.RandomGreedyOptimizer(max_repeats=1024, costmod=(0.1, 2.0), temperature=(0.1, 0.3), simplify=False, parallel=True, accel=True)
+                    rgo = ctg.pathfinders.path_basic.RandomGreedyOptimizer(max_repeats=512, costmod=(0.1, 2.0), temperature=(0.1, 0.3), simplify=True, parallel=True, accel=True)
                     cnf_sat_contraction = CotengraContraction(FinRel, d_sat.wiring, optimize=rgo)
 
                     start_time_tensorsat = time.time()
