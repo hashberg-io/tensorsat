@@ -12,16 +12,21 @@ import time
 import cotengra as ctg
 from z3 import Solver, sat
 
-def benchmark_formulae() -> None:
+def benchmark_formulae(timeout: float) -> None:
     solver = Solver()
-    with open("examples/all_shuffled.txt", "r") as f:
-        num_sat = 0
-        num_unsat = 0
-        time_total_z3 = 0
-        time_total_tensorsat = 0
-        num_errors = 0
-        i = 0
-        for line in f:
+    args = sys.argv
+
+    with open("examples/all_shuffled.txt", "r") as bfile:
+        num_sat_z3 = 0
+        num_unsat_z3 = 0
+        time_total_z3 = 0.0
+        time_total_tensorsat = 0.0
+
+        ## Cactus plot data for Z3
+        for line in bfile:
+            if time_total_z3 > timeout:
+                break
+
             if len(line) > 1:
                 phi: Formula | None = eval(line)
                 if phi:
@@ -30,19 +35,39 @@ def benchmark_formulae() -> None:
                     solver.push()
                     f = to_z3_formula(phi)
 
-                    # print("Constructing diagram...")
+                    start_time = time.time()
+                    solver.add(f)
+                    if solver.check() == sat:
+                        num_sat_z3 += 1
+                    else:
+                        num_unsat_z3 += 1
+                    time_taken_z3 = (time.time() - start_time) * 1000
+                    time_total_z3 += time_taken_z3
+
+                    # print(f"{num_sat_z3} sat, {num_unsat_z3} unsatisfiable.")
+
+                    solver.pop()
+                else:
+                    raise ParseError("Could not read formula.")
+
+        num_solved_z3 = num_sat_z3 + num_unsat_z3
+
+        # Cactus plot data for TensorSat
+        bfile.seek(0)
+        num_sat_tensorsat = 0
+        num_unsat_tensorsat = 0
+        for line in bfile:
+            if time_total_tensorsat > timeout:
+                break
+
+            if len(line) > 1:
+                phi: Formula | None = eval(line)
+                if phi:
                     diag = diagram_of_formula(phi)
                     d = diag.diagram()
-                    # draw_diagram(
-                    #     d,
-                    #     node_label={ "box": binop_labels, "wire": str },
-                    #     layout="circuit",
-                    #     simplify_wires=False,
-                    #     figsize=(8, 4)
-                    # )
                     d_sat = d.flatten()
-                    # print("Done.")
-                    rgo = ctg.pathfinders.path_basic.RandomGreedyOptimizer(max_repeats=512, costmod=(0.1, 2.0), temperature=(0.1, 0.3), simplify=True, parallel=True, accel=True)
+                    rgo = ctg.pathfinders.path_basic.RandomGreedyOptimizer(max_repeats=1024, costmod=(0.1, 2.0), temperature=(0.1, 0.3), simplify=False, parallel=True, accel=True)
+
                     cnf_sat_contraction = CotengraContraction(FinRel, d_sat.wiring, optimize=rgo)
 
                     start_time_tensorsat = time.time()
@@ -50,34 +75,19 @@ def benchmark_formulae() -> None:
                     time_taken_tensorsat = (time.time() - start_time_tensorsat) * 1000
                     time_total_tensorsat += time_taken_tensorsat
 
-                    start_time_z3 = time.time()
-                    solver.add(f)
-                    if solver.check() == sat:
-                        # print("z3: sat")
-                        assert(result)
-                        num_sat += 1
+                    if result:
+                        num_sat_tensorsat += 1
                     else:
-                        # print("z3: unsat")
-                        if result:
-                            print(line)
-                        assert(not result)
-                        num_unsat += 1
+                        num_unsat_tensorsat += 1
 
-                    # print(f"{num_sat} sat, {num_unsat} unsatisfiable.")
-
-                    # print(f"Num errors: {num_errors}")
-                    solver.pop()
-                    time_taken_z3 = (time.time() - start_time_z3) * 1000
-                    time_total_z3 += time_taken_z3
-                    # print("{} ms".format(time_taken))
+                    # print(f"{num_sat_tensorsat} sat, {num_unsat_tensorsat} unsatisfiable.")
                 else:
                     raise ParseError("Could not read formula.")
 
-                i += 1
+        num_solved_tensorsat = num_sat_tensorsat + num_unsat_tensorsat
+        print(f"{timeout}, {num_solved_z3}, {num_solved_tensorsat}")
 
-        print(f"{num_sat} sat, {num_unsat} unsatisfiable.")
-        print("Z3 total time: {} seconds".format(time_total_z3 / 1000))
-        print("TensorSat total time: {} seconds".format(time_total_tensorsat / 1000))
 
 def main() -> None:
-    benchmark_formulae()
+    for i in range(1, 500):
+        benchmark_formulae(25.0 * i)
